@@ -55,6 +55,11 @@ impl From<AppError> for ApiError {
             AppError::Connector(message) => {
                 Self::new(StatusCode::BAD_GATEWAY, "CONNECTOR_ERROR", message)
             }
+            AppError::Database(_) => Self::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                "internal server error".to_owned(),
+            ),
             AppError::Io(_) => Self::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",

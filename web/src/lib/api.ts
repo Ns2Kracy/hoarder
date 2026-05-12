@@ -12,6 +12,7 @@ import type {
 
 const API_BASE = "/api";
 const REDACTED = "redacted";
+const DEFAULT_SERVICE_KIND = "fs";
 
 const now = new Date("2026-05-12T09:24:00+08:00");
 
@@ -283,16 +284,73 @@ async function withMockFallback<T>(loader: () => Promise<T>, fallback: () => T):
   }
 }
 
+interface BackendListResponse<T> {
+  data: T[];
+}
+
+interface BackendSourceDto {
+  id: string;
+  name: string;
+  connectorKind: "opendal";
+  config: {
+    service: string;
+    options: Record<string, string>;
+  };
+  enabled: boolean;
+}
+
+interface BackendJobDto {
+  id: string;
+  sourceId: string;
+  name: string;
+  enabled: boolean;
+  schedule?: string | null;
+}
+
+interface BackendRunDto {
+  id: string;
+  jobId: string;
+  status: "pending" | "synced" | "failed" | "skipped" | "deleted_on_source";
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  processedCount: number;
+  syncedCount: number;
+  skippedCount: number;
+  failedCount: number;
+}
+
+interface BackendJobRunResponse {
+  runId: string;
+  status: "pending" | "synced" | "failed" | "skipped" | "deleted_on_source";
+}
+
+interface BackendSettingsDto {
+  databasePath: string;
+  vaultPath: string;
+  listenAddr: string;
+  jobConcurrency: number;
+  fileConcurrency: number;
+}
+
 export const api = {
-  getSources: () => withMockFallback(() => request<SourceDto[]>("/sources"), () => [...mockSources]),
+  getSources: () =>
+    withMockFallback(
+      async () => {
+        const response = await request<BackendListResponse<BackendSourceDto>>("/sources");
+        return response.data.map(toSourceDto);
+      },
+      () => [...mockSources]
+    ),
 
   createSource: async (input: SourceFormInput): Promise<ApiData<SourceDto>> =>
     withMockFallback(
-      () =>
-        request<SourceDto>("/sources", {
+      async () => {
+        const response = await request<BackendSourceDto>("/sources", {
           method: "POST",
           body: JSON.stringify(toSourceRequest(input))
-        }),
+        });
+        return toSourceDto(response);
+      },
       () => {
         const created = {
           id: `src-${input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "new"}`,
@@ -323,11 +381,25 @@ export const api = {
       }
     ),
 
-  getJobs: () => withMockFallback(() => request<SyncJobDto[]>("/jobs"), () => [...mockJobs]),
+  getJobs: () =>
+    withMockFallback(
+      async () => {
+        const sources = await api.getSources();
+        const sourceNames = new Map(sources.data.map((source) => [source.id, source.name]));
+        const response = await request<BackendListResponse<BackendJobDto>>("/jobs");
+        return response.data.map((job) => toJobDto(job, sourceNames));
+      },
+      () => [...mockJobs]
+    ),
 
   runJob: async (jobId: string): Promise<ApiData<SyncRunDto>> =>
     withMockFallback(
-      () => request<SyncRunDto>(`/jobs/${jobId}/run`, { method: "POST" }),
+      async () => {
+        const response = await request<BackendJobRunResponse>(`/jobs/${jobId}/run`, {
+          method: "POST"
+        });
+        return runResponseToRunDto(jobId, response);
+      },
       () => {
         const job = mockJobs.find((candidate) => candidate.id === jobId);
         const run: SyncRunDto = {
@@ -356,9 +428,22 @@ export const api = {
       }
     ),
 
-  getRuns: () => withMockFallback(() => request<SyncRunDto[]>("/runs"), () => [...mockRuns]),
+  getRuns: () =>
+    withMockFallback(
+      async () => {
+        const jobs = await api.getJobs();
+        const jobsById = new Map(jobs.data.map((job) => [job.id, job]));
+        const response = await request<BackendListResponse<BackendRunDto>>("/runs");
+        return response.data.map((run) => toRunDto(run, jobsById));
+      },
+      () => [...mockRuns]
+    ),
 
-  getSettings: () => withMockFallback(() => request<SettingsDto>("/settings"), () => ({ ...mockSettings })),
+  getSettings: () =>
+    withMockFallback(
+      async () => toSettingsDto(await request<BackendSettingsDto>("/settings")),
+      () => ({ ...mockSettings })
+    ),
 
   updateSettings: async (settings: SettingsUpdate): Promise<ApiData<SettingsDto>> =>
     withMockFallback(
@@ -375,13 +460,126 @@ export const api = {
 };
 
 function toSourceRequest(input: SourceFormInput) {
+  const options: Record<string, string> = {};
+  for (const [key, value] of Object.entries({
+    root: input.config.root,
+    endpoint: input.config.endpoint,
+    bucket: input.config.bucket,
+    region: input.config.region,
+    username: input.config.username,
+    access_key_id: input.config.accessKeyId,
+    secret_access_key: input.config.secretAccessKey,
+    token: input.config.token
+  })) {
+    if (value) {
+      options[key] = value;
+    }
+  }
+
   return {
     name: input.name,
-    connector_kind: "opendal",
-    service_kind: input.serviceKind,
-    enabled: input.enabled,
-    config: input.config
+    config: {
+      kind: "opendal",
+      service: input.serviceKind,
+      options
+    },
+    enabled: input.enabled
   };
+}
+
+function toSourceDto(source: BackendSourceDto): SourceDto {
+  const serviceKind = source.config.service || DEFAULT_SERVICE_KIND;
+
+  return {
+    id: source.id,
+    name: source.name,
+    connectorKind: source.connectorKind,
+    serviceKind: serviceKind as SourceDto["serviceKind"],
+    enabled: source.enabled,
+    config: {
+      service: serviceKind as SourceDto["serviceKind"],
+      ...source.config.options
+    },
+    health: source.enabled ? "untested" : "disabled",
+    itemCount: 0
+  };
+}
+
+function toJobDto(job: BackendJobDto, sourceNames: Map<string, string>): SyncJobDto {
+  return {
+    id: job.id,
+    sourceId: job.sourceId,
+    sourceName: sourceNames.get(job.sourceId) ?? job.sourceId,
+    schedule: job.schedule ?? "Manual",
+    enabled: job.enabled,
+    status: job.enabled ? "scheduled" : "paused"
+  };
+}
+
+function toRunDto(run: BackendRunDto, jobsById: Map<string, SyncJobDto>): SyncRunDto {
+  const job = jobsById.get(run.jobId);
+
+  return {
+    id: run.id,
+    jobId: run.jobId,
+    sourceId: job?.sourceId ?? "unknown-source",
+    sourceName: job?.sourceName ?? "Unknown source",
+    status: backendRunStatus(run.status),
+    startedAt: run.startedAt ?? new Date().toISOString(),
+    finishedAt: run.finishedAt ?? undefined,
+    counts: {
+      processed: run.processedCount,
+      synced: run.syncedCount,
+      skipped: run.skippedCount,
+      failed: run.failedCount,
+      deleted: 0
+    },
+    errors: []
+  };
+}
+
+function runResponseToRunDto(jobId: string, response: BackendJobRunResponse): SyncRunDto {
+  const job = mockJobs.find((candidate) => candidate.id === jobId);
+
+  return {
+    id: response.runId,
+    jobId,
+    sourceId: job?.sourceId ?? "unknown-source",
+    sourceName: job?.sourceName ?? "Unknown source",
+    status: backendRunStatus(response.status),
+    startedAt: new Date().toISOString(),
+    counts: {
+      processed: 0,
+      synced: 0,
+      skipped: 0,
+      failed: 0,
+      deleted: 0
+    },
+    errors: []
+  };
+}
+
+function toSettingsDto(settings: BackendSettingsDto): SettingsDto {
+  return {
+    vaultPath: settings.vaultPath,
+    databasePath: settings.databasePath,
+    listenAddress: settings.listenAddr,
+    jobConcurrency: settings.jobConcurrency,
+    fileConcurrency: settings.fileConcurrency,
+    logLevel: "info"
+  };
+}
+
+function backendRunStatus(status: BackendRunDto["status"]): SyncRunDto["status"] {
+  if (status === "pending") {
+    return "running";
+  }
+
+  if (status === "synced" || status === "skipped" || status === "deleted_on_source") {
+    return "completed";
+  }
+
+  return "failed";
 }
 
 function redactConfig(input: SourceFormInput) {

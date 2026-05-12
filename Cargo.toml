@@ -10,6 +10,7 @@ camino = { version = "1", features = ["serde1"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env"] }
 futures = "0.3"
+include_dir = "0.7"
 opendal = { version = "0.56", default-features = false, features = ["executors-tokio", "services-fs"] }
 sea-orm = { version = "2.0.0-rc.38", default-features = false, features = ["entity-registry", "macros", "runtime-tokio-rustls", "schema-sync", "sqlx-sqlite", "with-chrono", "with-json", "with-uuid"] }
 serde = { version = "1", features = ["derive"] }
@@ -18,3 +19,7 @@ thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread", "signal"] }
 tracing = "0.1"
 uuid = { version = "1", features = ["serde", "v7"] }
+
+[profile.release]
+lto = "thin"
+strip = "symbols"

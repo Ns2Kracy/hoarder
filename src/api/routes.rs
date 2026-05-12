@@ -20,6 +20,16 @@ use super::{
 };
 
 pub fn router(state: ApiState) -> Router {
+    api_routes_without_state()
+        .fallback(api_not_found)
+        .with_state(state)
+}
+
+pub fn router_without_fallback(state: ApiState) -> Router {
+    api_routes_without_state().with_state(state)
+}
+
+fn api_routes_without_state() -> Router<ApiState> {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/sources", get(list_sources).post(create_source))
@@ -29,8 +39,6 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/items", get(list_items))
         .route("/api/errors", get(list_errors))
         .route("/api/settings", get(settings))
-        .fallback(api_not_found)
-        .with_state(state)
 }
 
 async fn health() -> Json<HealthResponse> {

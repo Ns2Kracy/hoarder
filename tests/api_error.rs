@@ -54,6 +54,18 @@ async fn api_error_hides_internal_io_error_details() {
     assert_eq!(body["error"]["message"], json!("internal server error"));
 }
 
+#[tokio::test]
+async fn api_error_hides_internal_database_error_details() {
+    let response =
+        ApiError::from(AppError::Database("private database detail".to_owned())).into_response();
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let body = response_json(response).await;
+
+    assert_eq!(body["error"]["code"], json!("INTERNAL_ERROR"));
+    assert_eq!(body["error"]["message"], json!("internal server error"));
+}
+
 #[test]
 fn api_error_source_dto_redacts_secret_config_values() {
     let source_id =
