@@ -20,6 +20,7 @@ The first release focuses on a connector platform rather than a single OpenDAL-o
 - CLI uses `clap`.
 - Backend uses Rust, Axum, SQLite, and SeaORM 2.0 entity-first.
 - Frontend uses Tailwind CSS and should be designed before implementation.
+- Frontend package and script execution uses Bun.
 - Release target is a single binary with embedded frontend assets.
 
 ## Architecture
@@ -216,7 +217,7 @@ Design constraints:
 - No decorative hero sections.
 - No search UI in the first release.
 
-Recommended stack: Svelte + Vite + Tailwind. The interface is configuration and status heavy, so Svelte keeps component code and runtime weight low. React or Solid remain acceptable if implementation constraints change.
+Recommended stack: Svelte + Vite + Tailwind + Bun. The interface is configuration and status heavy, so Svelte keeps component code and runtime weight low. React or Solid remain acceptable if implementation constraints change.
 
 ## Sync Runtime
 

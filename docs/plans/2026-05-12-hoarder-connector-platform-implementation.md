@@ -6,7 +6,7 @@
 
 **Architecture:** Define shared domain contracts first, then split work across independent backend, connector, sync, CLI/API, and frontend lanes. OpenDAL is isolated behind a Hoarder connector trait. SQLite schema is defined by SeaORM entities.
 
-**Tech Stack:** Rust 2024, Axum, Tokio, Clap, SeaORM 2.0 entity-first, SQLite, OpenDAL, Svelte + Vite + Tailwind CSS.
+**Tech Stack:** Rust 2024, Axum, Tokio, Clap, SeaORM 2.0 entity-first, SQLite, OpenDAL, Svelte + Vite + Tailwind CSS, Bun.
 
 ---
 
@@ -18,6 +18,7 @@
 - Shared contract changes require coordination through `src/core/` and must happen before dependent tasks.
 - Commit after each task that builds and passes its focused tests.
 - Run `cargo test` before merging backend branches.
+- Use Bun for all frontend dependency and script commands.
 - Run frontend build/check commands before merging frontend branches.
 
 ## Suggested Worktrees
@@ -42,6 +43,172 @@ Merge order:
 5. api-cli
 6. web-ui
 7. packaging-integration
+```
+
+## Copy-Paste Execution Prompts
+
+Use this order:
+
+1. Run the foundation prompt in the main worktree.
+2. Commit foundation.
+3. Create the worktrees above.
+4. Run the DB, Connector, Sync, CLI/API, and Web prompts in parallel.
+5. Merge those branches after their verification passes.
+6. Run the Integration prompt last.
+
+### Foundation Prompt
+
+```text
+Implement Phase 1, Tasks 1-4 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md.
+
+You own the shared foundation only:
+- Cargo.toml
+- src/main.rs
+- src/lib.rs
+- src/config.rs
+- src/error.rs
+- src/core/**
+- src/connectors/mod.rs
+- src/connectors/traits.rs
+- src/connectors/registry.rs
+- tests/core_types.rs
+- tests/vault_path.rs
+- tests/connector_contract.rs
+
+Do not implement DB entities, OpenDAL connector internals, sync engine, Axum routes, CLI commands beyond a thin entrypoint, or frontend files.
+
+Follow the plan task-by-task. Run:
+- cargo build
+- cargo test
+
+Commit only the foundation changes when verification passes. Return changed files, test results, and any contract decisions future agents must follow.
+```
+
+### Parallel DB Prompt
+
+```text
+Implement Tasks 5-6 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md.
+
+Ownership:
+- src/entity/**
+- src/db/**
+- tests/db_schema.rs
+
+Use SeaORM 2.0 entity-first. Keep entities as the schema source of truth. Do not edit connector, sync, API, CLI, or frontend files unless compilation is blocked by a shared contract; if blocked, report the needed contract change instead of making broad edits.
+
+Run:
+- cargo check
+- cargo test db_schema
+
+Commit only DB-lane changes when verification passes. Return changed files, test results, and any assumptions about repository traits.
+```
+
+### Parallel Connector Prompt
+
+```text
+Implement Tasks 7-8 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md.
+
+Ownership:
+- src/connectors/opendal/**
+- connector-related updates to src/connectors/mod.rs only if needed
+- tests/opendal_config.rs
+- tests/opendal_fs_connector.rs
+
+Implement OpenDAL config validation/redaction and the filesystem source connector first. Do not expose OpenDAL types through SourceConnector. Do not edit sync engine, API, DB repository, or frontend files.
+
+Run:
+- cargo test opendal_config
+- cargo test opendal_fs_connector
+
+Commit only connector-lane changes when verification passes. Return changed files, test results, and supported OpenDAL service kinds.
+```
+
+### Parallel Sync Prompt
+
+```text
+Implement Tasks 9-11 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md.
+
+Ownership:
+- src/sync/**
+- tests/vault_writer.rs
+- tests/sync_planner.rs
+- tests/sync_engine.rs
+
+Depend on connector and repository traits. Do not import concrete OpenDAL types or SeaORM entities in the sync engine. Preserve the one-way source-to-vault behavior and default no-local-delete policy.
+
+Run:
+- cargo test vault_writer
+- cargo test sync_planner
+- cargo test sync_engine
+
+Commit only sync-lane changes when verification passes. Return changed files, test results, and how failed item handling works.
+```
+
+### Parallel CLI/API Prompt
+
+```text
+Implement Tasks 12-15 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md.
+
+Ownership:
+- src/cli.rs
+- src/api/**
+- src/server.rs
+- src/main.rs
+- tests/cli_parse.rs
+- tests/api_error.rs
+- tests/api_routes.rs
+
+Keep route handlers thin. Use service and repository abstractions. Default server binding must remain 127.0.0.1. Do not implement frontend or rewrite sync/DB/connector internals.
+
+Run:
+- cargo test cli_parse
+- cargo test api_error
+- cargo test api_routes
+- cargo run -- serve --addr 127.0.0.1:4761
+
+Stop the server after confirming startup. Commit only CLI/API-lane changes when verification passes. Return changed files, endpoint list, and test results.
+```
+
+### Parallel Web Prompt
+
+```text
+Implement Tasks 16-19 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md.
+
+Ownership:
+- web/**
+
+Use Svelte + Vite + Tailwind CSS + Bun. Build a real local management console, not a landing page. Use mocked data until API endpoints are available, then route through web/src/lib/api.ts. Keep UI compact and operational: Overview, Sources, Jobs, Runs, Settings.
+
+Run:
+- cd web
+- bun install
+- bun run build
+
+Commit only web-lane changes when verification passes. Return changed files, build summary, and screenshots if browser verification is available.
+```
+
+### Final Integration Prompt
+
+```text
+Implement Tasks 20-22 from docs/plans/2026-05-12-hoarder-connector-platform-implementation.md after DB, Connector, Sync, CLI/API, and Web branches are merged.
+
+Ownership:
+- src/assets.rs
+- static serving integration in src/server.rs
+- tests/e2e_local_fs_sync.rs
+- docs/development.md
+- integration-only fixes needed to make the full system work
+
+Do not redesign frontend or rewrite sync internals. Use Bun for frontend commands.
+
+Run:
+- cargo test
+- cd web
+- bun run build
+- cd ..
+- cargo build --release
+
+Commit only integration changes when verification passes. Return full verification results and remaining release risks.
 ```
 
 ## Phase 1: Shared Foundation
@@ -598,23 +765,23 @@ Frontend work can begin with mocked API data after Task 13 defines DTOs. Final i
 
 **Steps:**
 
-1. Scaffold Svelte + Vite + Tailwind.
+1. Scaffold Svelte + Vite + Tailwind using Bun.
 2. Add app shell with sidebar and top status bar.
 3. Define design tokens through Tailwind utility usage rather than custom one-off CSS values.
 4. Use realistic mocked state.
 
 **Acceptance criteria:**
 
-- `npm install` or chosen package manager install succeeds.
-- `npm run build` succeeds.
+- `bun install` succeeds.
+- `bun run build` succeeds.
 - First screen is the app console, not a landing page.
 
 **Verification:**
 
 ```bash
 cd web
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 **Dependencies:** None, but align labels with design doc.
@@ -647,7 +814,7 @@ npm run build
 
 ```bash
 cd web
-npm run build
+bun run build
 ```
 
 **Dependencies:** Task 13
@@ -683,7 +850,7 @@ npm run build
 
 ```bash
 cd web
-npm run build
+bun run build
 ```
 
 **Dependencies:** Tasks 16-17
@@ -719,7 +886,7 @@ npm run build
 
 ```bash
 cd web
-npm run build
+bun run build
 ```
 
 **Dependencies:** Tasks 16-17
@@ -754,7 +921,7 @@ npm run build
 
 ```bash
 cd web
-npm run build
+bun run build
 cd ..
 cargo build --release
 ```
@@ -826,7 +993,7 @@ cargo test e2e_local_fs_sync
 ```bash
 cargo test
 cd web
-npm run build
+bun run build
 cd ..
 cargo build --release
 ```
@@ -908,7 +1075,7 @@ Return: changed files, tests run, and endpoint list.
 
 Implement Tasks 16-19 from `docs/plans/2026-05-12-hoarder-connector-platform-implementation.md`.
 
-Ownership: `web/**` only. Build a real management console with Tailwind CSS. Do not add a landing page. Use mocked data until API endpoints are available, then route through `web/src/lib/api.ts`.
+Ownership: `web/**` only. Build a real management console with Tailwind CSS. Do not add a landing page. Use mocked data until API endpoints are available, then route through `web/src/lib/api.ts`. Use Bun for all frontend commands: `bun install`, `bun run build`, and any additional package scripts.
 
 Return: changed files, build command output summary, and screenshots if browser verification is available.
 
@@ -946,8 +1113,8 @@ Frontend:
 
 ```bash
 cd web
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 Runtime examples:
