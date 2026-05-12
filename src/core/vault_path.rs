@@ -1,0 +1,71 @@
+use camino::{Utf8Path, Utf8PathBuf};
+
+use crate::{
+    core::types::SourceId,
+    error::{AppError, AppResult},
+};
+
+pub fn normalize_source_path(input: &str) -> AppResult<String> {
+    if input.is_empty() {
+        return Err(AppError::Path("source path cannot be empty".to_owned()));
+    }
+
+    if input.starts_with('/') || input.starts_with('\\') {
+        return Err(AppError::Path("source path cannot be absolute".to_owned()));
+    }
+
+    if has_windows_drive_prefix(input) {
+        return Err(AppError::Path(
+            "source path cannot include a Windows drive prefix".to_owned(),
+        ));
+    }
+
+    if input.contains('\0') {
+        return Err(AppError::Path("source path cannot contain NUL".to_owned()));
+    }
+
+    let unified = input.replace('\\', "/");
+    let mut parts = Vec::new();
+
+    for part in unified.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                return Err(AppError::Path(
+                    "source path cannot include traversal".to_owned(),
+                ));
+            }
+            value => parts.push(value),
+        }
+    }
+
+    let Some(first) = parts.first() else {
+        return Err(AppError::Path("source path cannot be empty".to_owned()));
+    };
+
+    if *first == ".hoarder" {
+        return Err(AppError::Path(
+            "source path cannot target the .hoarder directory".to_owned(),
+        ));
+    }
+
+    Ok(parts.join("/"))
+}
+
+pub fn target_path(
+    vault_root: impl AsRef<Utf8Path>,
+    source_id: &SourceId,
+    normalized_path: &str,
+) -> AppResult<Utf8PathBuf> {
+    let normalized_path = normalize_source_path(normalized_path)?;
+
+    Ok(vault_root
+        .as_ref()
+        .join(source_id.to_string())
+        .join(normalized_path))
+}
+
+fn has_windows_drive_prefix(input: &str) -> bool {
+    let bytes = input.as_bytes();
+    bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+}
