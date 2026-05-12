@@ -1,0 +1,193 @@
+use std::{collections::BTreeMap, net::SocketAddr};
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::{
+    config::AppConfig,
+    connectors::traits::ConnectorConfig,
+    core::types::{ConnectorKind, ItemId, ItemType, JobId, RunId, SourceId, SyncStatus},
+};
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListResponse<T> {
+    pub data: Vec<T>,
+}
+
+impl<T> ListResponse<T> {
+    pub fn new(data: Vec<T>) -> Self {
+        Self { data }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthResponse {
+    pub status: String,
+}
+
+impl HealthResponse {
+    pub fn ok() -> Self {
+        Self {
+            status: "ok".to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceDto {
+    pub id: SourceId,
+    pub name: String,
+    pub connector_kind: ConnectorKind,
+    pub config: RedactedConnectorConfig,
+    pub enabled: bool,
+}
+
+impl SourceDto {
+    pub fn new(id: SourceId, name: String, config: &ConnectorConfig, enabled: bool) -> Self {
+        Self {
+            id,
+            name,
+            connector_kind: config.kind(),
+            config: RedactedConnectorConfig::from(config),
+            enabled,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedactedConnectorConfig {
+    pub kind: ConnectorKind,
+    pub service: String,
+    pub options: BTreeMap<String, String>,
+}
+
+impl From<&ConnectorConfig> for RedactedConnectorConfig {
+    fn from(config: &ConnectorConfig) -> Self {
+        match config {
+            ConnectorConfig::OpenDal { service, options } => Self {
+                kind: ConnectorKind::OpenDal,
+                service: service.clone(),
+                options: options
+                    .iter()
+                    .map(|(key, value)| {
+                        let value = if is_secret_key(key) {
+                            "<redacted>".to_owned()
+                        } else {
+                            value.clone()
+                        };
+
+                        (key.clone(), value)
+                    })
+                    .collect(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSourceRequest {
+    pub name: String,
+    pub config: ConnectorConfig,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JobDto {
+    pub id: JobId,
+    pub source_id: SourceId,
+    pub name: String,
+    pub enabled: bool,
+    pub schedule: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunDto {
+    pub id: RunId,
+    pub job_id: JobId,
+    pub status: SyncStatus,
+    pub started_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub processed_count: u64,
+    pub synced_count: u64,
+    pub skipped_count: u64,
+    pub failed_count: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemDto {
+    pub id: ItemId,
+    pub source_id: SourceId,
+    pub source_path: String,
+    pub item_type: ItemType,
+    pub status: SyncStatus,
+    pub size: Option<u64>,
+    pub etag: Option<String>,
+    pub modified_at: Option<DateTime<Utc>>,
+    pub content_hash: Option<String>,
+    pub metadata_json: Option<Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncErrorDto {
+    pub id: String,
+    pub run_id: Option<RunId>,
+    pub source_id: Option<SourceId>,
+    pub source_path: Option<String>,
+    pub code: String,
+    pub message: String,
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsDto {
+    pub database_path: String,
+    pub vault_path: String,
+    pub listen_addr: SocketAddr,
+    pub job_concurrency: usize,
+    pub file_concurrency: usize,
+}
+
+impl From<&AppConfig> for SettingsDto {
+    fn from(config: &AppConfig) -> Self {
+        Self {
+            database_path: config.database_path.to_string(),
+            vault_path: config.vault_path.to_string(),
+            listen_addr: config.listen_addr,
+            job_concurrency: config.job_concurrency,
+            file_concurrency: config.file_concurrency,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JobRunResponse {
+    pub run_id: RunId,
+    pub status: SyncStatus,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+fn is_secret_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+
+    key.contains("password")
+        || key.contains("token")
+        || key.contains("access_key")
+        || key.contains("secret_key")
+        || key.contains("secret_access_key")
+}
