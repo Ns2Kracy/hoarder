@@ -10,6 +10,9 @@ pub enum AppError {
     #[error("connector error: {0}")]
     Connector(String),
 
+    #[error("database error: {0}")]
+    Database(String),
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
