@@ -1,8 +1,8 @@
-use camino::Utf8PathBuf;
 use hoarder::core::{
     types::SourceId,
     vault_path::{normalize_source_path, target_path},
 };
+use std::path::PathBuf;
 use uuid::Uuid;
 
 #[test]
@@ -52,13 +52,13 @@ fn vault_path_rejects_hoarder_root_paths() {
 fn vault_path_target_path_places_items_under_source_directory() {
     let source_id =
         SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
-    let vault_root = Utf8PathBuf::from("/tmp/hoarder-vault");
+    let vault_root = PathBuf::from("/tmp/hoarder-vault");
 
     let target = target_path(&vault_root, &source_id, "folder/report.pdf").unwrap();
 
     assert_eq!(
         target,
-        Utf8PathBuf::from(format!("/tmp/hoarder-vault/{source_id}/folder/report.pdf"))
+        PathBuf::from(format!("/tmp/hoarder-vault/{source_id}/folder/report.pdf"))
     );
 }
 
@@ -67,7 +67,7 @@ fn vault_path_target_path_revalidates_normalized_input() {
     let source_id =
         SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
 
-    let vault_root = Utf8PathBuf::from("./vault");
+    let vault_root = PathBuf::from("./vault");
 
     assert!(target_path(&vault_root, &source_id, "../escape").is_err());
     assert!(target_path(&vault_root, &source_id, ".hoarder/state.db").is_err());

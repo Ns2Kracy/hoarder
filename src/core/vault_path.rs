@@ -1,4 +1,4 @@
-use camino::{Utf8Path, Utf8PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::{
     core::types::SourceId,
@@ -64,10 +64,10 @@ pub fn normalize_source_path(input: &str) -> AppResult<String> {
 ///
 /// Returns an error when `normalized_path` is not a safe source-relative path.
 pub fn target_path(
-    vault_root: impl AsRef<Utf8Path>,
+    vault_root: impl AsRef<Path>,
     source_id: &SourceId,
     normalized_path: &str,
-) -> AppResult<Utf8PathBuf> {
+) -> AppResult<PathBuf> {
     let normalized_path = normalize_source_path(normalized_path)?;
 
     Ok(vault_root

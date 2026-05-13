@@ -1,5 +1,6 @@
+use std::path::{Path, PathBuf};
+
 use bytes::Bytes;
-use camino::{Utf8Path, Utf8PathBuf};
 use futures::StreamExt;
 use sha2::{Digest, Sha256};
 use tokio::{fs, io::AsyncWriteExt};
@@ -16,12 +17,12 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct VaultWriter {
-    vault_root: Utf8PathBuf,
+    vault_root: PathBuf,
 }
 
 impl VaultWriter {
     #[must_use]
-    pub const fn new(vault_root: Utf8PathBuf) -> Self {
+    pub const fn new(vault_root: PathBuf) -> Self {
         Self { vault_root }
     }
 
@@ -43,7 +44,7 @@ impl VaultWriter {
         outcome
     }
 
-    fn temp_path(&self, source_id: &str, normalized_path: &str) -> Utf8PathBuf {
+    fn temp_path(&self, source_id: &str, normalized_path: &str) -> PathBuf {
         let leaf = normalized_path
             .rsplit('/')
             .next()
@@ -56,8 +57,8 @@ impl VaultWriter {
 
     async fn write_via_temp(
         &self,
-        temp_path: &Utf8Path,
-        target_path: &Utf8Path,
+        temp_path: &Path,
+        target_path: &Path,
         mut bytes: ByteStream,
     ) -> AppResult<VaultWrite> {
         if let Some(parent) = target_path.parent() {
@@ -93,7 +94,7 @@ impl VaultWriter {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VaultWrite {
-    pub target_path: Utf8PathBuf,
+    pub target_path: PathBuf,
     pub content_hash: String,
     pub bytes_written: u64,
 }

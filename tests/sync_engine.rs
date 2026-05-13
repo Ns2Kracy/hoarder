@@ -1,10 +1,10 @@
 use std::{
     collections::{BTreeMap, VecDeque},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use bytes::Bytes;
-use camino::Utf8PathBuf;
 use futures::{FutureExt, stream};
 use hoarder::{
     connectors::traits::{
@@ -436,9 +436,8 @@ fn connector_config() -> ConnectorConfig {
     }
 }
 
-fn temp_vault_root(name: &str) -> Utf8PathBuf {
+fn temp_vault_root(name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("hoarder-sync-engine-{name}-{}", SourceId::new()));
-    let root = Utf8PathBuf::from_path_buf(root).unwrap();
     std::fs::remove_dir_all(&root).ok();
     root
 }

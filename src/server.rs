@@ -5,7 +5,6 @@ use std::{
 };
 
 use axum::Router;
-use camino::Utf8PathBuf;
 use futures::FutureExt;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder};
 use tokio::net::TcpListener;
@@ -97,7 +96,7 @@ const fn apply_addr_override(mut config: AppConfig, addr: Option<SocketAddr>) ->
 
 async fn connect_sqlite(config: &AppConfig) -> AppResult<sea_orm::DatabaseConnection> {
     if let Some(parent) = config.database_path.parent()
-        && !parent.as_str().is_empty()
+        && !parent.as_os_str().is_empty()
     {
         tokio::fs::create_dir_all(parent).await?;
     }
@@ -110,7 +109,7 @@ async fn connect_sqlite(config: &AppConfig) -> AppResult<sea_orm::DatabaseConnec
 }
 
 fn sqlite_url(config: &AppConfig) -> String {
-    let path = config.database_path.as_str();
+    let path = config.database_path.to_string_lossy();
     if path == ":memory:" {
         return "sqlite://:memory:".to_owned();
     }
@@ -322,11 +321,11 @@ impl ApiRepository for DatabaseApiRepository {
 
 struct EngineSyncService {
     repository: Arc<SeaOrmRepository>,
-    vault_root: Utf8PathBuf,
+    vault_root: PathBuf,
 }
 
 impl EngineSyncService {
-    const fn new(repository: Arc<SeaOrmRepository>, vault_root: Utf8PathBuf) -> Self {
+    const fn new(repository: Arc<SeaOrmRepository>, vault_root: PathBuf) -> Self {
         Self {
             repository,
             vault_root,

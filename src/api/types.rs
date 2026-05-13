@@ -165,8 +165,8 @@ pub struct SettingsDto {
 impl From<&AppConfig> for SettingsDto {
     fn from(config: &AppConfig) -> Self {
         Self {
-            database_path: config.database_path.to_string(),
-            vault_path: config.vault_path.to_string(),
+            database_path: config.database_path.to_string_lossy().into_owned(),
+            vault_path: config.vault_path.to_string_lossy().into_owned(),
             listen_addr: config.listen_addr,
             job_concurrency: config.job_concurrency,
             file_concurrency: config.file_concurrency,

@@ -1,6 +1,5 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, path::PathBuf, sync::Arc};
 
-use camino::Utf8PathBuf;
 use futures::StreamExt;
 
 use crate::{
@@ -268,7 +267,7 @@ impl std::error::Error for ItemFailure {}
 
 fn synced_file_outcome(
     snapshot: ItemSnapshot,
-    target_path: Utf8PathBuf,
+    target_path: PathBuf,
     content_hash: String,
     bytes_written: u64,
 ) -> ItemSyncOutcome {

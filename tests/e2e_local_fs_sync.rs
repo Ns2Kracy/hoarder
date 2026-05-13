@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
-use camino::Utf8PathBuf;
 use hoarder::{
     connectors::{
         opendal::source::OpenDalSourceConnector,
@@ -25,7 +24,7 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
 {
     let temp = TempDir::new("e2e-local-fs-sync");
     let source_root = temp.path.join("source");
-    let vault_root = Utf8PathBuf::from_path_buf(temp.path.join("vault")).unwrap();
+    let vault_root = temp.path.join("vault");
     let db_path = temp.path.join("hoarder.sqlite");
 
     fs::create_dir_all(source_root.join("docs/nested"))?;
@@ -94,6 +93,7 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
     let readme_vault_path = vault_root
         .join(source.id.to_string())
         .join("docs/readme.md");
+    let readme_vault_path = readme_vault_path.to_string_lossy().into_owned();
     assert_eq!(
         readme.local_path.as_deref(),
         Some(readme_vault_path.as_str())
@@ -137,7 +137,7 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
 fn sync_engine(
     repository: Arc<SeaOrmRepository>,
     source_id: SourceId,
-    vault_root: Utf8PathBuf,
+    vault_root: PathBuf,
 ) -> SyncEngine<SeaOrmRepository> {
     SyncEngine::new(
         repository,

@@ -348,7 +348,10 @@ async fn upsert_sync_item(
         .await
         .map_err(map_db_error)?;
     let now = Utc::now();
-    let target_path = outcome.target_path.as_ref().map(ToString::to_string);
+    let target_path = outcome
+        .target_path
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned());
     let size = optional_u64_to_i64(outcome.size, "sync_item.size")?;
 
     if let Some(model) = existing {

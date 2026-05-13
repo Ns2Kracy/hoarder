@@ -1,4 +1,5 @@
-use camino::Utf8PathBuf;
+use std::path::PathBuf;
+
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 
@@ -54,7 +55,7 @@ pub struct ItemSyncOutcome {
     pub source_path: String,
     pub item_type: ItemType,
     pub status: SyncStatus,
-    pub target_path: Option<Utf8PathBuf>,
+    pub target_path: Option<PathBuf>,
     pub size: Option<u64>,
     pub etag: Option<String>,
     pub modified_at: Option<DateTime<Utc>>,

@@ -1,5 +1,6 @@
+use std::path::PathBuf;
+
 use bytes::Bytes;
-use camino::Utf8PathBuf;
 use futures::stream;
 use hoarder::{
     connectors::traits::ByteStream,
@@ -96,9 +97,8 @@ fn byte_stream<const N: usize>(items: [Result<Bytes, hoarder::AppError>; N]) -> 
     Box::pin(stream::iter(items))
 }
 
-fn temp_vault_root() -> Utf8PathBuf {
+fn temp_vault_root() -> PathBuf {
     let root = std::env::temp_dir().join(format!("hoarder-vault-writer-{}", SourceId::new()));
-    let root = Utf8PathBuf::from_path_buf(root).unwrap();
     std::fs::remove_dir_all(&root).ok();
     root
 }
