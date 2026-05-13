@@ -1,5 +1,7 @@
 # Hoarder
 
+[中文文档](README.zh-CN.md)
+
 Hoarder is a local-first data aggregation and one-way sync platform. It connects external sources, writes their content into a readable local vault, and records sync state in SQLite so runs can be inspected, retried, and audited from a local CLI, API, or web console.
 
 The first implementation focuses on a strong local foundation: Rust, Axum, SeaORM 2.0 entity-first, SQLite, OpenDAL, Svelte, Tailwind CSS, Bun, and a release path that embeds the frontend into one Rust binary.
