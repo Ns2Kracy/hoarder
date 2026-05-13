@@ -398,11 +398,11 @@ export const api = {
       },
     ),
 
-  getJobs: () =>
+  getJobs: (sourceList?: SourceDto[]) =>
     withMockFallback(
       async () => {
-        const sources = await api.getSources();
-        const sourceNames = new Map(sources.data.map((source) => [source.id, source.name]));
+        const resolvedSources = sourceList ?? (await api.getSources()).data;
+        const sourceNames = new Map(resolvedSources.map((source) => [source.id, source.name]));
         const response = await request<BackendListResponse<BackendJobDto>>("/jobs");
         return response.data.map((job) => toJobDto(job, sourceNames));
       },
@@ -445,11 +445,11 @@ export const api = {
       },
     ),
 
-  getRuns: () =>
+  getRuns: (jobList?: SyncJobDto[]) =>
     withMockFallback(
       async () => {
-        const jobs = await api.getJobs();
-        const jobsById = new Map(jobs.data.map((job) => [job.id, job]));
+        const resolvedJobs = jobList ?? (await api.getJobs()).data;
+        const jobsById = new Map(resolvedJobs.map((job) => [job.id, job]));
         const response = await request<BackendListResponse<BackendRunDto>>("/runs");
         return response.data.map((run) => toRunDto(run, jobsById));
       },

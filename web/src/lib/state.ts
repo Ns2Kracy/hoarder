@@ -76,12 +76,13 @@ export async function loadConsoleData() {
   runs.update((current) => ({ ...current, status: "loading" }));
   settings.update((current) => ({ ...current, status: "loading" }));
 
-  const [sourceResult, jobResult, runResult, settingsResult] = await Promise.all([
-    api.getSources(),
-    api.getJobs(),
-    api.getRuns(),
-    api.getSettings(),
-  ]);
+  const sourceResultPromise = api.getSources();
+  const settingsResultPromise = api.getSettings();
+
+  const sourceResult = await sourceResultPromise;
+  const jobResult = await api.getJobs(sourceResult.data);
+  const runResult = await api.getRuns(jobResult.data);
+  const settingsResult = await settingsResultPromise;
 
   sources.set(applyResult(sourceResult, statusFor(sourceResult)));
   jobs.set(applyResult(jobResult, statusFor(jobResult)));
