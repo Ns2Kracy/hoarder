@@ -55,7 +55,7 @@
     <p class="mt-1 text-sm text-zinc-600">Local paths, bind address, concurrency, and runtime logging.</p>
   </div>
 
-  <form class="rounded border border-zinc-200 bg-white" onsubmit={(event) => { event.preventDefault(); submit(); }}>
+  <form class="rounded-sm border border-zinc-200 bg-white" onsubmit={(event) => { event.preventDefault(); submit(); }}>
     <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
       <SettingsIcon aria-hidden="true" size={16} class="text-zinc-500" />
       <h2 class="text-sm font-semibold text-zinc-900">Runtime Configuration</h2>
@@ -65,24 +65,24 @@
       <label class="space-y-1">
         <span class="text-xs font-medium text-zinc-600">Vault path</span>
         <input
-          class="h-9 w-full rounded border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
+          class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
           bind:value={vaultPath}
         />
       </label>
       <label class="space-y-1">
         <span class="text-xs font-medium text-zinc-600">Database path</span>
         <input
-          class="h-9 w-full rounded border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
+          class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
           bind:value={databasePath}
         />
       </label>
       <label class="space-y-1">
         <span class="text-xs font-medium text-zinc-600">Listen address</span>
-        <input class="h-9 w-full rounded border border-zinc-300 bg-white px-2 font-mono text-sm" bind:value={listenAddress} />
+        <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm" bind:value={listenAddress} />
       </label>
       <label class="space-y-1">
         <span class="text-xs font-medium text-zinc-600">Log level</span>
-        <select class="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm" bind:value={logLevel}>
+        <select class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={logLevel}>
           <option value="trace">trace</option>
           <option value="debug">debug</option>
           <option value="info">info</option>
@@ -93,7 +93,7 @@
       <label class="space-y-1">
         <span class="text-xs font-medium text-zinc-600">Job concurrency</span>
         <input
-          class="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm"
+          class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
           type="number"
           min="1"
           max="16"
@@ -103,7 +103,7 @@
       <label class="space-y-1">
         <span class="text-xs font-medium text-zinc-600">File concurrency</span>
         <input
-          class="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm"
+          class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
           type="number"
           min="1"
           max="64"
@@ -114,7 +114,7 @@
 
     <div class="flex justify-end border-t border-zinc-200 px-3 py-2">
       <button
-        class="inline-flex h-8 items-center gap-1 rounded border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
+        class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
         type="submit"
         disabled={isSaving}
       >

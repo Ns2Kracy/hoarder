@@ -84,7 +84,7 @@
         {#each navigation as item (item.id)}
           {@const Icon = item.icon}
           <button
-            class={`flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm font-medium ${
+            class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-medium ${
               activePage === item.id ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
             }`}
             type="button"
@@ -116,7 +116,7 @@
           {#each navigation as item (item.id)}
             {@const Icon = item.icon}
             <button
-              class={`flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm font-medium ${
+              class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-medium ${
                 activePage === item.id ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
               }`}
               type="button"
@@ -138,7 +138,7 @@
         <div class="flex h-12 items-center justify-between gap-3 px-3 lg:px-4">
           <div class="flex min-w-0 items-center gap-2">
             <button
-              class="inline-flex size-8 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 lg:hidden"
+              class="inline-flex size-8 items-center justify-center rounded-sm border border-zinc-300 bg-white text-zinc-700 lg:hidden"
               type="button"
               aria-label="Open navigation"
               onclick={() => (sidebarOpen = true)}
@@ -156,7 +156,7 @@
 
           <div class="flex items-center gap-2">
             <span
-              class={`inline-flex h-6 items-center rounded border px-2 text-xs font-medium ${
+              class={`inline-flex h-6 items-center rounded-sm border px-2 text-xs font-medium ${
                 $consoleOrigin === "api"
                   ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : "border-amber-200 bg-amber-50 text-amber-800"
@@ -165,7 +165,7 @@
               {$consoleOrigin === "api" ? "API" : "Mock"}
             </span>
             <button
-              class="inline-flex size-8 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+              class="inline-flex size-8 items-center justify-center rounded-sm border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
               type="button"
               aria-label="Refresh console data"
               disabled={$isRefreshing}

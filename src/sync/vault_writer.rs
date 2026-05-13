@@ -85,7 +85,7 @@ impl VaultWriter {
 
         Ok(VaultWrite {
             target_path: target_path.to_owned(),
-            content_hash: format!("sha256:{:x}", hasher.finalize()),
+            content_hash: format!("sha256:{}", hex::encode(hasher.finalize())),
             bytes_written,
         })
     }

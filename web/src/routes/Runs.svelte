@@ -18,7 +18,7 @@
     <p class="mt-1 text-sm text-zinc-600">Review sync outcomes, item counts, and structured errors.</p>
   </div>
 
-  <section class="rounded border border-zinc-200 bg-white">
+  <section class="rounded-sm border border-zinc-200 bg-white">
     <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
       <ListChecks aria-hidden="true" size={16} class="text-zinc-500" />
       <h2 class="text-sm font-semibold text-zinc-900">Run History</h2>
@@ -32,7 +32,7 @@
   </section>
 
   {#if selectedRun}
-    <section class="rounded border border-zinc-200 bg-white">
+    <section class="rounded-sm border border-zinc-200 bg-white">
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 px-3 py-2">
         <div>
           <h2 class="text-sm font-semibold text-zinc-900">{selectedRun.sourceName}</h2>
@@ -87,7 +87,7 @@
           </div>
           <div class="space-y-2">
             {#each selectedRun.errors as error (error.id)}
-              <div class="rounded border border-rose-200 bg-rose-50 p-2">
+              <div class="rounded-sm border border-rose-200 bg-rose-50 p-2">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <p class="font-mono text-xs font-semibold text-rose-950">{error.code}</p>
                   <p class="text-xs text-rose-800">{formatDateTime(error.createdAt)}</p>
@@ -96,7 +96,7 @@
                 {#if error.sourcePath}
                   <p class="mt-1 truncate font-mono text-xs text-rose-900">{error.sourcePath}</p>
                 {/if}
-                <pre class="mt-2 max-h-44 overflow-auto rounded border border-rose-200 bg-white p-2 font-mono text-xs text-rose-950">{JSON.stringify(error.details ?? {}, null, 2)}</pre>
+                <pre class="mt-2 max-h-44 overflow-auto rounded-sm border border-rose-200 bg-white p-2 font-mono text-xs text-rose-950">{JSON.stringify(error.details ?? {}, null, 2)}</pre>
               </div>
             {/each}
           </div>

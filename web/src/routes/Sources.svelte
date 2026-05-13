@@ -35,7 +35,7 @@
     <p class="mt-1 text-sm text-zinc-600">Configure OpenDAL-backed sources and validate connectivity.</p>
   </div>
 
-  <section class="rounded border border-zinc-200 bg-white">
+  <section class="rounded-sm border border-zinc-200 bg-white">
     <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
       <Cable aria-hidden="true" size={16} class="text-zinc-500" />
       <h2 class="text-sm font-semibold text-zinc-900">Add Source</h2>
@@ -45,7 +45,7 @@
     </div>
   </section>
 
-  <section class="rounded border border-zinc-200 bg-white">
+  <section class="rounded-sm border border-zinc-200 bg-white">
     <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2">
       <h2 class="text-sm font-semibold text-zinc-900">Configured Sources</h2>
       <span class="text-xs text-zinc-500">{formatCount(sources.data.length)} total</span>
@@ -98,7 +98,7 @@
                 <td class="whitespace-nowrap px-3 py-2 text-zinc-600">{formatDateTime(source.lastCheckedAt)}</td>
                 <td class="px-3 py-2 text-right">
                   <button
-                    class="inline-flex h-8 items-center gap-1 rounded border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                    class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
                     type="button"
                     onclick={() => onTestSource(source.id)}
                   >

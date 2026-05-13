@@ -20,7 +20,7 @@
     <p class="mt-1 text-sm text-zinc-600">Inspect schedules and start one-off sync runs.</p>
   </div>
 
-  <section class="rounded border border-zinc-200 bg-white">
+  <section class="rounded-sm border border-zinc-200 bg-white">
     <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2">
       <div class="flex items-center gap-2">
         <TimerReset aria-hidden="true" size={16} class="text-zinc-500" />
@@ -59,7 +59,7 @@
                 <td class="whitespace-nowrap px-3 py-2 text-zinc-600">{formatDateTime(job.nextRunAt)}</td>
                 <td class="px-3 py-2 text-right">
                   <button
-                    class="inline-flex h-8 items-center gap-1 rounded border border-zinc-900 bg-zinc-900 px-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
+                    class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
                     type="button"
                     disabled={!job.enabled || job.status === "running"}
                     onclick={() => onRunJob(job.id)}

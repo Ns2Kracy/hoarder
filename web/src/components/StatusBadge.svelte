@@ -60,7 +60,7 @@
 </script>
 
 <span
-  class={`inline-flex min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium leading-4 ${classByStatus[status]}`}
+  class={`inline-flex min-w-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium leading-4 ${classByStatus[status]}`}
 >
   <Icon aria-hidden="true" size={12} strokeWidth={2.2} />
   <span class="truncate">{label}</span>

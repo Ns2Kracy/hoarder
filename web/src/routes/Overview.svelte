@@ -30,7 +30,7 @@
       <p class="mt-1 text-sm text-zinc-600">Local connector sync status and recent activity.</p>
     </div>
     <button
-      class="inline-flex h-8 items-center gap-1 rounded border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+      class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
       type="button"
       onclick={onRefresh}
     >
@@ -40,7 +40,7 @@
   </div>
 
   <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-    <div class="rounded border border-zinc-200 bg-white p-3">
+    <div class="rounded-sm border border-zinc-200 bg-white p-3">
       <div class="flex items-center justify-between gap-2">
         <p class="text-xs font-medium uppercase tracking-normal text-zinc-500">Sources</p>
         <Database aria-hidden="true" class="text-zinc-500" size={17} />
@@ -49,7 +49,7 @@
       <p class="mt-1 text-xs text-zinc-500">Enabled connectors</p>
     </div>
 
-    <div class="rounded border border-zinc-200 bg-white p-3">
+    <div class="rounded-sm border border-zinc-200 bg-white p-3">
       <div class="flex items-center justify-between gap-2">
         <p class="text-xs font-medium uppercase tracking-normal text-zinc-500">Active Jobs</p>
         <PlayCircle aria-hidden="true" class="text-zinc-500" size={17} />
@@ -58,7 +58,7 @@
       <p class="mt-1 text-xs text-zinc-500">Running now / enabled</p>
     </div>
 
-    <div class="rounded border border-zinc-200 bg-white p-3">
+    <div class="rounded-sm border border-zinc-200 bg-white p-3">
       <div class="flex items-center justify-between gap-2">
         <p class="text-xs font-medium uppercase tracking-normal text-zinc-500">Failed Items</p>
         <AlertTriangle aria-hidden="true" class="text-zinc-500" size={17} />
@@ -67,7 +67,7 @@
       <p class="mt-1 text-xs text-zinc-500">Across visible runs</p>
     </div>
 
-    <div class="rounded border border-zinc-200 bg-white p-3">
+    <div class="rounded-sm border border-zinc-200 bg-white p-3">
       <div class="flex items-center justify-between gap-2">
         <p class="text-xs font-medium uppercase tracking-normal text-zinc-500">Vault Size</p>
         <Archive aria-hidden="true" class="text-zinc-500" size={17} />
@@ -78,7 +78,7 @@
   </div>
 
   <div class="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-    <section class="rounded border border-zinc-200 bg-white">
+    <section class="rounded-sm border border-zinc-200 bg-white">
       <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2">
         <h2 class="text-sm font-semibold text-zinc-900">Recent Runs</h2>
         {#if summary.lastRun}
@@ -93,7 +93,7 @@
       {/if}
     </section>
 
-    <section class="rounded border border-zinc-200 bg-white">
+    <section class="rounded-sm border border-zinc-200 bg-white">
       <div class="border-b border-zinc-200 px-3 py-2">
         <h2 class="text-sm font-semibold text-zinc-900">Source Health</h2>
       </div>
