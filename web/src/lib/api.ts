@@ -7,7 +7,7 @@ import type {
   SourceDto,
   SourceFormInput,
   SyncJobDto,
-  SyncRunDto
+  SyncRunDto,
 } from "./types";
 
 const API_BASE = "/api";
@@ -17,7 +17,8 @@ const DEFAULT_SERVICE_KIND = "fs";
 const now = new Date("2026-05-12T09:24:00+08:00");
 
 const isoMinutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
-const isoMinutesAhead = (minutes: number) => new Date(now.getTime() + minutes * 60_000).toISOString();
+const isoMinutesAhead = (minutes: number) =>
+  new Date(now.getTime() + minutes * 60_000).toISOString();
 
 const mockSources: SourceDto[] = [
   {
@@ -30,7 +31,7 @@ const mockSources: SourceDto[] = [
     health: "healthy",
     itemCount: 1284,
     lastCheckedAt: isoMinutesAgo(18),
-    lastRunAt: isoMinutesAgo(32)
+    lastRunAt: isoMinutesAgo(32),
   },
   {
     id: "src-team-s3",
@@ -43,13 +44,14 @@ const mockSources: SourceDto[] = [
       bucket: "team-archive",
       region: "us-west-2",
       access_key_id: REDACTED,
-      secret_access_key: REDACTED
+      secret_access_key: REDACTED,
     },
     health: "warning",
     itemCount: 6432,
     lastCheckedAt: isoMinutesAgo(84),
     lastRunAt: isoMinutesAgo(102),
-    lastError: "Two objects were skipped because their source paths normalize into reserved vault paths."
+    lastError:
+      "Two objects were skipped because their source paths normalize into reserved vault paths.",
   },
   {
     id: "src-webdav-research",
@@ -61,12 +63,12 @@ const mockSources: SourceDto[] = [
       service: "webdav",
       endpoint: "https://dav.example.test/research",
       username: "alex",
-      token: REDACTED
+      token: REDACTED,
     },
     health: "disabled",
     itemCount: 0,
-    lastCheckedAt: isoMinutesAgo(1500)
-  }
+    lastCheckedAt: isoMinutesAgo(1500),
+  },
 ];
 
 const mockJobs: SyncJobDto[] = [
@@ -79,7 +81,7 @@ const mockJobs: SyncJobDto[] = [
     status: "scheduled",
     nextRunAt: isoMinutesAhead(26),
     lastRunAt: isoMinutesAgo(32),
-    lastRunStatus: "completed"
+    lastRunStatus: "completed",
   },
   {
     id: "job-s3-nightly",
@@ -90,7 +92,7 @@ const mockJobs: SyncJobDto[] = [
     status: "running",
     nextRunAt: isoMinutesAhead(977),
     lastRunAt: isoMinutesAgo(11),
-    lastRunStatus: "running"
+    lastRunStatus: "running",
   },
   {
     id: "job-webdav-paused",
@@ -100,8 +102,8 @@ const mockJobs: SyncJobDto[] = [
     enabled: false,
     status: "paused",
     lastRunAt: isoMinutesAgo(1500),
-    lastRunStatus: "failed"
-  }
+    lastRunStatus: "failed",
+  },
 ];
 
 const mockRuns: SyncRunDto[] = [
@@ -117,7 +119,7 @@ const mockRuns: SyncRunDto[] = [
       synced: 184,
       skipped: 2019,
       failed: 1,
-      deleted: 14
+      deleted: 14,
     },
     errors: [
       {
@@ -128,11 +130,11 @@ const mockRuns: SyncRunDto[] = [
         message: "Source item cannot write under the reserved .hoarder directory.",
         details: {
           target_path: "src-team-s3/.hoarder/tmp/leaked",
-          policy: "mark_failed_continue_run"
+          policy: "mark_failed_continue_run",
         },
-        createdAt: isoMinutesAgo(8)
-      }
-    ]
+        createdAt: isoMinutesAgo(8),
+      },
+    ],
   },
   {
     id: "run-20260512-011",
@@ -148,9 +150,9 @@ const mockRuns: SyncRunDto[] = [
       synced: 17,
       skipped: 1267,
       failed: 0,
-      deleted: 0
+      deleted: 0,
     },
-    errors: []
+    errors: [],
   },
   {
     id: "run-20260511-025",
@@ -166,7 +168,7 @@ const mockRuns: SyncRunDto[] = [
       synced: 0,
       skipped: 0,
       failed: 1,
-      deleted: 0
+      deleted: 0,
     },
     errors: [
       {
@@ -176,12 +178,12 @@ const mockRuns: SyncRunDto[] = [
         message: "WebDAV token was rejected by the remote server.",
         details: {
           endpoint: "https://dav.example.test/research",
-          status: 401
+          status: 401,
         },
-        createdAt: isoMinutesAgo(1501)
-      }
-    ]
-  }
+        createdAt: isoMinutesAgo(1501),
+      },
+    ],
+  },
 ];
 
 const mockSettings: SettingsDto = {
@@ -190,7 +192,7 @@ const mockSettings: SettingsDto = {
   listenAddress: "127.0.0.1:4761",
   jobConcurrency: 1,
   fileConcurrency: 4,
-  logLevel: "info"
+  logLevel: "info",
 };
 
 function normalizeApiError(error: unknown, status?: number): FrontendApiError {
@@ -203,7 +205,7 @@ function normalizeApiError(error: unknown, status?: number): FrontendApiError {
       code: error.error.code,
       message: error.error.message,
       details: error.error.details,
-      status
+      status,
     };
   }
 
@@ -211,23 +213,23 @@ function normalizeApiError(error: unknown, status?: number): FrontendApiError {
     return {
       code: "NETWORK_ERROR",
       message: error.message,
-      status
+      status,
     };
   }
 
   return {
     code: "UNKNOWN_ERROR",
     message: "The local API returned an unexpected error.",
-    status
+    status,
   };
 }
 
 function isFrontendApiError(value: unknown): value is FrontendApiError {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as { code?: unknown }).code === "string" &&
-      typeof (value as { message?: unknown }).message === "string"
+    typeof value === "object" &&
+    typeof (value as { code?: unknown }).code === "string" &&
+    typeof (value as { message?: unknown }).message === "string",
   );
 }
 
@@ -239,9 +241,9 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
   const maybeError = (value as { error?: unknown }).error;
   return Boolean(
     maybeError &&
-      typeof maybeError === "object" &&
-      typeof (maybeError as { code?: unknown }).code === "string" &&
-      typeof (maybeError as { message?: unknown }).message === "string"
+    typeof maybeError === "object" &&
+    typeof (maybeError as { code?: unknown }).code === "string" &&
+    typeof (maybeError as { message?: unknown }).message === "string",
   );
 }
 
@@ -250,9 +252,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      ...init?.headers
+      ...init?.headers,
     },
-    ...init
+    ...init,
   });
 
   let body: unknown = undefined;
@@ -269,18 +271,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw {
       code: "API_UNAVAILABLE",
       message: "The local Hoarder API is not serving JSON yet.",
-      status: response.status
+      status: response.status,
     } satisfies FrontendApiError;
   }
 
   return body as T;
 }
 
-async function withMockFallback<T>(loader: () => Promise<T>, fallback: () => T): Promise<ApiData<T>> {
+async function withMockFallback<T>(
+  loader: () => Promise<T>,
+  fallback: () => T,
+): Promise<ApiData<T>> {
   try {
     return { data: await loader(), origin: "api" };
   } catch (error) {
-    return { data: fallback(), origin: "mock", error: normalizeApiError(error) };
+    return {
+      data: fallback(),
+      origin: "mock",
+      error: normalizeApiError(error),
+    };
   }
 }
 
@@ -339,7 +348,7 @@ export const api = {
         const response = await request<BackendListResponse<BackendSourceDto>>("/sources");
         return response.data.map(toSourceDto);
       },
-      () => [...mockSources]
+      () => [...mockSources],
     ),
 
   createSource: async (input: SourceFormInput): Promise<ApiData<SourceDto>> =>
@@ -347,29 +356,37 @@ export const api = {
       async () => {
         const response = await request<BackendSourceDto>("/sources", {
           method: "POST",
-          body: JSON.stringify(toSourceRequest(input))
+          body: JSON.stringify(toSourceRequest(input)),
         });
         return toSourceDto(response);
       },
       () => {
         const created = {
-          id: `src-${input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "new"}`,
+          id: `src-${
+            input.name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/(^-|-$)/g, "") || "new"
+          }`,
           name: input.name,
           connectorKind: "opendal" as const,
           serviceKind: input.serviceKind,
           enabled: input.enabled,
           config: redactConfig(input),
           health: "untested" as const,
-          itemCount: 0
+          itemCount: 0,
         };
         mockSources.unshift(created);
         return created;
-      }
+      },
     ),
 
   testSource: async (sourceId: string): Promise<ApiData<{ ok: boolean; checkedAt: string }>> =>
     withMockFallback(
-      () => request<{ ok: boolean; checkedAt: string }>(`/sources/${sourceId}/test`, { method: "POST" }),
+      () =>
+        request<{ ok: boolean; checkedAt: string }>(`/sources/${sourceId}/test`, {
+          method: "POST",
+        }),
       () => {
         const checkedAt = new Date().toISOString();
         const source = mockSources.find((candidate) => candidate.id === sourceId);
@@ -378,7 +395,7 @@ export const api = {
           source.lastCheckedAt = checkedAt;
         }
         return { ok: true, checkedAt };
-      }
+      },
     ),
 
   getJobs: () =>
@@ -389,14 +406,14 @@ export const api = {
         const response = await request<BackendListResponse<BackendJobDto>>("/jobs");
         return response.data.map((job) => toJobDto(job, sourceNames));
       },
-      () => [...mockJobs]
+      () => [...mockJobs],
     ),
 
   runJob: async (jobId: string): Promise<ApiData<SyncRunDto>> =>
     withMockFallback(
       async () => {
         const response = await request<BackendJobRunResponse>(`/jobs/${jobId}/run`, {
-          method: "POST"
+          method: "POST",
         });
         return runResponseToRunDto(jobId, response);
       },
@@ -414,9 +431,9 @@ export const api = {
             synced: 0,
             skipped: 0,
             failed: 0,
-            deleted: 0
+            deleted: 0,
           },
-          errors: []
+          errors: [],
         };
         mockRuns.unshift(run);
         if (job) {
@@ -425,7 +442,7 @@ export const api = {
           job.lastRunStatus = run.status;
         }
         return run;
-      }
+      },
     ),
 
   getRuns: () =>
@@ -436,13 +453,13 @@ export const api = {
         const response = await request<BackendListResponse<BackendRunDto>>("/runs");
         return response.data.map((run) => toRunDto(run, jobsById));
       },
-      () => [...mockRuns]
+      () => [...mockRuns],
     ),
 
   getSettings: () =>
     withMockFallback(
       async () => toSettingsDto(await request<BackendSettingsDto>("/settings")),
-      () => ({ ...mockSettings })
+      () => ({ ...mockSettings }),
     ),
 
   updateSettings: async (settings: SettingsUpdate): Promise<ApiData<SettingsDto>> =>
@@ -450,13 +467,13 @@ export const api = {
       () =>
         request<SettingsDto>("/settings", {
           method: "PATCH",
-          body: JSON.stringify(settings)
+          body: JSON.stringify(settings),
         }),
       () => {
         Object.assign(mockSettings, settings);
         return { ...mockSettings };
-      }
-    )
+      },
+    ),
 };
 
 function toSourceRequest(input: SourceFormInput) {
@@ -469,7 +486,7 @@ function toSourceRequest(input: SourceFormInput) {
     username: input.config.username,
     access_key_id: input.config.accessKeyId,
     secret_access_key: input.config.secretAccessKey,
-    token: input.config.token
+    token: input.config.token,
   })) {
     if (value) {
       options[key] = value;
@@ -481,9 +498,9 @@ function toSourceRequest(input: SourceFormInput) {
     config: {
       kind: "opendal",
       service: input.serviceKind,
-      options
+      options,
     },
-    enabled: input.enabled
+    enabled: input.enabled,
   };
 }
 
@@ -498,10 +515,10 @@ function toSourceDto(source: BackendSourceDto): SourceDto {
     enabled: source.enabled,
     config: {
       service: serviceKind as SourceDto["serviceKind"],
-      ...source.config.options
+      ...source.config.options,
     },
     health: source.enabled ? "untested" : "disabled",
-    itemCount: 0
+    itemCount: 0,
   };
 }
 
@@ -512,7 +529,7 @@ function toJobDto(job: BackendJobDto, sourceNames: Map<string, string>): SyncJob
     sourceName: sourceNames.get(job.sourceId) ?? job.sourceId,
     schedule: job.schedule ?? "Manual",
     enabled: job.enabled,
-    status: job.enabled ? "scheduled" : "paused"
+    status: job.enabled ? "scheduled" : "paused",
   };
 }
 
@@ -532,9 +549,9 @@ function toRunDto(run: BackendRunDto, jobsById: Map<string, SyncJobDto>): SyncRu
       synced: run.syncedCount,
       skipped: run.skippedCount,
       failed: run.failedCount,
-      deleted: 0
+      deleted: 0,
     },
-    errors: []
+    errors: [],
   };
 }
 
@@ -553,9 +570,9 @@ function runResponseToRunDto(jobId: string, response: BackendJobRunResponse): Sy
       synced: 0,
       skipped: 0,
       failed: 0,
-      deleted: 0
+      deleted: 0,
     },
-    errors: []
+    errors: [],
   };
 }
 
@@ -566,7 +583,7 @@ function toSettingsDto(settings: BackendSettingsDto): SettingsDto {
     listenAddress: settings.listenAddr,
     jobConcurrency: settings.jobConcurrency,
     fileConcurrency: settings.fileConcurrency,
-    logLevel: "info"
+    logLevel: "info",
   };
 }
 
@@ -593,6 +610,6 @@ function redactConfig(input: SourceFormInput) {
     username: config.username,
     access_key_id: config.accessKeyId ? REDACTED : undefined,
     secret_access_key: config.secretAccessKey ? REDACTED : undefined,
-    token: config.token ? REDACTED : undefined
+    token: config.token ? REDACTED : undefined,
   };
 }

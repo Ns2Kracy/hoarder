@@ -9,12 +9,12 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     proxy: {
-      "/api": "http://127.0.0.1:4761"
-    }
+      "/api": "http://127.0.0.1:4761",
+    },
   },
   preview: {
     host: "127.0.0.1",
     port: 4173,
-    strictPort: false
-  }
+    strictPort: false,
+  },
 });

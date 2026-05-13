@@ -8,19 +8,19 @@ import type {
   SourceDto,
   SourceFormInput,
   SyncJobDto,
-  SyncRunDto
+  SyncRunDto,
 } from "./types";
 
 const emptyList = <T>(): Loadable<T[]> => ({
   status: "idle",
   data: [],
-  origin: "mock"
+  origin: "mock",
 });
 
 const emptyValue = <T>(data: T): Loadable<T> => ({
   status: "idle",
   data,
-  origin: "mock"
+  origin: "mock",
 });
 
 const defaultSettings: SettingsDto = {
@@ -29,7 +29,7 @@ const defaultSettings: SettingsDto = {
   listenAddress: "127.0.0.1:4761",
   jobConcurrency: 1,
   fileConcurrency: 4,
-  logLevel: "info"
+  logLevel: "info",
 };
 
 export const sources = writable<Loadable<SourceDto[]>>(emptyList());
@@ -38,15 +38,15 @@ export const runs = writable<Loadable<SyncRunDto[]>>(emptyList());
 export const settings = writable<Loadable<SettingsDto>>(emptyValue(defaultSettings));
 
 export const summary = derived([sources, jobs, runs], ([$sources, $jobs, $runs]) =>
-  summarizeConsole($sources.data, $jobs.data, $runs.data)
+  summarizeConsole($sources.data, $jobs.data, $runs.data),
 );
 
 export const consoleOrigin = derived([sources, jobs, runs, settings], (loadables) =>
-  loadables.some((loadable) => loadable.origin === "api") ? "api" : "mock"
+  loadables.some((loadable) => loadable.origin === "api") ? "api" : "mock",
 );
 
 export const isRefreshing = derived([sources, jobs, runs, settings], (loadables) =>
-  loadables.some((loadable) => loadable.status === "loading")
+  loadables.some((loadable) => loadable.status === "loading"),
 );
 
 function statusFor<T>(result: ApiData<T[]>) {
@@ -57,13 +57,16 @@ function statusFor<T>(result: ApiData<T[]>) {
   return "ready" as const;
 }
 
-function applyResult<T>(result: ApiData<T>, fallbackStatus: "ready" | "empty" = "ready"): Loadable<T> {
+function applyResult<T>(
+  result: ApiData<T>,
+  fallbackStatus: "ready" | "empty" = "ready",
+): Loadable<T> {
   return {
     status: fallbackStatus,
     data: result.data,
     origin: result.origin,
     error: result.error,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -77,7 +80,7 @@ export async function loadConsoleData() {
     api.getSources(),
     api.getJobs(),
     api.getRuns(),
-    api.getSettings()
+    api.getSettings(),
   ]);
 
   sources.set(applyResult(sourceResult, statusFor(sourceResult)));
@@ -94,7 +97,7 @@ export async function addSource(input: SourceFormInput) {
     origin: result.origin,
     error: result.error,
     data: [result.data, ...current.data],
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   }));
 }
 
@@ -109,11 +112,11 @@ export async function testSourceConnection(sourceId: string) {
         ? {
             ...source,
             health: result.data.ok ? "healthy" : "failed",
-            lastCheckedAt: result.data.checkedAt
+            lastCheckedAt: result.data.checkedAt,
           }
-        : source
+        : source,
     ),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   }));
 }
 
@@ -125,7 +128,7 @@ export async function triggerJobRun(jobId: string) {
     origin: result.origin,
     error: result.error,
     data: [result.data, ...current.data],
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   }));
   jobs.update((current) => ({
     ...current,
@@ -137,11 +140,11 @@ export async function triggerJobRun(jobId: string) {
             ...job,
             status: "running",
             lastRunAt: result.data.startedAt,
-            lastRunStatus: result.data.status
+            lastRunStatus: result.data.status,
           }
-        : job
+        : job,
     ),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   }));
 }
 
@@ -150,8 +153,14 @@ export async function saveSettings(nextSettings: SettingsDto) {
   settings.set(applyResult(result));
 }
 
-export function summarizeConsole(sourceList: SourceDto[], jobList: SyncJobDto[], runList: SyncRunDto[]): ConsoleSummary {
-  const sortedRuns = [...runList].sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt));
+export function summarizeConsole(
+  sourceList: SourceDto[],
+  jobList: SyncJobDto[],
+  runList: SyncRunDto[],
+): ConsoleSummary {
+  const sortedRuns = [...runList].sort(
+    (left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt),
+  );
   const failedItemCount = runList.reduce((total, run) => total + run.counts.failed, 0);
   const syncedItems = runList.reduce((total, run) => total + run.counts.synced, 0);
 
@@ -162,7 +171,7 @@ export function summarizeConsole(sourceList: SourceDto[], jobList: SyncJobDto[],
     runningJobCount: jobList.filter((job) => job.status === "running").length,
     failedItemCount,
     vaultSizeLabel: estimateVaultSize(syncedItems),
-    lastRun: sortedRuns[0]
+    lastRun: sortedRuns[0],
   };
 }
 

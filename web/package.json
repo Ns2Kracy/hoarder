@@ -1,14 +1,18 @@
 {
   "name": "hoarder-web",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "verify": "bun run check && bun run build"
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "verify": "bun run fmt:check && bun run lint && bun run check && bun run build"
   },
   "dependencies": {
     "lucide-svelte": "^1.0.1"
@@ -17,6 +21,8 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.0",
     "@tsconfig/svelte": "^5.0.8",
+    "oxfmt": "^0.49.0",
+    "oxlint": "^1.64.0",
     "svelte": "^5.55.5",
     "svelte-check": "^4.4.8",
     "tailwindcss": "^4.3.0",
