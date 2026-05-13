@@ -16,6 +16,7 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它用于连
 - 安全写入：文件先流式写入临时路径，再原子替换到最终 vault 路径。
 - 默认不删除本地文件：源端消失的文件会标记为 `deleted_on_source`，但本地 vault 文件会保留。
 - 结构化运行历史：run、item、error、计数、hash、时间戳都会持久化。
+- 结构化请求日志：Axum middleware 会记录 method、path、version、status、latency、user agent 和 request id。
 - 单二进制发布：Rust release binary 会嵌入 `web/dist` 前端资源。
 - 严格质量门禁：`Cargo.toml` 中已开启 Rust warnings 和严格 Clippy deny 规则。
 
@@ -173,7 +174,8 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 稳定的结构化错误响应
 - [x] API 错误隐藏内部数据库和 IO 细节
 - [x] 未匹配的 `/api/*` 路由保持 JSON 错误形态
-- [ ] `POST /api/sources/{id}/test`
+- [x] `POST /api/sources/{id}/test`
+- [x] 结构化请求日志 middleware
 - [ ] `POST /api/jobs`
 - [ ] `GET /api/runs/{id}`
 - [ ] 按 source 或 status 过滤 item 列表
@@ -197,7 +199,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 状态徽标和紧凑型运营表格
 - [x] API client 带 mock fallback，方便本地 API 不可用时预览
 - [ ] 所有展示控件完全接入 live API
-- [ ] Source test action 接入 API route
+- [x] Source test action 接入 API route
 - [ ] Settings save 接入 API route
 - [ ] Run detail endpoint 集成
 - [ ] 键盘和屏幕阅读器可访问性检查

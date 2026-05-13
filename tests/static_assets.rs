@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use axum::Router;
 use hoarder::{AppConfig, server};
 use serde_json::json;
@@ -8,11 +10,11 @@ use tokio::{
 
 #[tokio::test]
 async fn static_assets_serves_app_shell_for_frontend_routes() {
-    let root = request(server::app(AppConfig::default()), "GET", "/").await;
+    let root = request(test_app().await, "GET", "/").await;
     assert_eq!(root.status, 200);
     assert!(root.content_type().starts_with("text/html"));
 
-    let response = request(server::app(AppConfig::default()), "GET", "/sources").await;
+    let response = request(test_app().await, "GET", "/sources").await;
 
     assert_eq!(response.status, 200);
     assert!(response.content_type().starts_with("text/html"));
@@ -21,7 +23,7 @@ async fn static_assets_serves_app_shell_for_frontend_routes() {
 
 #[tokio::test]
 async fn static_assets_keep_unmatched_api_routes_json() {
-    let response = request(server::app(AppConfig::default()), "GET", "/api/missing").await;
+    let response = request(test_app().await, "GET", "/api/missing").await;
 
     assert_eq!(response.status, 404);
     assert!(response.content_type().starts_with("application/json"));
@@ -36,6 +38,15 @@ async fn static_assets_keep_unmatched_api_routes_json() {
             }
         })
     );
+}
+
+async fn test_app() -> Router {
+    let config = AppConfig {
+        database_path: PathBuf::from(":memory:"),
+        vault_path: PathBuf::from("./target/test-vault"),
+        ..AppConfig::default()
+    };
+    server::app(config).await.unwrap()
 }
 
 struct HttpResponse {

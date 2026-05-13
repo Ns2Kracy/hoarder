@@ -1,22 +1,23 @@
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex},
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use axum::Router;
-use futures::FutureExt;
 use hoarder::{
-    api::{
-        routes::router,
-        state::{ApiFuture, ApiRepository, ApiState, SyncService},
-        types::{
-            CreateSourceRequest, ItemDto, JobDto, JobRunResponse, RunDto, SettingsDto, SourceDto,
-            SyncErrorDto,
-        },
-    },
+    api::{routes::router, state::ApiState},
     config::AppConfig,
     connectors::traits::ConnectorConfig,
-    core::types::{JobId, RunId, SourceId, SyncStatus},
+    core::types::{ConnectorKind, JobId, SourceId},
+    db::{
+        connect_sqlite,
+        repository::{
+            NewSource, NewSyncJob, SeaOrmRepository, SourceRepository, SyncJobRepository,
+        },
+        schema::sync_schema,
+    },
 };
 use serde_json::{Value, json};
 use tokio::{
@@ -27,7 +28,8 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn api_routes_health_returns_success() {
-    let response = request(test_router(), "GET", "/api/health", None).await;
+    let test = TestApp::new().await;
+    let response = request(test.app.clone(), "GET", "/api/health", None).await;
 
     assert_eq!(response.status, 200);
     assert_eq!(response.body, json!({ "status": "ok" }));
@@ -35,42 +37,68 @@ async fn api_routes_health_returns_success() {
 
 #[tokio::test]
 async fn api_routes_sources_returns_repository_list() {
-    let response = request(test_router(), "GET", "/api/sources", None).await;
+    let test = TestApp::new().await;
+    let response = request(test.app.clone(), "GET", "/api/sources", None).await;
 
     assert_eq!(response.status, 200);
     assert_eq!(response.body["data"][0]["name"], json!("Local Docs"));
     assert_eq!(
         response.body["data"][0]["config"]["options"]["root"],
-        json!(".")
+        json!(test.source_root.to_string_lossy())
     );
 }
 
 #[tokio::test]
 async fn api_routes_collection_endpoints_return_lists_and_settings() {
-    for path in ["/api/jobs", "/api/runs", "/api/items", "/api/errors"] {
-        let response = request(test_router(), "GET", path, None).await;
+    let test = TestApp::new().await;
+    let jobs = request(test.app.clone(), "GET", "/api/jobs", None).await;
+
+    assert_eq!(jobs.status, 200);
+    assert_eq!(jobs.body["data"][0]["id"], json!(test.job_id.to_string()));
+
+    for path in ["/api/runs", "/api/items", "/api/errors"] {
+        let response = request(test.app.clone(), "GET", path, None).await;
 
         assert_eq!(response.status, 200, "{path}");
         assert_eq!(response.body, json!({ "data": [] }), "{path}");
     }
 
-    let settings = request(test_router(), "GET", "/api/settings", None).await;
+    let settings = request(test.app.clone(), "GET", "/api/settings", None).await;
     assert_eq!(settings.status, 200);
     assert_eq!(settings.body["listenAddr"], json!("127.0.0.1:4761"));
 }
 
 #[tokio::test]
-async fn api_routes_run_job_triggers_sync_service() {
-    let job_id = JobId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
-    let sync = Arc::new(RecordingSyncService::default());
-    let state = ApiState::new(Arc::new(FakeRepository), sync.clone());
-    let app = router(state);
+async fn api_routes_run_job_runs_sync_engine() {
+    let test = TestApp::new().await;
 
-    let response = request(app, "POST", &format!("/api/jobs/{job_id}/run"), Some("")).await;
+    let response = request(
+        test.app.clone(),
+        "POST",
+        &format!("/api/jobs/{}/run", test.job_id),
+        Some(""),
+    )
+    .await;
 
     assert_eq!(response.status, 200);
-    assert_eq!(response.body["status"], json!("pending"));
-    assert_eq!(sync.recorded_job_ids(), vec![job_id]);
+    assert_eq!(response.body["status"], json!("synced"));
+    assert!(response.body["runId"].as_str().is_some());
+}
+
+#[tokio::test]
+async fn api_routes_test_source_checks_repository() {
+    let test = TestApp::new().await;
+    let response = request(
+        test.app.clone(),
+        "POST",
+        &format!("/api/sources/{}/test", test.source_id),
+        Some(""),
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["ok"], json!(true));
+    assert!(response.body["checkedAt"].as_str().is_some());
 }
 
 #[derive(Clone)]
@@ -148,93 +176,82 @@ fn decode_chunked(mut body: &[u8]) -> Vec<u8> {
     decoded
 }
 
-fn test_router() -> Router {
-    let state = ApiState::new(
-        Arc::new(FakeRepository),
-        Arc::new(RecordingSyncService::default()),
-    );
-
-    router(state)
+struct TestApp {
+    app: Router,
+    source_id: SourceId,
+    job_id: JobId,
+    source_root: PathBuf,
+    _temp: TempDir,
 }
 
-#[derive(Default)]
-struct FakeRepository;
+impl TestApp {
+    async fn new() -> Self {
+        let temp = TempDir::new("api-routes");
+        let source_root = temp.path.join("source");
+        let vault_root = temp.path.join("vault");
+        fs::create_dir_all(&source_root).unwrap();
+        fs::write(source_root.join("readme.md"), "hello").unwrap();
 
-impl ApiRepository for FakeRepository {
-    fn list_sources(&self) -> ApiFuture<'_, Vec<SourceDto>> {
-        async move {
-            let source_id = SourceId::from_uuid(
-                Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap(),
-            );
-            let config = ConnectorConfig::OpenDal {
-                service: "fs".to_owned(),
-                options: BTreeMap::from([("root".to_owned(), ".".to_owned())]),
-            };
-
-            Ok(vec![SourceDto::new(
-                source_id,
-                "Local Docs".to_owned(),
-                &config,
-                true,
-            )])
-        }
-        .boxed()
-    }
-
-    fn create_source(&self, request: CreateSourceRequest) -> ApiFuture<'_, SourceDto> {
-        async move {
-            Ok(SourceDto::new(
-                SourceId::new(),
-                request.name,
-                &request.config,
-                request.enabled,
-            ))
-        }
-        .boxed()
-    }
-
-    fn list_jobs(&self) -> ApiFuture<'_, Vec<JobDto>> {
-        async move { Ok(vec![]) }.boxed()
-    }
-
-    fn list_runs(&self) -> ApiFuture<'_, Vec<RunDto>> {
-        async move { Ok(vec![]) }.boxed()
-    }
-
-    fn list_items(&self) -> ApiFuture<'_, Vec<ItemDto>> {
-        async move { Ok(vec![]) }.boxed()
-    }
-
-    fn list_errors(&self) -> ApiFuture<'_, Vec<SyncErrorDto>> {
-        async move { Ok(vec![]) }.boxed()
-    }
-
-    fn settings(&self) -> ApiFuture<'_, SettingsDto> {
-        async move { Ok(SettingsDto::from(&AppConfig::default())) }.boxed()
-    }
-}
-
-#[derive(Default)]
-struct RecordingSyncService {
-    job_ids: Mutex<Vec<JobId>>,
-}
-
-impl RecordingSyncService {
-    fn recorded_job_ids(&self) -> Vec<JobId> {
-        self.job_ids.lock().unwrap().clone()
-    }
-}
-
-impl SyncService for RecordingSyncService {
-    fn run_job(&self, job_id: JobId) -> ApiFuture<'_, JobRunResponse> {
-        async move {
-            self.job_ids.lock().unwrap().push(job_id);
-
-            Ok(JobRunResponse {
-                run_id: RunId::new(),
-                status: SyncStatus::Pending,
+        let db = connect_sqlite("sqlite::memory:").await.unwrap();
+        sync_schema(&db).await.unwrap();
+        let repository = Arc::new(SeaOrmRepository::new(db));
+        let source_config = fs_config(&source_root);
+        let source = repository
+            .create_source(NewSource {
+                name: "Local Docs".to_owned(),
+                kind: ConnectorKind::OpenDal,
+                config_json: serde_json::to_value(&source_config).unwrap(),
+                enabled: true,
             })
+            .await
+            .unwrap();
+        let job = repository
+            .create_job(NewSyncJob {
+                source_id: source.id,
+                name: "Default sync".to_owned(),
+                enabled: true,
+            })
+            .await
+            .unwrap();
+        let config = AppConfig {
+            database_path: PathBuf::from(":memory:"),
+            vault_path: vault_root,
+            ..AppConfig::default()
+        };
+        let state = ApiState::new(repository, config);
+
+        Self {
+            app: router(state),
+            source_id: source.id,
+            job_id: job.id,
+            source_root,
+            _temp: temp,
         }
-        .boxed()
+    }
+}
+
+fn fs_config(root: &Path) -> ConnectorConfig {
+    ConnectorConfig::OpenDal {
+        service: "fs".to_owned(),
+        options: BTreeMap::from([("root".to_owned(), root.to_string_lossy().into_owned())]),
+    }
+}
+
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new(name: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("hoarder-{name}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&path).unwrap();
+
+        Self { path }
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
     }
 }

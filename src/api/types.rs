@@ -103,6 +103,13 @@ pub struct CreateSourceRequest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SourceTestResponse {
+    pub ok: bool,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JobDto {
     pub id: JobId,
     pub source_id: SourceId,

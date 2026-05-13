@@ -33,6 +33,21 @@ impl SeaOrmRepository {
     pub const fn connection(&self) -> &DatabaseConnection {
         &self.db
     }
+
+    /// Loads a source by id.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the query fails or no source exists for `source_id`.
+    pub async fn load_source(&self, source_id: SourceId) -> AppResult<SourceRecord> {
+        let model = source::Entity::find_by_id(source_id.as_uuid())
+            .one(&self.db)
+            .await
+            .map_err(map_db_error)?
+            .ok_or_else(|| AppError::NotFound(format!("source not found: {source_id}")))?;
+
+        source_record_from_model(model)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

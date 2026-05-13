@@ -16,6 +16,7 @@ The first implementation focuses on a strong local foundation: Rust, Axum, SeaOR
 - Safe writes: files stream through a temporary path and are atomically promoted into the vault.
 - No automatic local deletion: missing source files are marked `deleted_on_source`, but local vault files remain.
 - Structured run history: runs, items, errors, counts, hashes, and timestamps are persisted.
+- Structured request logging: Axum middleware records method, path, version, status, latency, user agent, and request id.
 - Single binary packaging: the Rust release binary embeds `web/dist` assets.
 - Strict quality gate: Rust warnings and strict Clippy groups are denied in `Cargo.toml`.
 
@@ -173,7 +174,8 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Stable structured error response shape
 - [x] Internal database and IO details hidden from API errors
 - [x] API fallback keeps unknown `/api/*` routes JSON-shaped
-- [ ] `POST /api/sources/{id}/test`
+- [x] `POST /api/sources/{id}/test`
+- [x] Structured request logging middleware
 - [ ] `POST /api/jobs`
 - [ ] `GET /api/runs/{id}`
 - [ ] Filtered item listing by source or status
@@ -197,7 +199,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Status badges and compact operational tables
 - [x] API client with mock fallback while the local API is unavailable
 - [ ] Full live wiring for every displayed control
-- [ ] Source test action backed by API route
+- [x] Source test action backed by API route
 - [ ] Settings save backed by API route
 - [ ] Run detail endpoint integration
 - [ ] Accessibility pass with keyboard and screen-reader checks
