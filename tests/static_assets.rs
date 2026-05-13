@@ -40,6 +40,21 @@ async fn static_assets_keep_unmatched_api_routes_json() {
     );
 }
 
+#[tokio::test]
+async fn static_assets_server_sets_request_id_and_cors_headers() {
+    let response = request_with_headers(
+        test_app().await,
+        "GET",
+        "/api/health",
+        &[("Origin", "http://localhost:4173")],
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert!(!response.header("x-request-id").is_empty());
+    assert_eq!(response.header("access-control-allow-origin"), "*");
+}
+
 async fn test_app() -> Router {
     let config = AppConfig {
         database_path: PathBuf::from(":memory:"),
@@ -56,16 +71,21 @@ struct HttpResponse {
 }
 
 impl HttpResponse {
-    fn content_type(&self) -> &str {
+    fn header(&self, name: &str) -> &str {
         self.headers
             .lines()
             .find_map(|line| {
-                line.split_once(':').and_then(|(name, value)| {
-                    name.eq_ignore_ascii_case("content-type")
+                line.split_once(':').and_then(|(header_name, value)| {
+                    header_name
+                        .eq_ignore_ascii_case(name)
                         .then_some(value.trim())
                 })
             })
             .unwrap_or("")
+    }
+
+    fn content_type(&self) -> &str {
+        self.header("content-type")
     }
 
     fn body_text(&self) -> String {
@@ -74,6 +94,15 @@ impl HttpResponse {
 }
 
 async fn request(app: Router, method: &str, path: &str) -> HttpResponse {
+    request_with_headers(app, method, path, &[]).await
+}
+
+async fn request_with_headers(
+    app: Router,
+    method: &str,
+    path: &str,
+    headers: &[(&str, &str)],
+) -> HttpResponse {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
@@ -81,8 +110,13 @@ async fn request(app: Router, method: &str, path: &str) -> HttpResponse {
     });
 
     let mut stream = TcpStream::connect(addr).await.unwrap();
-    let request =
-        format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    let headers = headers
+        .iter()
+        .map(|(name, value)| format!("{name}: {value}\r\n"))
+        .collect::<String>();
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n{headers}\r\n"
+    );
     stream.write_all(request.as_bytes()).await.unwrap();
 
     let mut response = Vec::new();

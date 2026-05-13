@@ -3,10 +3,10 @@ name = "hoarder"
 version = "0.1.0"
 edition = "2024"
 description = "Local-first connector platform for one-way data aggregation"
-license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ns2kracy/hoarder"
-keywords = ["sync", "opendal", "sqlite", "axum", "vault"]
+license = "MIT"
+keywords = ["axum", "opendal", "sqlite", "sync", "vault"]
 categories = ["command-line-utilities", "database", "filesystem"]
 
 [dependencies]
@@ -17,19 +17,40 @@ clap = { version = "4.6.1", features = ["derive", "env"] }
 futures = "0.3.32"
 hex = "0.4.3"
 include_dir = "0.7.4"
-opendal = { version = "0.56.0", default-features = false, features = ["executors-tokio", "services-fs"] }
-sea-orm = { version = "2.0.0-rc.38", default-features = false, features = ["entity-registry", "macros", "runtime-tokio-rustls", "schema-sync", "sqlx-sqlite", "with-chrono", "with-json", "with-uuid"] }
+opendal = { version = "0.56.0", default-features = false, features = [
+  "executors-tokio",
+  "services-fs"
+] }
+sea-orm = { version = "2.0.0-rc.38", default-features = false, features = [
+  "entity-registry",
+  "macros",
+  "runtime-tokio-rustls",
+  "schema-sync",
+  "sqlx-sqlite",
+  "with-chrono",
+  "with-json",
+  "with-uuid"
+] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.11.0"
 thiserror = "2.0.18"
-tokio = { version = "1.52.3", features = ["fs", "io-util", "macros", "rt-multi-thread", "signal"] }
+tokio = { version = "1.52.3", features = [
+  "fs",
+  "io-util",
+  "macros",
+  "rt-multi-thread",
+  "signal"
+] }
+tower-http = { version = "0.6.10", features = [
+  "compression-gzip",
+  "cors",
+  "propagate-header",
+  "request-id"
+] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.23.1", features = ["serde", "v4"] }
-
-[lints.rust]
-warnings = "deny"
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }
@@ -39,6 +60,9 @@ multiple_crate_versions = { level = "allow", priority = 0 }
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 
+[lints.rust]
+warnings = "deny"
+
 [profile.release]
-lto = "thin"
 strip = "symbols"
+lto = "thin"

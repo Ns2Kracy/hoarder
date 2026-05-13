@@ -2,23 +2,24 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Instant,
 };
 
-use axum::{
-    Router,
-    extract::Request,
-    middleware::{self, Next},
-    response::Response,
-};
+use axum::{Router, http::HeaderName, middleware};
 use sea_orm::{ConnectOptions, DatabaseConnection};
 use tokio::net::TcpListener;
+use tower_http::{
+    compression::CompressionLayer,
+    cors::CorsLayer,
+    propagate_header::PropagateHeaderLayer,
+    request_id::{MakeRequestUuid, SetRequestIdLayer},
+};
 
 use crate::{
     AppConfig, AppError, AppResult,
     api::{routes::router_without_fallback, state::ApiState},
     assets,
     db::{repository::SeaOrmRepository, schema::sync_schema},
+    middleware::logger::logger as middleware_logger,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -41,7 +42,6 @@ pub async fn serve(options: ServeOptions) -> AppResult<()> {
     let listener = TcpListener::bind(addr).await?;
 
     tracing::info!(%addr, "hoarder API listening");
-    println!("hoarder API listening on http://{addr}");
     axum::serve(listener, app).await?;
 
     Ok(())
@@ -135,37 +135,14 @@ fn app_with_state(state: ApiState) -> Router {
     Router::new()
         .merge(router_without_fallback(state))
         .fallback(assets::serve)
-        .layer(middleware::from_fn(log_request))
-}
-
-async fn log_request(request: Request, next: Next) -> Response {
-    let method = request.method().clone();
-    let uri_path = request.uri().path().to_owned();
-    let version = request.version();
-    let request_id = request
-        .headers()
-        .get("x-request-id")
-        .map_or("-", |value| value.to_str().unwrap_or("-"))
-        .to_owned();
-    let user_agent = request
-        .headers()
-        .get("user-agent")
-        .map_or("-", |value| value.to_str().unwrap_or("-"))
-        .to_owned();
-    let start = Instant::now();
-    let response = next.run(request).await;
-    let latency = start.elapsed();
-    let status = response.status().as_u16();
-
-    tracing::info!(
-        method = %method,
-        uri = %uri_path,
-        ?version,
-        status = %status,
-        ?latency,
-        user_agent = %user_agent,
-        request_id = ?request_id,
-    );
-
-    response
+        .layer(middleware::from_fn(middleware_logger))
+        .layer(CompressionLayer::new())
+        .layer(PropagateHeaderLayer::new(HeaderName::from_static(
+            "x-request-id",
+        )))
+        .layer(SetRequestIdLayer::new(
+            HeaderName::from_static("x-request-id"),
+            MakeRequestUuid,
+        ))
+        .layer(CorsLayer::permissive())
 }
