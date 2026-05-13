@@ -22,11 +22,13 @@ pub struct OpenDalSourceConnector {
 }
 
 impl OpenDalSourceConnector {
-    pub fn new(source_id: SourceId) -> Self {
+    #[must_use]
+    pub const fn new(source_id: SourceId) -> Self {
         Self { source_id }
     }
 
-    pub fn source_id(&self) -> SourceId {
+    #[must_use]
+    pub const fn source_id(&self) -> SourceId {
         self.source_id
     }
 }
@@ -117,7 +119,7 @@ impl Default for OpenDalSourceConnector {
 fn build_operator(config: &OpenDalServiceConfig) -> AppResult<Operator> {
     match config {
         OpenDalServiceConfig::Fs { root } => Operator::new(Fs::default().root(root))
-            .map(|builder| builder.finish())
+            .map(opendal::OperatorBuilder::finish)
             .map_err(|error| opendal_error("build filesystem source operator", error)),
         config => Err(AppError::Connector(format!(
             "OpenDAL service `{}` is validated but the source connector currently supports `fs` only",
@@ -164,6 +166,7 @@ fn snapshot_from_entry(source_id: SourceId, entry: Entry) -> Option<AppResult<It
     }))
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn opendal_error(context: &str, error: opendal::Error) -> AppError {
     AppError::Connector(format!("{context}: {error}"))
 }

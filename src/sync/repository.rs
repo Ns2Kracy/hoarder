@@ -15,7 +15,7 @@ use super::{
 pub type RepositoryFuture<'a, T> = BoxFuture<'a, AppResult<T>>;
 
 pub trait SyncRepository: Send + Sync {
-    fn load_job<'a>(&'a self, job_id: JobId) -> RepositoryFuture<'a, SyncJob>;
+    fn load_job(&self, job_id: JobId) -> RepositoryFuture<'_, SyncJob>;
 
     fn start_run<'a>(&'a self, job: &'a SyncJob) -> RepositoryFuture<'a, RunId>;
 
@@ -25,16 +25,13 @@ pub trait SyncRepository: Send + Sync {
         source_path: &'a str,
     ) -> RepositoryFuture<'a, Option<StoredItemState>>;
 
-    fn known_item_states<'a>(
-        &'a self,
-        source_id: SourceId,
-    ) -> RepositoryFuture<'a, Vec<StoredItemState>>;
+    fn known_item_states(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<StoredItemState>>;
 
-    fn record_item_outcome<'a>(
-        &'a self,
+    fn record_item_outcome(
+        &self,
         run_id: RunId,
         outcome: ItemSyncOutcome,
-    ) -> RepositoryFuture<'a, ()>;
+    ) -> RepositoryFuture<'_, ()>;
 
     fn mark_deleted<'a>(
         &'a self,
@@ -43,15 +40,15 @@ pub trait SyncRepository: Send + Sync {
         source_path: &'a str,
     ) -> RepositoryFuture<'a, ()>;
 
-    fn finish_run<'a>(
-        &'a self,
+    fn finish_run(
+        &self,
         run_id: RunId,
         status: SyncRunStatus,
         summary: SyncRunSummary,
-    ) -> RepositoryFuture<'a, ()>;
+    ) -> RepositoryFuture<'_, ()>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ItemSyncOutcome {
     pub source_id: SourceId,
     pub source_path: String,

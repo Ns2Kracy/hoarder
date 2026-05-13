@@ -126,9 +126,8 @@ fn connector_contract_registry_finds_registered_connector() {
 fn connector_contract_registry_reports_missing_connector() {
     let registry = ConnectorRegistry::default();
 
-    let error = match registry.create(&ConnectorKind::Notion) {
-        Ok(_) => panic!("missing connector should not resolve"),
-        Err(error) => error,
+    let Err(error) = registry.create(&ConnectorKind::Notion) else {
+        panic!("missing connector should not resolve");
     };
 
     assert!(error.to_string().contains("connector factory"));

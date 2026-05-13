@@ -286,7 +286,7 @@ struct FakeRepository {
 }
 
 impl FakeRepository {
-    fn new(job: SyncJob) -> Self {
+    const fn new(job: SyncJob) -> Self {
         Self {
             job,
             next_run_ids: Mutex::new(VecDeque::new()),
@@ -317,7 +317,7 @@ impl FakeRepository {
 }
 
 impl SyncRepository for FakeRepository {
-    fn load_job<'a>(&'a self, job_id: JobId) -> ConnectorFuture<'a, SyncJob> {
+    fn load_job(&self, job_id: JobId) -> ConnectorFuture<'_, SyncJob> {
         async move {
             assert_eq!(job_id, self.job.id);
             Ok(self.job.clone())
@@ -332,7 +332,7 @@ impl SyncRepository for FakeRepository {
                 .lock()
                 .unwrap()
                 .pop_front()
-                .unwrap_or_else(RunId::new);
+                .unwrap_or_default();
             self.events
                 .lock()
                 .unwrap()
@@ -350,18 +350,15 @@ impl SyncRepository for FakeRepository {
         async move { Ok(self.item_states.lock().unwrap().get(source_path).cloned()) }.boxed()
     }
 
-    fn known_item_states<'a>(
-        &'a self,
-        _source_id: SourceId,
-    ) -> ConnectorFuture<'a, Vec<StoredItemState>> {
+    fn known_item_states(&self, _source_id: SourceId) -> ConnectorFuture<'_, Vec<StoredItemState>> {
         async move { Ok(self.all_known_item_states.lock().unwrap().clone()) }.boxed()
     }
 
-    fn record_item_outcome<'a>(
-        &'a self,
+    fn record_item_outcome(
+        &self,
         _run_id: RunId,
         outcome: ItemSyncOutcome,
-    ) -> ConnectorFuture<'a, ()> {
+    ) -> ConnectorFuture<'_, ()> {
         async move {
             let event = match outcome.status {
                 SyncStatus::Synced => RepoEvent::RecordSynced(outcome.source_path),
@@ -392,12 +389,12 @@ impl SyncRepository for FakeRepository {
         .boxed()
     }
 
-    fn finish_run<'a>(
-        &'a self,
+    fn finish_run(
+        &self,
         run_id: RunId,
         status: SyncRunStatus,
         summary: SyncRunSummary,
-    ) -> ConnectorFuture<'a, ()> {
+    ) -> ConnectorFuture<'_, ()> {
         async move {
             self.events
                 .lock()

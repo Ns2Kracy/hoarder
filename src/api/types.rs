@@ -17,7 +17,8 @@ pub struct ListResponse<T> {
 }
 
 impl<T> ListResponse<T> {
-    pub fn new(data: Vec<T>) -> Self {
+    #[must_use]
+    pub const fn new(data: Vec<T>) -> Self {
         Self { data }
     }
 }
@@ -29,6 +30,7 @@ pub struct HealthResponse {
 }
 
 impl HealthResponse {
+    #[must_use]
     pub fn ok() -> Self {
         Self {
             status: "ok".to_owned(),
@@ -36,7 +38,7 @@ impl HealthResponse {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceDto {
     pub id: SourceId,
@@ -47,6 +49,7 @@ pub struct SourceDto {
 }
 
 impl SourceDto {
+    #[must_use]
     pub fn new(id: SourceId, name: String, config: &ConnectorConfig, enabled: bool) -> Self {
         Self {
             id,
@@ -122,7 +125,7 @@ pub struct RunDto {
     pub failed_count: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemDto {
     pub id: ItemId,
@@ -178,7 +181,7 @@ pub struct JobRunResponse {
     pub status: SyncStatus,
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 

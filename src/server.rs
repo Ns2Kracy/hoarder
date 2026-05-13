@@ -37,6 +37,12 @@ pub struct ServeOptions {
     pub addr: Option<SocketAddr>,
 }
 
+/// Starts the local Axum server.
+///
+/// # Errors
+///
+/// Returns an error when config loading, database setup, binding, or serving
+/// fails.
 pub async fn serve(options: ServeOptions) -> AppResult<()> {
     let config = load_config(options.config_path.as_deref()).await?;
     let config = apply_addr_override(config, options.addr);
@@ -53,6 +59,12 @@ pub async fn serve(options: ServeOptions) -> AppResult<()> {
     Ok(())
 }
 
+/// Synchronizes the configured database schema.
+///
+/// # Errors
+///
+/// Returns an error when config loading, database connection, or schema sync
+/// fails.
 pub async fn sync_database(config_path: Option<PathBuf>) -> AppResult<()> {
     let config = load_config(config_path.as_deref()).await?;
     let db = connect_sqlite(&config).await?;
@@ -75,7 +87,7 @@ async fn load_config(path: Option<&Path>) -> AppResult<AppConfig> {
     })
 }
 
-fn apply_addr_override(mut config: AppConfig, addr: Option<SocketAddr>) -> AppConfig {
+const fn apply_addr_override(mut config: AppConfig, addr: Option<SocketAddr>) -> AppConfig {
     if let Some(addr) = addr {
         config.listen_addr = addr;
     }
@@ -84,10 +96,10 @@ fn apply_addr_override(mut config: AppConfig, addr: Option<SocketAddr>) -> AppCo
 }
 
 async fn connect_sqlite(config: &AppConfig) -> AppResult<sea_orm::DatabaseConnection> {
-    if let Some(parent) = config.database_path.parent() {
-        if !parent.as_str().is_empty() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
+    if let Some(parent) = config.database_path.parent()
+        && !parent.as_str().is_empty()
+    {
+        tokio::fs::create_dir_all(parent).await?;
     }
 
     let database_url = sqlite_url(config);
@@ -106,14 +118,16 @@ fn sqlite_url(config: &AppConfig) -> String {
     format!("sqlite://{path}?mode=rwc")
 }
 
+#[must_use]
 pub fn config_with_addr(addr: Option<SocketAddr>) -> AppConfig {
     apply_addr_override(AppConfig::default(), addr)
 }
 
+#[must_use]
 pub fn default_state(config: AppConfig) -> ApiState {
     ApiState::new(
         Arc::new(InMemoryApiRepository::new(config)),
-        Arc::new(PlaceholderSyncService::default()),
+        Arc::new(PlaceholderSyncService),
     )
 }
 
@@ -145,7 +159,7 @@ struct DatabaseApiRepository {
 }
 
 impl DatabaseApiRepository {
-    fn new(repository: Arc<SeaOrmRepository>, config: AppConfig) -> Self {
+    const fn new(repository: Arc<SeaOrmRepository>, config: AppConfig) -> Self {
         Self { repository, config }
     }
 }
@@ -312,7 +326,7 @@ struct EngineSyncService {
 }
 
 impl EngineSyncService {
-    fn new(repository: Arc<SeaOrmRepository>, vault_root: Utf8PathBuf) -> Self {
+    const fn new(repository: Arc<SeaOrmRepository>, vault_root: Utf8PathBuf) -> Self {
         Self {
             repository,
             vault_root,
@@ -401,6 +415,7 @@ fn i64_to_u64(value: i64, field: &str) -> AppResult<u64> {
     u64::try_from(value).map_err(|_| AppError::Database(format!("{field} is negative: {value}")))
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn map_db_error(error: sea_orm::DbErr) -> AppError {
     AppError::Database(error.to_string())
 }
@@ -411,7 +426,7 @@ struct InMemoryApiRepository {
 }
 
 impl InMemoryApiRepository {
-    fn new(config: AppConfig) -> Self {
+    const fn new(config: AppConfig) -> Self {
         Self {
             config,
             sources: Mutex::new(Vec::new()),

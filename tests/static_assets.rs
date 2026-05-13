@@ -113,10 +113,7 @@ fn decode_response(response: &[u8]) -> HttpResponse {
 fn decode_chunked(mut body: &[u8]) -> Vec<u8> {
     let mut decoded = Vec::new();
 
-    loop {
-        let Some(size_end) = body.windows(2).position(|window| window == b"\r\n") else {
-            break;
-        };
+    while let Some(size_end) = body.windows(2).position(|window| window == b"\r\n") {
         let size = std::str::from_utf8(&body[..size_end]).unwrap();
         let size = usize::from_str_radix(size.trim(), 16).unwrap();
         if size == 0 {

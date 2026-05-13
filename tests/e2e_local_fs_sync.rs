@@ -83,9 +83,9 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
         .await?
         .expect("first sync run row exists");
     assert_eq!(first_run.status, "completed");
-    assert_eq!(first_run.processed_count, first.processed as i64);
-    assert_eq!(first_run.synced_count, first.synced as i64);
-    assert_eq!(first_run.skipped_count, first.skipped as i64);
+    assert_eq!(first_run.processed_count, first.processed.cast_signed());
+    assert_eq!(first_run.synced_count, first.synced.cast_signed());
+    assert_eq!(first_run.skipped_count, first.skipped.cast_signed());
     assert_eq!(first_run.failed_count, 0);
     assert!(first_run.finished_at.is_some());
 

@@ -45,10 +45,12 @@ impl ApiState {
         }
     }
 
+    #[must_use]
     pub fn repository(&self) -> &dyn ApiRepository {
         self.repository.as_ref()
     }
 
+    #[must_use]
     pub fn sync_service(&self) -> &dyn SyncService {
         self.sync_service.as_ref()
     }

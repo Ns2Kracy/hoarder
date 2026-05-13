@@ -23,6 +23,7 @@ pub struct StoredItemState {
 pub struct SyncPlanner;
 
 impl SyncPlanner {
+    #[must_use]
     pub fn plan(source: Option<&ItemSnapshot>, stored: Option<&StoredItemState>) -> PlanDecision {
         match (source, stored) {
             (Some(_), None) => PlanDecision::Sync,

@@ -24,6 +24,12 @@ During Rust compilation, `src/assets.rs` embeds the current contents of `web/dis
 
 ## Verification
 
+Run the strict Clippy gate before merging Rust changes:
+
+```bash
+cargo clippy --all-targets --all-features
+```
+
 Run the backend test suite:
 
 ```bash

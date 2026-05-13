@@ -20,6 +20,7 @@ pub enum OpenDalServiceKind {
 }
 
 impl OpenDalServiceKind {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Fs => "fs",
@@ -95,7 +96,8 @@ pub enum OpenDalServiceConfig {
 }
 
 impl OpenDalServiceConfig {
-    pub fn kind(&self) -> OpenDalServiceKind {
+    #[must_use]
+    pub const fn kind(&self) -> OpenDalServiceKind {
         match self {
             Self::Fs { .. } => OpenDalServiceKind::Fs,
             Self::WebDav { .. } => OpenDalServiceKind::WebDav,
@@ -104,6 +106,7 @@ impl OpenDalServiceConfig {
         }
     }
 
+    #[must_use]
     pub fn redacted(&self) -> Self {
         match self {
             Self::Fs { root } => Self::Fs { root: root.clone() },
@@ -154,7 +157,8 @@ impl OpenDalServiceConfig {
     }
 }
 
-pub fn supported_service_kinds() -> &'static [OpenDalServiceKind] {
+#[must_use]
+pub const fn supported_service_kinds() -> &'static [OpenDalServiceKind] {
     &[
         OpenDalServiceKind::Fs,
         OpenDalServiceKind::WebDav,
@@ -163,6 +167,12 @@ pub fn supported_service_kinds() -> &'static [OpenDalServiceKind] {
     ]
 }
 
+/// Validates a generic connector config as an `OpenDAL` config.
+///
+/// # Errors
+///
+/// Returns an error when the service kind is unknown or required service
+/// options are missing.
 pub fn validate_connector_config(config: &ConnectorConfig) -> AppResult<OpenDalServiceConfig> {
     match config {
         ConnectorConfig::OpenDal { service, options } => {
@@ -171,6 +181,7 @@ pub fn validate_connector_config(config: &ConnectorConfig) -> AppResult<OpenDalS
     }
 }
 
+#[must_use]
 pub fn redacted_connector_config(config: &ConnectorConfig) -> ConnectorConfig {
     match config {
         ConnectorConfig::OpenDal { service, options } => ConnectorConfig::OpenDal {
@@ -180,6 +191,7 @@ pub fn redacted_connector_config(config: &ConnectorConfig) -> ConnectorConfig {
     }
 }
 
+#[must_use]
 pub fn redacted_options(options: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     options
         .iter()
@@ -252,7 +264,7 @@ fn optional(options: &BTreeMap<String, String>, key: &str) -> Option<String> {
 fn is_secret_option_key(key: &str) -> bool {
     let normalized = key
         .chars()
-        .filter(|character| character.is_ascii_alphanumeric())
+        .filter(char::is_ascii_alphanumeric)
         .flat_map(char::to_lowercase)
         .collect::<String>();
 

@@ -46,7 +46,8 @@ pub enum ConnectorConfig {
 }
 
 impl ConnectorConfig {
-    pub fn kind(&self) -> ConnectorKind {
+    #[must_use]
+    pub const fn kind(&self) -> ConnectorKind {
         match self {
             Self::OpenDal { .. } => ConnectorKind::OpenDal,
         }

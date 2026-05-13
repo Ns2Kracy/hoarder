@@ -1,3 +1,5 @@
+#![allow(clippy::derive_partial_eq_without_eq, clippy::future_not_send)]
+
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]

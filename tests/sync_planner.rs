@@ -122,7 +122,7 @@ struct SnapshotBuilder {
 }
 
 impl SnapshotBuilder {
-    fn with_size(mut self, size: u64) -> Self {
+    const fn with_size(mut self, size: u64) -> Self {
         self.snapshot.size = Some(size);
         self
     }
@@ -132,7 +132,7 @@ impl SnapshotBuilder {
         self
     }
 
-    fn with_modified_at(mut self, modified_at: chrono::DateTime<Utc>) -> Self {
+    const fn with_modified_at(mut self, modified_at: chrono::DateTime<Utc>) -> Self {
         self.snapshot.modified_at = Some(modified_at);
         self
     }

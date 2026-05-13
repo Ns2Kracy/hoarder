@@ -5,6 +5,12 @@ use crate::{
     error::{AppError, AppResult},
 };
 
+/// Normalizes a source-relative path for safe storage in the vault.
+///
+/// # Errors
+///
+/// Returns an error when the path is empty, absolute, contains traversal, or
+/// targets Hoarder's reserved `.hoarder` directory.
 pub fn normalize_source_path(input: &str) -> AppResult<String> {
     if input.is_empty() {
         return Err(AppError::Path("source path cannot be empty".to_owned()));
@@ -52,6 +58,11 @@ pub fn normalize_source_path(input: &str) -> AppResult<String> {
     Ok(parts.join("/"))
 }
 
+/// Builds a vault target path for a normalized source path.
+///
+/// # Errors
+///
+/// Returns an error when `normalized_path` is not a safe source-relative path.
 pub fn target_path(
     vault_root: impl AsRef<Utf8Path>,
     source_id: &SourceId,

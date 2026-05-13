@@ -15,6 +15,7 @@ pub struct ConnectorRegistry {
 }
 
 impl ConnectorRegistry {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -27,10 +28,16 @@ impl ConnectorRegistry {
         self.factories.insert(kind, factory)
     }
 
+    #[must_use]
     pub fn get_factory(&self, kind: &ConnectorKind) -> Option<ConnectorFactory> {
         self.factories.get(kind).cloned()
     }
 
+    /// Creates a connector for the requested kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no factory is registered for `kind`.
     pub fn create(&self, kind: &ConnectorKind) -> AppResult<Arc<dyn SourceConnector>> {
         let factory = self.get_factory(kind).ok_or_else(|| {
             AppError::NotFound(format!("connector factory not registered for {kind:?}"))

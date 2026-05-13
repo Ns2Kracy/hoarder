@@ -5,6 +5,11 @@ use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
 use crate::{AppError, AppResult};
 
+/// Connects to `SQLite` using either a full `SQLite` URL or a filesystem path.
+///
+/// # Errors
+///
+/// Returns an error when the database connection cannot be established.
 pub async fn connect_sqlite(database_url: &str) -> AppResult<DatabaseConnection> {
     let url = if database_url.starts_with("sqlite:") {
         database_url.to_owned()

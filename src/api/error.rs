@@ -36,7 +36,7 @@ impl ApiError {
         Self::new(StatusCode::NOT_FOUND, "NOT_FOUND", message.into())
     }
 
-    fn new(status: StatusCode, code: &'static str, message: String) -> Self {
+    const fn new(status: StatusCode, code: &'static str, message: String) -> Self {
         Self {
             status,
             body: ApiErrorBody {
@@ -55,12 +55,7 @@ impl From<AppError> for ApiError {
             AppError::Connector(message) => {
                 Self::new(StatusCode::BAD_GATEWAY, "CONNECTOR_ERROR", message)
             }
-            AppError::Database(_) => Self::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
-                "internal server error".to_owned(),
-            ),
-            AppError::Io(_) => Self::new(
+            AppError::Database(_) | AppError::Io(_) => Self::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",
                 "internal server error".to_owned(),

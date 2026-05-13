@@ -18,7 +18,7 @@ use super::{
 pub type ConnectorResolver =
     Arc<dyn Fn(ConnectorKind) -> AppResult<Arc<dyn SourceConnector>> + Send + Sync>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SyncJob {
     pub id: JobId,
     pub source_id: SourceId,
@@ -53,6 +53,12 @@ where
         }
     }
 
+    /// Runs one sync job and records its final summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the job, resolving the connector, scanning
+    /// the source, writing the vault, or recording run state fails.
     pub async fn run_job(&self, job_id: JobId) -> AppResult<SyncRunSummary> {
         let job = self.repository.load_job(job_id).await?;
         let run_id = self.repository.start_run(&job).await?;
@@ -247,7 +253,7 @@ struct ItemFailure {
 }
 
 impl ItemFailure {
-    fn new(snapshot: ItemSnapshot, source: AppError) -> Self {
+    const fn new(snapshot: ItemSnapshot, source: AppError) -> Self {
         Self { snapshot, source }
     }
 }

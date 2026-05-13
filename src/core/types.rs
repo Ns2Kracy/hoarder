@@ -18,11 +18,11 @@ macro_rules! uuid_newtype {
                 Self(Uuid::now_v7())
             }
 
-            pub fn from_uuid(uuid: Uuid) -> Self {
+            pub const fn from_uuid(uuid: Uuid) -> Self {
                 Self(uuid)
             }
 
-            pub fn as_uuid(self) -> Uuid {
+            pub const fn as_uuid(self) -> Uuid {
                 self.0
             }
         }
@@ -30,6 +30,12 @@ macro_rules! uuid_newtype {
         impl From<Uuid> for $name {
             fn from(value: Uuid) -> Self {
                 Self(value)
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::new()
             }
         }
 
@@ -87,6 +93,7 @@ pub enum ConnectorKind {
     Feishu,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectorCapabilities {
@@ -96,7 +103,7 @@ pub struct ConnectorCapabilities {
     pub supports_incremental_scan: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemSnapshot {
     pub source_id: SourceId,
@@ -110,6 +117,7 @@ pub struct ItemSnapshot {
 }
 
 impl ItemSnapshot {
+    #[must_use]
     pub fn item_ref(&self) -> ItemRef {
         ItemRef {
             source_id: self.source_id,

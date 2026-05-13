@@ -63,7 +63,7 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
 async fn api_routes_run_job_triggers_sync_service() {
     let job_id = JobId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
     let sync = Arc::new(RecordingSyncService::default());
-    let state = ApiState::new(Arc::new(FakeRepository::default()), sync.clone());
+    let state = ApiState::new(Arc::new(FakeRepository), sync.clone());
     let app = router(state);
 
     let response = request(app, "POST", &format!("/api/jobs/{job_id}/run"), Some("")).await;
@@ -132,10 +132,7 @@ fn decode_response(response: &[u8]) -> HttpResponse {
 fn decode_chunked(mut body: &[u8]) -> Vec<u8> {
     let mut decoded = Vec::new();
 
-    loop {
-        let Some(size_end) = body.windows(2).position(|window| window == b"\r\n") else {
-            break;
-        };
+    while let Some(size_end) = body.windows(2).position(|window| window == b"\r\n") {
         let size = std::str::from_utf8(&body[..size_end]).unwrap();
         let size = usize::from_str_radix(size.trim(), 16).unwrap();
         if size == 0 {
@@ -153,7 +150,7 @@ fn decode_chunked(mut body: &[u8]) -> Vec<u8> {
 
 fn test_router() -> Router {
     let state = ApiState::new(
-        Arc::new(FakeRepository::default()),
+        Arc::new(FakeRepository),
         Arc::new(RecordingSyncService::default()),
     );
 

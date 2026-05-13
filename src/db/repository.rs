@@ -24,16 +24,18 @@ pub struct SeaOrmRepository {
 }
 
 impl SeaOrmRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+    #[must_use]
+    pub const fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
-    pub fn connection(&self) -> &DatabaseConnection {
+    #[must_use]
+    pub const fn connection(&self) -> &DatabaseConnection {
         &self.db
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewSource {
     pub name: String,
     pub kind: ConnectorKind,
@@ -41,7 +43,7 @@ pub struct NewSource {
     pub enabled: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceRecord {
     pub id: SourceId,
     pub name: String,
@@ -52,14 +54,14 @@ pub struct SourceRecord {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewSyncJob {
     pub source_id: SourceId,
     pub name: String,
     pub enabled: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SyncJobRecord {
     pub id: JobId,
     pub source_id: SourceId,
@@ -73,19 +75,19 @@ pub struct SyncJobRecord {
 }
 
 pub trait SourceRepository: Send + Sync {
-    fn create_source<'a>(&'a self, input: NewSource) -> RepositoryFuture<'a, SourceRecord>;
+    fn create_source(&self, input: NewSource) -> RepositoryFuture<'_, SourceRecord>;
 
     fn list_sources(&self) -> RepositoryFuture<'_, Vec<SourceRecord>>;
 }
 
 pub trait SyncJobRepository: Send + Sync {
-    fn create_job<'a>(&'a self, input: NewSyncJob) -> RepositoryFuture<'a, SyncJobRecord>;
+    fn create_job(&self, input: NewSyncJob) -> RepositoryFuture<'_, SyncJobRecord>;
 
     fn list_jobs(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<SyncJobRecord>>;
 }
 
 impl SourceRepository for SeaOrmRepository {
-    fn create_source<'a>(&'a self, input: NewSource) -> RepositoryFuture<'a, SourceRecord> {
+    fn create_source(&self, input: NewSource) -> RepositoryFuture<'_, SourceRecord> {
         Box::pin(async move {
             let now = Utc::now();
             let active_model = source::ActiveModel {
@@ -116,7 +118,7 @@ impl SourceRepository for SeaOrmRepository {
 }
 
 impl SyncJobRepository for SeaOrmRepository {
-    fn create_job<'a>(&'a self, input: NewSyncJob) -> RepositoryFuture<'a, SyncJobRecord> {
+    fn create_job(&self, input: NewSyncJob) -> RepositoryFuture<'_, SyncJobRecord> {
         Box::pin(async move {
             let now = Utc::now();
             let active_model = sync_job::ActiveModel {
@@ -150,7 +152,7 @@ impl SyncJobRepository for SeaOrmRepository {
 }
 
 impl SyncRepository for SeaOrmRepository {
-    fn load_job<'a>(&'a self, job_id: JobId) -> RepositoryFuture<'a, SyncJob> {
+    fn load_job(&self, job_id: JobId) -> RepositoryFuture<'_, SyncJob> {
         Box::pin(async move {
             let job = sync_job::Entity::find_by_id(job_id.as_uuid())
                 .one(&self.db)
@@ -230,10 +232,7 @@ impl SyncRepository for SeaOrmRepository {
         })
     }
 
-    fn known_item_states<'a>(
-        &'a self,
-        source_id: SourceId,
-    ) -> RepositoryFuture<'a, Vec<StoredItemState>> {
+    fn known_item_states(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<StoredItemState>> {
         Box::pin(async move {
             let items = sync_item::Entity::find()
                 .filter(sync_item::Column::SourceId.eq(source_id.as_uuid()))
@@ -249,11 +248,11 @@ impl SyncRepository for SeaOrmRepository {
         })
     }
 
-    fn record_item_outcome<'a>(
-        &'a self,
+    fn record_item_outcome(
+        &self,
         run_id: RunId,
         outcome: ItemSyncOutcome,
-    ) -> RepositoryFuture<'a, ()> {
+    ) -> RepositoryFuture<'_, ()> {
         Box::pin(async move {
             let item = upsert_sync_item(&self.db, run_id, &outcome).await?;
 
@@ -296,12 +295,12 @@ impl SyncRepository for SeaOrmRepository {
         })
     }
 
-    fn finish_run<'a>(
-        &'a self,
+    fn finish_run(
+        &self,
         run_id: RunId,
         status: SyncRunStatus,
         summary: SyncRunSummary,
-    ) -> RepositoryFuture<'a, ()> {
+    ) -> RepositoryFuture<'_, ()> {
         Box::pin(async move {
             let run = sync_run::Entity::find_by_id(run_id.as_uuid())
                 .one(&self.db)
@@ -357,8 +356,11 @@ async fn upsert_sync_item(
             (target_path, outcome.content_hash.clone())
         } else {
             (
-                target_path.or(model.local_path.clone()),
-                outcome.content_hash.clone().or(model.content_hash.clone()),
+                target_path.or_else(|| model.local_path.clone()),
+                outcome
+                    .content_hash
+                    .clone()
+                    .or_else(|| model.content_hash.clone()),
             )
         };
         let metadata_json = model.metadata_json.clone();
@@ -473,7 +475,7 @@ fn sync_job_record_from_model(model: sync_job::Model) -> SyncJobRecord {
     }
 }
 
-fn connector_kind_to_str(kind: ConnectorKind) -> &'static str {
+const fn connector_kind_to_str(kind: ConnectorKind) -> &'static str {
     match kind {
         ConnectorKind::OpenDal => "opendal",
         ConnectorKind::Notion => "notion",
@@ -492,7 +494,7 @@ fn connector_kind_from_str(kind: &str) -> AppResult<ConnectorKind> {
     }
 }
 
-fn item_type_to_str(item_type: ItemType) -> &'static str {
+const fn item_type_to_str(item_type: ItemType) -> &'static str {
     match item_type {
         ItemType::File => "file",
         ItemType::Directory => "directory",
@@ -511,7 +513,7 @@ fn item_type_from_str(item_type: &str) -> AppResult<ItemType> {
     }
 }
 
-fn sync_status_to_str(status: SyncStatus) -> &'static str {
+const fn sync_status_to_str(status: SyncStatus) -> &'static str {
     match status {
         SyncStatus::Pending => "pending",
         SyncStatus::Synced => "synced",
@@ -521,7 +523,7 @@ fn sync_status_to_str(status: SyncStatus) -> &'static str {
     }
 }
 
-fn sync_run_status_to_str(status: SyncRunStatus) -> &'static str {
+const fn sync_run_status_to_str(status: SyncRunStatus) -> &'static str {
     match status {
         SyncRunStatus::Completed => "completed",
         SyncRunStatus::CompletedWithFailures => "completed_with_failures",
@@ -529,7 +531,7 @@ fn sync_run_status_to_str(status: SyncRunStatus) -> &'static str {
     }
 }
 
-fn job_status_after_run(status: SyncRunStatus) -> &'static str {
+const fn job_status_after_run(status: SyncRunStatus) -> &'static str {
     match status {
         SyncRunStatus::Completed | SyncRunStatus::CompletedWithFailures => "idle",
         SyncRunStatus::Failed => "failed",
@@ -554,6 +556,7 @@ fn optional_i64_to_u64(value: Option<i64>, field: &str) -> AppResult<Option<u64>
         .transpose()
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn map_db_error(error: sea_orm::DbErr) -> AppError {
     AppError::Database(error.to_string())
 }

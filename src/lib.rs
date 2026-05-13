@@ -1,3 +1,5 @@
+#![recursion_limit = "4096"]
+
 pub mod api;
 pub mod assets;
 pub mod cli;

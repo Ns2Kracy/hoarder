@@ -13,6 +13,7 @@ pub async fn serve(uri: Uri) -> Response {
     response_for_path(uri.path())
 }
 
+#[must_use]
 pub fn response_for_path(path: &str) -> Response {
     let asset_path = path.trim_start_matches('/');
 
@@ -28,10 +29,10 @@ pub fn response_for_path(path: &str) -> Response {
         return not_found("asset not found");
     }
 
-    match WEB_DIST.get_file("index.html") {
-        Some(file) => file_response("index.html", file),
-        None => not_found("frontend assets have not been built"),
-    }
+    WEB_DIST.get_file("index.html").map_or_else(
+        || not_found("frontend assets have not been built"),
+        |file| file_response("index.html", file),
+    )
 }
 
 fn asset_file(path: &str) -> Option<(&str, &'static File<'static>)> {
@@ -69,8 +70,7 @@ fn content_type(path: &str) -> &'static str {
         Some("css") => "text/css; charset=utf-8",
         Some("html") => "text/html; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
-        Some("json") => "application/json; charset=utf-8",
-        Some("map") => "application/json; charset=utf-8",
+        Some("json" | "map") => "application/json; charset=utf-8",
         Some("svg") => "image/svg+xml",
         Some("wasm") => "application/wasm",
         _ => "application/octet-stream",
