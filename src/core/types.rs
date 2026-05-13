@@ -15,7 +15,7 @@ macro_rules! uuid_newtype {
 
         impl $name {
             pub fn new() -> Self {
-                Self(Uuid::now_v7())
+                Self(Uuid::new_v4())
             }
 
             pub const fn from_uuid(uuid: Uuid) -> Self {

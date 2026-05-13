@@ -17,7 +17,7 @@ struct TempDir {
 
 impl TempDir {
     fn new(name: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("hoarder-{name}-{}", Uuid::now_v7()));
+        let path = std::env::temp_dir().join(format!("hoarder-{name}-{}", Uuid::new_v4()));
         fs::create_dir_all(&path).unwrap();
 
         Self { path }

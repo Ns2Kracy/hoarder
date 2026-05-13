@@ -52,7 +52,7 @@ impl VaultWriter {
             .unwrap_or("item");
         self.vault_root
             .join(".hoarder/tmp")
-            .join(format!("{source_id}-{}-{leaf}.tmp", Uuid::now_v7()))
+            .join(format!("{source_id}-{}-{leaf}.tmp", Uuid::new_v4()))
     }
 
     async fn write_via_temp(

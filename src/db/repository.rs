@@ -425,7 +425,7 @@ async fn insert_sync_error(
         .await
         .map_err(map_db_error)?;
     let active_model = sync_error::ActiveModel {
-        id: Set(Uuid::now_v7()),
+        id: Set(Uuid::new_v4()),
         source_id: Set(outcome.source_id.as_uuid()),
         job_id: Set(run.as_ref().map(|run| run.job_id)),
         run_id: Set(Some(run_id.as_uuid())),
