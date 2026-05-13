@@ -63,6 +63,8 @@ async fn db_schema_syncs_tables_and_inserts_source_job() -> Result<(), Box<dyn s
     assert_eq!(created_source.name, "local files");
     assert_eq!(created_source.kind, ConnectorKind::OpenDal);
     assert!(created_source.enabled);
+    assert_eq!(created_source.last_check_status, None);
+    assert_eq!(created_source.last_checked_at, None);
 
     let sources = repository.list_sources().await?;
     assert_eq!(sources.len(), 1);

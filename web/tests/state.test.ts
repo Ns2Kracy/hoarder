@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { loadConsoleData } from "../src/lib/state";
+import { get } from "svelte/store";
+import { loadConsoleData, sources, testSourceConnection } from "../src/lib/state";
 
 const originalFetch = globalThis.fetch;
 
@@ -24,6 +25,74 @@ test("loadConsoleData requests each top-level resource once", async () => {
   await loadConsoleData();
 
   expect(paths.sort()).toEqual(["/api/jobs", "/api/runs", "/api/settings", "/api/sources"]);
+});
+
+test("testSourceConnection persists healthy status after reload when api returns source health", async () => {
+  let tested = false;
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/sources" && (!init?.method || init.method === "GET")) {
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "src-local",
+              name: "Local source",
+              connectorKind: "opendal",
+              config: {
+                service: "fs",
+                options: {
+                  root: "/tmp/hoarder",
+                },
+              },
+              enabled: true,
+              health: tested ? "healthy" : "untested",
+              lastCheckedAt: tested ? "2026-05-12T09:25:00.000Z" : null,
+            },
+          ],
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
+    if (path === "/api/sources/src-local/test" && init?.method === "POST") {
+      tested = true;
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          checkedAt: "2026-05-12T09:25:00.000Z",
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
+    return new Response(JSON.stringify(responseFor(path)), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  expect(get(sources).data[0]?.health).toBe("untested");
+
+  await testSourceConnection("src-local");
+  expect(get(sources).data[0]?.health).toBe("healthy");
+  expect(get(sources).data[0]?.lastCheckedAt).toBe("2026-05-12T09:25:00.000Z");
+
+  await loadConsoleData();
+  expect(get(sources).data[0]?.health).toBe("healthy");
+  expect(get(sources).data[0]?.lastCheckedAt).toBe("2026-05-12T09:25:00.000Z");
 });
 
 function requestPath(input: RequestInfo | URL) {

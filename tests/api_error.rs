@@ -80,7 +80,14 @@ fn api_error_source_dto_redacts_secret_config_values() {
         ]),
     };
 
-    let source = SourceDto::new(source_id, "Docs".to_owned(), &config, true);
+    let source = SourceDto::new(
+        source_id,
+        "Docs".to_owned(),
+        &config,
+        true,
+        hoarder::api::types::SourceHealth::Untested,
+        None,
+    );
     let encoded = serde_json::to_value(source).unwrap();
 
     assert_eq!(encoded["config"]["options"]["bucket"], json!("docs"));

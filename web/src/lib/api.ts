@@ -306,6 +306,8 @@ interface BackendSourceDto {
     options: Record<string, string>;
   };
   enabled: boolean;
+  health?: SourceDto["health"];
+  lastCheckedAt?: string | null;
 }
 
 interface BackendJobDto {
@@ -517,8 +519,9 @@ function toSourceDto(source: BackendSourceDto): SourceDto {
       service: serviceKind as SourceDto["serviceKind"],
       ...source.config.options,
     },
-    health: source.enabled ? "untested" : "disabled",
+    health: source.health ?? (source.enabled ? "untested" : "disabled"),
     itemCount: 0,
+    lastCheckedAt: source.lastCheckedAt ?? undefined,
   };
 }
 

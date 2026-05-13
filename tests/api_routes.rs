@@ -42,6 +42,7 @@ async fn api_routes_sources_returns_repository_list() {
 
     assert_eq!(response.status, 200);
     assert_eq!(response.body["data"][0]["name"], json!("Local Docs"));
+    assert_eq!(response.body["data"][0]["health"], json!("untested"));
     assert_eq!(
         response.body["data"][0]["config"]["options"]["root"],
         json!(test.source_root.to_string_lossy())
@@ -99,6 +100,11 @@ async fn api_routes_test_source_checks_repository() {
     assert_eq!(response.status, 200);
     assert_eq!(response.body["ok"], json!(true));
     assert!(response.body["checkedAt"].as_str().is_some());
+
+    let sources = request(test.app.clone(), "GET", "/api/sources", None).await;
+    assert_eq!(sources.status, 200);
+    assert_eq!(sources.body["data"][0]["health"], json!("healthy"));
+    assert!(sources.body["data"][0]["lastCheckedAt"].as_str().is_some());
 }
 
 #[derive(Clone)]

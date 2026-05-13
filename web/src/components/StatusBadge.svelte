@@ -55,7 +55,8 @@
     deleted_on_source: AlertTriangle
   } satisfies Record<Status, typeof CheckCircle2>;
 
-  let { status, label = labelByStatus[status] }: { status: Status; label?: string } = $props();
+  let { status, label }: { status: Status; label?: string } = $props();
+  let displayLabel = $derived(label ?? labelByStatus[status]);
   let Icon = $derived(iconByStatus[status]);
 </script>
 
@@ -63,5 +64,5 @@
   class={`inline-flex min-w-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium leading-4 ${classByStatus[status]}`}
 >
   <Icon aria-hidden="true" size={12} strokeWidth={2.2} />
-  <span class="truncate">{label}</span>
+  <span class="truncate">{displayLabel}</span>
 </span>

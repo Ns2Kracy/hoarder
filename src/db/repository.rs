@@ -65,6 +65,8 @@ pub struct SourceRecord {
     pub kind: ConnectorKind,
     pub config_json: Value,
     pub enabled: bool,
+    pub last_check_status: Option<String>,
+    pub last_checked_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -111,6 +113,8 @@ impl SourceRepository for SeaOrmRepository {
                 kind: Set(connector_kind_to_str(input.kind).to_owned()),
                 config_json: Set(input.config_json),
                 enabled: Set(input.enabled),
+                last_check_status: Set(None),
+                last_checked_at: Set(None),
                 created_at: Set(now),
                 updated_at: Set(now),
             };
@@ -474,6 +478,8 @@ fn source_record_from_model(model: source::Model) -> AppResult<SourceRecord> {
         kind: connector_kind_from_str(&model.kind)?,
         config_json: model.config_json,
         enabled: model.enabled,
+        last_check_status: model.last_check_status,
+        last_checked_at: model.last_checked_at,
         created_at: model.created_at,
         updated_at: model.updated_at,
     })

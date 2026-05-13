@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
 };
 use chrono::Utc;
-use sea_orm::{EntityTrait, QueryOrder};
+use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder};
 use std::sync::Arc;
 
 use crate::{
@@ -25,7 +25,7 @@ use super::{
     state::ApiState,
     types::{
         CreateSourceRequest, HealthResponse, ItemDto, JobDto, JobRunResponse, ListResponse, RunDto,
-        SettingsDto, SourceDto, SourceTestResponse, SyncErrorDto,
+        SettingsDto, SourceDto, SourceHealth, SourceTestResponse, SyncErrorDto,
     },
 };
 
@@ -69,6 +69,8 @@ async fn list_sources(
                 record.name,
                 &config,
                 record.enabled,
+                SourceHealth::from_record(record.enabled, record.last_check_status.as_deref()),
+                record.last_checked_at,
             ))
         })
         .collect::<AppResult<Vec<_>>>()?;
@@ -98,7 +100,14 @@ async fn create_source(
             enabled,
         })
         .await?;
-    let source = SourceDto::new(record.id, record.name, &config, record.enabled);
+    let source = SourceDto::new(
+        record.id,
+        record.name,
+        &config,
+        record.enabled,
+        SourceHealth::from_record(record.enabled, record.last_check_status.as_deref()),
+        record.last_checked_at,
+    );
 
     Ok((StatusCode::CREATED, Json(source)))
 }
@@ -110,12 +119,20 @@ async fn test_source(
     let Path(source_id) = path?;
     let source = state.repository().load_source(source_id).await?;
     let config = connector_config_from_json(source.id, source.config_json)?;
+    let checked_at = Utc::now();
 
     validate_source_connector(source.kind, source.id, &config).await?;
+    update_source_check(
+        state.repository().connection(),
+        source_id,
+        "healthy",
+        checked_at,
+    )
+    .await?;
 
     Ok(Json(SourceTestResponse {
         ok: true,
-        checked_at: Utc::now(),
+        checked_at,
     }))
 }
 
@@ -338,4 +355,24 @@ fn i64_to_u64(value: i64, field: &str) -> AppResult<u64> {
 #[allow(clippy::needless_pass_by_value)]
 fn map_db_error(error: sea_orm::DbErr) -> AppError {
     AppError::Database(error.to_string())
+}
+
+async fn update_source_check(
+    db: &sea_orm::DatabaseConnection,
+    source_id: SourceId,
+    status: &str,
+    checked_at: chrono::DateTime<Utc>,
+) -> AppResult<()> {
+    let source = crate::entity::source::Entity::find_by_id(source_id.as_uuid())
+        .one(db)
+        .await
+        .map_err(map_db_error)?
+        .ok_or_else(|| AppError::NotFound(format!("source not found: {source_id}")))?;
+    let mut active_model: crate::entity::source::ActiveModel = source.into();
+    active_model.last_check_status = sea_orm::ActiveValue::Set(Some(status.to_owned()));
+    active_model.last_checked_at = sea_orm::ActiveValue::Set(Some(checked_at));
+    active_model.updated_at = sea_orm::ActiveValue::Set(Utc::now());
+    active_model.update(db).await.map_err(map_db_error)?;
+
+    Ok(())
 }

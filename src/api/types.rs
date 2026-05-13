@@ -46,17 +46,54 @@ pub struct SourceDto {
     pub connector_kind: ConnectorKind,
     pub config: RedactedConnectorConfig,
     pub enabled: bool,
+    pub health: SourceHealth,
+    pub last_checked_at: Option<DateTime<Utc>>,
 }
 
 impl SourceDto {
     #[must_use]
-    pub fn new(id: SourceId, name: String, config: &ConnectorConfig, enabled: bool) -> Self {
+    pub fn new(
+        id: SourceId,
+        name: String,
+        config: &ConnectorConfig,
+        enabled: bool,
+        health: SourceHealth,
+        last_checked_at: Option<DateTime<Utc>>,
+    ) -> Self {
         Self {
             id,
             name,
             connector_kind: config.kind(),
             config: RedactedConnectorConfig::from(config),
             enabled,
+            health,
+            last_checked_at,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SourceHealth {
+    Healthy,
+    Warning,
+    Failed,
+    Untested,
+    Disabled,
+}
+
+impl SourceHealth {
+    #[must_use]
+    pub fn from_record(enabled: bool, last_check_status: Option<&str>) -> Self {
+        if !enabled {
+            return Self::Disabled;
+        }
+
+        match last_check_status {
+            Some("healthy") => Self::Healthy,
+            Some("warning") => Self::Warning,
+            Some("failed") => Self::Failed,
+            _ => Self::Untested,
         }
     }
 }

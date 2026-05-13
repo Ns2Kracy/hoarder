@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::Write as _, path::PathBuf};
 
 use axum::Router;
 use hoarder::{AppConfig, server};
@@ -110,12 +110,12 @@ async fn request_with_headers(
     });
 
     let mut stream = TcpStream::connect(addr).await.unwrap();
-    let headers = headers
-        .iter()
-        .map(|(name, value)| format!("{name}: {value}\r\n"))
-        .collect::<String>();
+    let mut headers_text = String::new();
+    for (name, value) in headers {
+        write!(&mut headers_text, "{name}: {value}\r\n").unwrap();
+    }
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n{headers}\r\n"
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n{headers_text}\r\n"
     );
     stream.write_all(request.as_bytes()).await.unwrap();
 
