@@ -5,10 +5,13 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    AppError, AppResult,
+    AppConfig, AppError, AppResult,
+    config::{RuntimeSettings, RuntimeSettingsPatch},
     connectors::traits::ConnectorConfig,
-    core::types::{ConnectorKind, ItemId, ItemType, JobId, RunId, SourceId, SyncStatus},
-    entity::{source, sync_error, sync_item, sync_job, sync_run},
+    core::types::{
+        ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
+    },
+    entity::{app_setting, source, sync_error, sync_item, sync_job, sync_run},
     sync::{
         engine::{SyncJob, SyncRunStatus, SyncRunSummary},
         planner::StoredItemState,
@@ -79,14 +82,31 @@ pub struct NewSyncJob {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NewScheduledSyncJob {
+    pub source_id: SourceId,
+    pub name: String,
+    pub enabled: bool,
+    pub schedule: SyncJobSchedule,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SyncJobSchedule {
+    Manual,
+    Interval { interval_seconds: u64 },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SyncJobRecord {
     pub id: JobId,
     pub source_id: SourceId,
     pub name: String,
     pub enabled: bool,
-    pub status: String,
+    pub schedule: SyncJobSchedule,
+    pub status: JobStatus,
     pub cursor: Option<String>,
     pub last_run_at: Option<DateTime<Utc>>,
+    pub last_run_status: Option<RunStatus>,
+    pub last_run_id: Option<RunId>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -100,7 +120,25 @@ pub trait SourceRepository: Send + Sync {
 pub trait SyncJobRepository: Send + Sync {
     fn create_job(&self, input: NewSyncJob) -> RepositoryFuture<'_, SyncJobRecord>;
 
+    fn create_scheduled_job(
+        &self,
+        input: NewScheduledSyncJob,
+    ) -> RepositoryFuture<'_, SyncJobRecord>;
+
     fn list_jobs(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<SyncJobRecord>>;
+}
+
+pub trait RuntimeSettingsRepository: Send + Sync {
+    fn load_runtime_settings<'a>(
+        &'a self,
+        config: &'a AppConfig,
+    ) -> RepositoryFuture<'a, RuntimeSettings>;
+
+    fn patch_runtime_settings<'a>(
+        &'a self,
+        config: &'a AppConfig,
+        patch: RuntimeSettingsPatch,
+    ) -> RepositoryFuture<'a, RuntimeSettings>;
 }
 
 impl SourceRepository for SeaOrmRepository {
@@ -138,16 +176,33 @@ impl SourceRepository for SeaOrmRepository {
 
 impl SyncJobRepository for SeaOrmRepository {
     fn create_job(&self, input: NewSyncJob) -> RepositoryFuture<'_, SyncJobRecord> {
+        self.create_scheduled_job(NewScheduledSyncJob {
+            source_id: input.source_id,
+            name: input.name,
+            enabled: input.enabled,
+            schedule: SyncJobSchedule::Manual,
+        })
+    }
+
+    fn create_scheduled_job(
+        &self,
+        input: NewScheduledSyncJob,
+    ) -> RepositoryFuture<'_, SyncJobRecord> {
         Box::pin(async move {
             let now = Utc::now();
+            let (schedule_kind, schedule_interval_seconds) = schedule_to_storage(&input.schedule)?;
             let active_model = sync_job::ActiveModel {
                 id: Set(JobId::new().as_uuid()),
                 source_id: Set(input.source_id.as_uuid()),
                 name: Set(input.name),
                 enabled: Set(input.enabled),
-                status: Set("idle".to_owned()),
+                schedule_kind: Set(schedule_kind.to_owned()),
+                schedule_interval_seconds: Set(schedule_interval_seconds),
+                status: Set(job_status_to_str(JobStatus::Idle).to_owned()),
                 cursor: Set(None),
                 last_run_at: Set(None),
+                last_run_status: Set(None),
+                last_run_id: Set(None),
                 created_at: Set(now),
                 updated_at: Set(now),
             };
@@ -166,6 +221,57 @@ impl SyncJobRepository for SeaOrmRepository {
                 .map_err(map_db_error)?;
 
             Ok(models.into_iter().map(sync_job_record_from_model).collect())
+        })
+    }
+}
+
+impl RuntimeSettingsRepository for SeaOrmRepository {
+    fn load_runtime_settings<'a>(
+        &'a self,
+        config: &'a AppConfig,
+    ) -> RepositoryFuture<'a, RuntimeSettings> {
+        Box::pin(async move {
+            let mut settings = RuntimeSettings::from_config(config);
+            for row in app_setting::Entity::find()
+                .all(&self.db)
+                .await
+                .map_err(map_db_error)?
+            {
+                apply_runtime_setting_row(&mut settings, &row.key, row.value_json)?;
+            }
+
+            Ok(settings)
+        })
+    }
+
+    fn patch_runtime_settings<'a>(
+        &'a self,
+        config: &'a AppConfig,
+        patch: RuntimeSettingsPatch,
+    ) -> RepositoryFuture<'a, RuntimeSettings> {
+        Box::pin(async move {
+            if matches!(patch.job_concurrency, Some(0)) {
+                return Err(AppError::Validation(
+                    "job_concurrency must be greater than zero".to_owned(),
+                ));
+            }
+            if matches!(patch.file_concurrency, Some(0)) {
+                return Err(AppError::Validation(
+                    "file_concurrency must be greater than zero".to_owned(),
+                ));
+            }
+
+            if let Some(value) = patch.job_concurrency {
+                upsert_app_setting(&self.db, "job_concurrency", serde_json::json!(value)).await?;
+            }
+            if let Some(value) = patch.file_concurrency {
+                upsert_app_setting(&self.db, "file_concurrency", serde_json::json!(value)).await?;
+            }
+            if let Some(value) = patch.log_level {
+                upsert_app_setting(&self.db, "log_level", serde_json::json!(value)).await?;
+            }
+
+            self.load_runtime_settings(config).await
         })
     }
 }
@@ -346,6 +452,8 @@ impl SyncRepository for SeaOrmRepository {
                 let mut active_job: sync_job::ActiveModel = job.into();
                 active_job.status = Set(job_status_after_run(status).to_owned());
                 active_job.last_run_at = Set(Some(now));
+                active_job.last_run_status = Set(Some(sync_run_status_to_str(status).to_owned()));
+                active_job.last_run_id = Set(Some(run_id.as_uuid()));
                 active_job.updated_at = Set(now);
                 active_job.update(&self.db).await.map_err(map_db_error)?;
             }
@@ -353,6 +461,70 @@ impl SyncRepository for SeaOrmRepository {
             Ok(())
         })
     }
+}
+
+async fn upsert_app_setting(
+    db: &DatabaseConnection,
+    key: &str,
+    value_json: Value,
+) -> AppResult<()> {
+    let existing = app_setting::Entity::find_by_id(key.to_owned())
+        .one(db)
+        .await
+        .map_err(map_db_error)?;
+    let now = Utc::now();
+
+    if let Some(model) = existing {
+        let mut active_model: app_setting::ActiveModel = model.into();
+        active_model.value_json = Set(value_json);
+        active_model.updated_at = Set(now);
+        active_model.update(db).await.map_err(map_db_error)?;
+    } else {
+        app_setting::ActiveModel {
+            key: Set(key.to_owned()),
+            value_json: Set(value_json),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .map_err(map_db_error)?;
+    }
+
+    Ok(())
+}
+
+fn apply_runtime_setting_row(
+    settings: &mut RuntimeSettings,
+    key: &str,
+    value: Value,
+) -> AppResult<()> {
+    match key {
+        "job_concurrency" => {
+            settings.job_concurrency = json_to_usize(value, key)?;
+        }
+        "file_concurrency" => {
+            settings.file_concurrency = json_to_usize(value, key)?;
+        }
+        "log_level" => {
+            settings.log_level = serde_json::from_value(value).map_err(|error| {
+                AppError::Database(format!("invalid app_setting value for {key}: {error}"))
+            })?;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn json_to_usize(value: Value, key: &str) -> AppResult<usize> {
+    let value = serde_json::from_value::<u64>(value).map_err(|error| {
+        AppError::Database(format!("invalid app_setting value for {key}: {error}"))
+    })?;
+    usize::try_from(value).map_err(|_| {
+        AppError::Database(format!(
+            "app_setting value for {key} exceeds usize range: {value}"
+        ))
+    })
 }
 
 async fn upsert_sync_item(
@@ -486,16 +658,58 @@ fn source_record_from_model(model: source::Model) -> AppResult<SourceRecord> {
 }
 
 fn sync_job_record_from_model(model: sync_job::Model) -> SyncJobRecord {
+    let schedule = schedule_from_storage(&model.schedule_kind, model.schedule_interval_seconds)
+        .unwrap_or(SyncJobSchedule::Manual);
+    let status = job_status_from_str(&model.status).unwrap_or(JobStatus::Failed);
+    let last_run_status = model
+        .last_run_status
+        .as_deref()
+        .map(run_status_from_str)
+        .transpose()
+        .unwrap_or(None);
     SyncJobRecord {
         id: JobId::from_uuid(model.id),
         source_id: SourceId::from_uuid(model.source_id),
         name: model.name,
         enabled: model.enabled,
-        status: model.status,
+        schedule,
+        status,
         cursor: model.cursor,
         last_run_at: model.last_run_at,
+        last_run_status,
+        last_run_id: model.last_run_id.map(RunId::from_uuid),
         created_at: model.created_at,
         updated_at: model.updated_at,
+    }
+}
+
+fn schedule_to_storage(schedule: &SyncJobSchedule) -> AppResult<(&'static str, Option<i64>)> {
+    match schedule {
+        SyncJobSchedule::Manual => Ok(("manual", None)),
+        SyncJobSchedule::Interval { interval_seconds } => Ok((
+            "interval",
+            Some(u64_to_i64(*interval_seconds, "schedule_interval_seconds")?),
+        )),
+    }
+}
+
+fn schedule_from_storage(kind: &str, interval_seconds: Option<i64>) -> AppResult<SyncJobSchedule> {
+    match kind {
+        "manual" => Ok(SyncJobSchedule::Manual),
+        "interval" => {
+            let interval_seconds = interval_seconds.ok_or_else(|| {
+                AppError::Database("interval job is missing schedule_interval_seconds".to_owned())
+            })?;
+            let interval_seconds = u64::try_from(interval_seconds).map_err(|_| {
+                AppError::Database(format!(
+                    "schedule_interval_seconds is negative: {interval_seconds}"
+                ))
+            })?;
+            Ok(SyncJobSchedule::Interval { interval_seconds })
+        }
+        other => Err(AppError::Database(format!(
+            "unknown schedule kind stored in database: {other}"
+        ))),
     }
 }
 
@@ -547,11 +761,45 @@ const fn sync_status_to_str(status: SyncStatus) -> &'static str {
     }
 }
 
+const fn job_status_to_str(status: JobStatus) -> &'static str {
+    match status {
+        JobStatus::Idle => "idle",
+        JobStatus::Running => "running",
+        JobStatus::Paused => "paused",
+        JobStatus::Failed => "failed",
+    }
+}
+
+fn job_status_from_str(status: &str) -> AppResult<JobStatus> {
+    match status {
+        "idle" => Ok(JobStatus::Idle),
+        "running" => Ok(JobStatus::Running),
+        "paused" => Ok(JobStatus::Paused),
+        "failed" => Ok(JobStatus::Failed),
+        other => Err(AppError::Database(format!(
+            "unknown job status stored in database: {other}"
+        ))),
+    }
+}
+
 const fn sync_run_status_to_str(status: SyncRunStatus) -> &'static str {
     match status {
         SyncRunStatus::Completed => "completed",
         SyncRunStatus::CompletedWithFailures => "completed_with_failures",
         SyncRunStatus::Failed => "failed",
+    }
+}
+
+fn run_status_from_str(status: &str) -> AppResult<RunStatus> {
+    match status {
+        "running" => Ok(RunStatus::Running),
+        "completed" => Ok(RunStatus::Completed),
+        "completed_with_failures" => Ok(RunStatus::CompletedWithFailures),
+        "failed" => Ok(RunStatus::Failed),
+        "cancelled" => Ok(RunStatus::Cancelled),
+        other => Err(AppError::Database(format!(
+            "unknown run status stored in database: {other}"
+        ))),
     }
 }
 

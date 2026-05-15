@@ -11,9 +11,13 @@ pub struct Model {
     pub source_id: Uuid,
     pub name: String,
     pub enabled: bool,
+    pub schedule_kind: String,
+    pub schedule_interval_seconds: Option<i64>,
     pub status: String,
     pub cursor: Option<String>,
     pub last_run_at: Option<DateTimeUtc>,
+    pub last_run_status: Option<String>,
+    pub last_run_id: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     #[sea_orm(belongs_to, from = "source_id", to = "id")]
