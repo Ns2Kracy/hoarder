@@ -74,6 +74,18 @@ Sync the SQLite schema for the configured database:
 cargo run -- db sync
 ```
 
+Create and run a local filesystem workflow from the CLI:
+
+```bash
+cargo run -- source add --name docs --service fs --root ./docs
+cargo run -- source list
+cargo run -- source test --id <source-id>
+cargo run -- job add --source-id <source-id> --name docs --interval 300
+cargo run -- job list
+cargo run -- sync run --job-id <job-id>
+cargo run -- sync status
+```
+
 Use a JSON config file when you need non-default paths:
 
 ```json
@@ -82,7 +94,8 @@ Use a JSON config file when you need non-default paths:
   "vaultPath": "./vault",
   "listenAddr": "127.0.0.1:4761",
   "jobConcurrency": 1,
-  "fileConcurrency": 4
+  "fileConcurrency": 4,
+  "logLevel": "info"
 }
 ```
 

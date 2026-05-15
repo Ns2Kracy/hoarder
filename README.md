@@ -51,7 +51,8 @@ Use a custom config:
   "vaultPath": "./vault",
   "listenAddr": "127.0.0.1:4761",
   "jobConcurrency": 1,
-  "fileConcurrency": 4
+  "fileConcurrency": 4,
+  "logLevel": "info"
 }
 ```
 
@@ -67,11 +68,13 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- serve --addr 127.0.0.1:4762` | [x] | Override the listen address. |
 | `cargo run -- --config ./hoarder.config.json serve` | [x] | Load JSON config before serving. |
 | `cargo run -- db sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
-| `cargo run -- source list` | [ ] | CLI source listing handler. |
-| `cargo run -- source add ...` | [ ] | CLI source creation handler. |
-| `cargo run -- source test ...` | [ ] | CLI source validation handler. |
-| `cargo run -- sync run ...` | [ ] | CLI one-shot sync handler. |
-| `cargo run -- sync status` | [ ] | CLI sync status handler. |
+| `cargo run -- source list` | [x] | List configured sources from SQLite. |
+| `cargo run -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
+| `cargo run -- source test --id <source-id>` | [x] | Validate a source and persist health. |
+| `cargo run -- job add --source-id <source-id> --name docs --interval 300` | [x] | Create a manual or interval sync job. |
+| `cargo run -- job list` | [x] | List configured sync jobs. |
+| `cargo run -- sync run --job-id <job-id>` | [x] | Run one sync job immediately. |
+| `cargo run -- sync status` | [x] | Print sync run status summaries. |
 
 ## Feature Checklist
 
@@ -87,8 +90,8 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Standard-library filesystem paths
 - [x] Strict Rust and Clippy lints in `Cargo.toml`
 - [x] Release profile with LTO and symbol stripping
-- [ ] Background scheduler inside serve mode
-- [ ] Runtime settings persistence and mutation
+- [x] Background scheduler inside serve mode
+- [x] Runtime settings persistence and mutation
 - [ ] Multi-user remote deployment mode
 - [ ] Authentication and authorization
 
@@ -104,7 +107,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] `sync_error` records
 - [x] Repository abstraction for sync engine tests
 - [x] SeaORM repository implementation
-- [ ] Durable app settings beyond the config file
+- [x] Durable app settings beyond the config file
 - [ ] Explicit schema migrations
 - [ ] Database pruning or retention policies
 
@@ -152,8 +155,8 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Connector-level failures fail the run
 - [x] Run summaries with processed, synced, skipped, failed, and byte counts
 - [ ] Bounded concurrent file sync execution
-- [ ] Job-level concurrency control
-- [ ] Scheduled recurring sync jobs
+- [x] Job-level concurrency control
+- [x] Scheduled recurring sync jobs
 - [ ] Resume from connector cursor
 - [ ] Retry policy for transient connector errors
 - [ ] Conflict resolution
@@ -176,10 +179,10 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] API fallback keeps unknown `/api/*` routes JSON-shaped
 - [x] `POST /api/sources/{id}/test`
 - [x] Structured request logging middleware
-- [ ] `POST /api/jobs`
-- [ ] `GET /api/runs/{id}`
-- [ ] Filtered item listing by source or status
-- [ ] `PATCH /api/settings`
+- [x] `POST /api/jobs`
+- [x] `GET /api/runs/{id}`
+- [x] Filtered item listing by source or status
+- [x] `PATCH /api/settings`
 - [ ] OpenAPI specification
 
 ### Web Console
@@ -198,10 +201,10 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Settings page
 - [x] Status badges and compact operational tables
 - [x] API client with mock fallback while the local API is unavailable
-- [ ] Full live wiring for every displayed control
+- [x] Full live wiring for the MVP workflow controls
 - [x] Source test action backed by API route
-- [ ] Settings save backed by API route
-- [ ] Run detail endpoint integration
+- [x] Settings save backed by API route
+- [x] Run detail endpoint integration
 - [ ] Accessibility pass with keyboard and screen-reader checks
 - [ ] Browser screenshot regression checks
 

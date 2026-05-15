@@ -51,7 +51,8 @@ http://127.0.0.1:4761
   "vaultPath": "./vault",
   "listenAddr": "127.0.0.1:4761",
   "jobConcurrency": 1,
-  "fileConcurrency": 4
+  "fileConcurrency": 4,
+  "logLevel": "info"
 }
 ```
 
@@ -67,11 +68,13 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- serve --addr 127.0.0.1:4762` | [x] | 覆盖监听地址。 |
 | `cargo run -- --config ./hoarder.config.json serve` | [x] | 启动前读取 JSON 配置。 |
 | `cargo run -- db sync` | [x] | 根据 SeaORM entities 同步 SQLite schema。 |
-| `cargo run -- source list` | [ ] | CLI source 列表处理逻辑。 |
-| `cargo run -- source add ...` | [ ] | CLI source 创建处理逻辑。 |
-| `cargo run -- source test ...` | [ ] | CLI source 校验处理逻辑。 |
-| `cargo run -- sync run ...` | [ ] | CLI 一次性同步处理逻辑。 |
-| `cargo run -- sync status` | [ ] | CLI 同步状态处理逻辑。 |
+| `cargo run -- source list` | [x] | 从 SQLite 列出已配置 sources。 |
+| `cargo run -- source add --name docs --service fs --root ./docs` | [x] | 创建 OpenDAL filesystem source。 |
+| `cargo run -- source test --id <source-id>` | [x] | 校验 source 并持久化健康状态。 |
+| `cargo run -- job add --source-id <source-id> --name docs --interval 300` | [x] | 创建手动或固定间隔 sync job。 |
+| `cargo run -- job list` | [x] | 列出 sync jobs。 |
+| `cargo run -- sync run --job-id <job-id>` | [x] | 立即运行一个 sync job。 |
+| `cargo run -- sync status` | [x] | 输出 sync run 状态摘要。 |
 
 ## 功能清单
 
@@ -87,8 +90,8 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 标准库文件系统路径
 - [x] `Cargo.toml` 中启用严格 Rust 和 Clippy lint
 - [x] Release profile 启用 LTO 和符号裁剪
-- [ ] serve 模式内置后台调度器
-- [ ] 运行时设置持久化和修改
+- [x] serve 模式内置后台调度器
+- [x] 运行时设置持久化和修改
 - [ ] 远程多用户部署模式
 - [ ] 认证和授权
 
@@ -104,7 +107,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] `sync_error` 记录
 - [x] 面向同步引擎测试的 repository 抽象
 - [x] SeaORM repository 实现
-- [ ] 配置文件之外的持久化 app settings
+- [x] 配置文件之外的持久化 app settings
 - [ ] 显式 schema migration
 - [ ] 数据库清理或保留策略
 
@@ -152,8 +155,8 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Connector 级失败会让 run 失败
 - [x] Run summary 记录 processed、synced、skipped、failed 和 byte count
 - [ ] 有界并发文件同步
-- [ ] Job 级并发控制
-- [ ] 定时同步任务
+- [x] Job 级并发控制
+- [x] 定时同步任务
 - [ ] 从 connector cursor 恢复
 - [ ] 临时性 connector 错误重试策略
 - [ ] 冲突处理
@@ -176,10 +179,10 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 未匹配的 `/api/*` 路由保持 JSON 错误形态
 - [x] `POST /api/sources/{id}/test`
 - [x] 结构化请求日志 middleware
-- [ ] `POST /api/jobs`
-- [ ] `GET /api/runs/{id}`
-- [ ] 按 source 或 status 过滤 item 列表
-- [ ] `PATCH /api/settings`
+- [x] `POST /api/jobs`
+- [x] `GET /api/runs/{id}`
+- [x] 按 source 或 status 过滤 item 列表
+- [x] `PATCH /api/settings`
 - [ ] OpenAPI specification
 
 ### Web 控制台
@@ -198,10 +201,10 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Settings 页面
 - [x] 状态徽标和紧凑型运营表格
 - [x] API client 带 mock fallback，方便本地 API 不可用时预览
-- [ ] 所有展示控件完全接入 live API
+- [x] MVP 工作流控件接入 live API
 - [x] Source test action 接入 API route
-- [ ] Settings save 接入 API route
-- [ ] Run detail endpoint 集成
+- [x] Settings save 接入 API route
+- [x] Run detail endpoint 集成
 - [ ] 键盘和屏幕阅读器可访问性检查
 - [ ] 浏览器截图回归检查
 
