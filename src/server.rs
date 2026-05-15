@@ -60,6 +60,21 @@ pub async fn sync_database(config_path: Option<PathBuf>) -> AppResult<()> {
     sync_schema(&db).await
 }
 
+/// Opens the configured database and returns a repository ready for commands.
+///
+/// # Errors
+///
+/// Returns an error when config loading, database connection, or schema sync fails.
+pub async fn open_repository(
+    config_path: Option<PathBuf>,
+) -> AppResult<(AppConfig, Arc<SeaOrmRepository>)> {
+    let config = load_config(config_path.as_deref()).await?;
+    let db = connect_sqlite(&config).await?;
+    sync_schema(&db).await?;
+
+    Ok((config, Arc::new(SeaOrmRepository::new(db))))
+}
+
 async fn load_config(path: Option<&Path>) -> AppResult<AppConfig> {
     let Some(path) = path else {
         return Ok(AppConfig::default());
