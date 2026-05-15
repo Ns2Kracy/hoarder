@@ -36,6 +36,18 @@ impl ApiError {
         Self::new(StatusCode::NOT_FOUND, "NOT_FOUND", message.into())
     }
 
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::CONFLICT, "CONFLICT", message.into())
+    }
+
+    pub fn unprocessable(message: impl Into<String>) -> Self {
+        Self::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "UNPROCESSABLE_ENTITY",
+            message.into(),
+        )
+    }
+
     const fn new(status: StatusCode, code: &'static str, message: String) -> Self {
         Self {
             status,
@@ -55,6 +67,7 @@ impl From<AppError> for ApiError {
             AppError::Connector(message) => {
                 Self::new(StatusCode::BAD_GATEWAY, "CONNECTOR_ERROR", message)
             }
+            AppError::Conflict(message) => Self::conflict(message),
             AppError::Database(_) | AppError::Io(_) => Self::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",
@@ -63,6 +76,7 @@ impl From<AppError> for ApiError {
             AppError::NotFound(message) => Self::not_found(message),
             AppError::Path(message) => Self::new(StatusCode::BAD_REQUEST, "PATH_ERROR", message),
             AppError::Validation(message) => Self::validation(message),
+            AppError::Unprocessable(message) => Self::unprocessable(message),
         }
     }
 }

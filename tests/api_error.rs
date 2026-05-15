@@ -40,6 +40,32 @@ async fn api_error_serializes_not_found_errors() {
 }
 
 #[tokio::test]
+async fn api_error_serializes_conflict_errors() {
+    let response =
+        ApiError::from(AppError::Conflict("job is already running".to_owned())).into_response();
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let body = response_json(response).await;
+
+    assert_eq!(body["error"]["code"], json!("CONFLICT"));
+    assert_eq!(body["error"]["message"], json!("job is already running"));
+}
+
+#[tokio::test]
+async fn api_error_serializes_unprocessable_errors() {
+    let response = ApiError::from(AppError::Unprocessable(
+        "interval must be positive".to_owned(),
+    ))
+    .into_response();
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = response_json(response).await;
+
+    assert_eq!(body["error"]["code"], json!("UNPROCESSABLE_ENTITY"));
+    assert_eq!(body["error"]["message"], json!("interval must be positive"));
+}
+
+#[tokio::test]
 async fn api_error_hides_internal_io_error_details() {
     let response = ApiError::from(AppError::Io(std::io::Error::new(
         std::io::ErrorKind::PermissionDenied,

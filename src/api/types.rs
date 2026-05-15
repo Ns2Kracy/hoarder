@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    config::AppConfig,
+    config::{AppConfig, RuntimeSettings},
     connectors::traits::ConnectorConfig,
     core::types::{
         ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
@@ -166,7 +166,10 @@ pub struct JobDto {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum JobScheduleDto {
     Manual,
-    Interval { interval_seconds: u64 },
+    Interval {
+        #[serde(rename = "intervalSeconds", alias = "interval_seconds")]
+        interval_seconds: u64,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -302,6 +305,24 @@ impl From<&AppConfig> for SettingsDto {
                 database_path: true,
                 vault_path: true,
                 listen_addr: true,
+            },
+        }
+    }
+}
+
+impl From<RuntimeSettings> for SettingsDto {
+    fn from(settings: RuntimeSettings) -> Self {
+        Self {
+            database_path: settings.database_path,
+            vault_path: settings.vault_path,
+            listen_addr: settings.listen_addr,
+            job_concurrency: settings.job_concurrency,
+            file_concurrency: settings.file_concurrency,
+            log_level: settings.log_level,
+            read_only: ReadOnlySettingsDto {
+                database_path: settings.read_only.database_path,
+                vault_path: settings.read_only.vault_path,
+                listen_addr: settings.read_only.listen_addr,
             },
         }
     }

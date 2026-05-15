@@ -10,6 +10,9 @@ pub enum AppError {
     #[error("connector error: {0}")]
     Connector(String),
 
+    #[error("conflict: {0}")]
+    Conflict(String),
+
     #[error("database error: {0}")]
     Database(String),
 
@@ -24,4 +27,7 @@ pub enum AppError {
 
     #[error("validation error: {0}")]
     Validation(String),
+
+    #[error("unprocessable entity: {0}")]
+    Unprocessable(String),
 }

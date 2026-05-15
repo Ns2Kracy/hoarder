@@ -1,34 +1,24 @@
 use axum::{
     Json, Router,
     extract::{
-        Path, State,
+        Path, Query, State,
         rejection::{JsonRejection, PathRejection},
     },
     http::StatusCode,
     routing::{get, post},
 };
-use chrono::Utc;
-use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder};
-use std::sync::Arc;
 
 use crate::{
-    AppError, AppResult,
-    connectors::{opendal::source::OpenDalSourceConnector, traits::SourceConnector},
-    core::types::{ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, SourceId, SyncStatus},
-    db::repository::{NewSource, SourceRepository},
-    entity::{sync_error, sync_item, sync_job, sync_run},
-    sync::{engine::SyncEngine, repository::SyncRepository, vault_writer::VaultWriter},
+    api::types::{
+        CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
+        ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
+        SourceDto, SourceTestResponse, SyncErrorDto, UpdateSettingsRequest,
+    },
+    app::{job_service, run_service, settings_service, source_service},
+    core::types::{JobId, RunId, SourceId},
 };
 
-use super::{
-    error::ApiError,
-    state::ApiState,
-    types::{
-        CreateSourceRequest, HealthResponse, ItemDto, JobDto, JobRunResponse, JobScheduleDto,
-        ListResponse, RunDto, SettingsDto, SourceDto, SourceHealth, SourceTestResponse,
-        SyncErrorDto,
-    },
-};
+use super::{error::ApiError, state::ApiState};
 
 pub fn router(state: ApiState) -> Router {
     api_routes_without_state()
@@ -45,12 +35,13 @@ fn api_routes_without_state() -> Router<ApiState> {
         .route("/api/health", get(health))
         .route("/api/sources", get(list_sources).post(create_source))
         .route("/api/sources/{id}/test", post(test_source))
-        .route("/api/jobs", get(list_jobs))
+        .route("/api/jobs", get(list_jobs).post(create_job))
         .route("/api/jobs/{id}/run", post(run_job))
         .route("/api/runs", get(list_runs))
+        .route("/api/runs/{id}", get(get_run_detail))
         .route("/api/items", get(list_items))
         .route("/api/errors", get(list_errors))
-        .route("/api/settings", get(settings))
+        .route("/api/settings", get(settings).patch(update_settings))
 }
 
 async fn health() -> Json<HealthResponse> {
@@ -60,23 +51,9 @@ async fn health() -> Json<HealthResponse> {
 async fn list_sources(
     State(state): State<ApiState>,
 ) -> Result<Json<ListResponse<SourceDto>>, ApiError> {
-    let records = state.repository().list_sources().await?;
-    let sources = records
-        .into_iter()
-        .map(|record| {
-            let config = connector_config_from_json(record.id, record.config_json)?;
-            Ok(SourceDto::new(
-                record.id,
-                record.name,
-                &config,
-                record.enabled,
-                SourceHealth::from_record(record.enabled, record.last_check_status.as_deref()),
-                record.last_checked_at,
-            ))
-        })
-        .collect::<AppResult<Vec<_>>>()?;
-
-    Ok(Json(ListResponse::new(sources)))
+    Ok(Json(ListResponse::new(
+        source_service::list_sources(state.repository()).await?,
+    )))
 }
 
 async fn create_source(
@@ -84,31 +61,7 @@ async fn create_source(
     payload: Result<Json<CreateSourceRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<SourceDto>), ApiError> {
     let Json(request) = payload?;
-    let CreateSourceRequest {
-        name,
-        config,
-        enabled,
-    } = request;
-    let config_json = serde_json::to_value(&config).map_err(|error| {
-        AppError::Database(format!("failed to serialize connector config: {error}"))
-    })?;
-    let record = state
-        .repository()
-        .create_source(NewSource {
-            name,
-            kind: config.kind(),
-            config_json,
-            enabled,
-        })
-        .await?;
-    let source = SourceDto::new(
-        record.id,
-        record.name,
-        &config,
-        record.enabled,
-        SourceHealth::from_record(record.enabled, record.last_check_status.as_deref()),
-        record.last_checked_at,
-    );
+    let source = source_service::create_source(state.repository(), request).await?;
 
     Ok((StatusCode::CREATED, Json(source)))
 }
@@ -118,50 +71,26 @@ async fn test_source(
     path: Result<Path<SourceId>, PathRejection>,
 ) -> Result<Json<SourceTestResponse>, ApiError> {
     let Path(source_id) = path?;
-    let source = state.repository().load_source(source_id).await?;
-    let config = connector_config_from_json(source.id, source.config_json)?;
-    let checked_at = Utc::now();
 
-    validate_source_connector(source.kind, source.id, &config).await?;
-    update_source_check(
-        state.repository().connection(),
-        source_id,
-        "healthy",
-        checked_at,
-    )
-    .await?;
-
-    Ok(Json(SourceTestResponse {
-        ok: true,
-        checked_at,
-    }))
+    Ok(Json(
+        source_service::test_source(state.repository(), source_id).await?,
+    ))
 }
 
 async fn list_jobs(State(state): State<ApiState>) -> Result<Json<ListResponse<JobDto>>, ApiError> {
-    let jobs = sync_job::Entity::find()
-        .order_by_asc(sync_job::Column::Name)
-        .all(state.repository().connection())
-        .await
-        .map_err(map_db_error)?;
-    let jobs = jobs
-        .into_iter()
-        .map(|job| {
-            Ok(JobDto {
-                id: JobId::from_uuid(job.id),
-                source_id: SourceId::from_uuid(job.source_id),
-                name: job.name,
-                enabled: job.enabled,
-                schedule: JobScheduleDto::Manual,
-                status: job_status_from_str(&job.status)?,
-                last_run_at: job.last_run_at,
-                last_run_status: None,
-                last_run_id: None,
-                next_run_at: None,
-            })
-        })
-        .collect::<AppResult<Vec<_>>>()?;
+    Ok(Json(ListResponse::new(
+        job_service::list_jobs(state.repository()).await?,
+    )))
+}
 
-    Ok(Json(ListResponse::new(jobs)))
+async fn create_job(
+    State(state): State<ApiState>,
+    payload: Result<Json<CreateJobRequest>, JsonRejection>,
+) -> Result<(StatusCode, Json<JobDto>), ApiError> {
+    let Json(request) = payload?;
+    let job = job_service::create_job(state.repository(), request).await?;
+
+    Ok((StatusCode::CREATED, Json(job)))
 }
 
 async fn run_job(
@@ -169,230 +98,69 @@ async fn run_job(
     path: Result<Path<JobId>, PathRejection>,
 ) -> Result<Json<JobRunResponse>, ApiError> {
     let Path(job_id) = path?;
-    let job = state.repository().load_job(job_id).await?;
-    let source_id = job.source_id;
-    let engine = SyncEngine::new(
-        Arc::clone(state.repository()),
-        Arc::new(move |kind| source_connector(kind, source_id)),
-        VaultWriter::new(state.vault_path()),
-    );
-    let summary = engine.run_job(job_id).await?;
 
-    Ok(Json(JobRunResponse {
-        run_id: summary.run_id,
-        status: if summary.failed == 0 {
-            SyncStatus::Synced
-        } else {
-            SyncStatus::Failed
-        },
-    }))
+    Ok(Json(
+        job_service::run_job(
+            std::sync::Arc::clone(state.repository()),
+            state.vault_path(),
+            job_id,
+        )
+        .await?,
+    ))
 }
 
 async fn list_runs(State(state): State<ApiState>) -> Result<Json<ListResponse<RunDto>>, ApiError> {
-    let runs = sync_run::Entity::find()
-        .order_by_desc(sync_run::Column::StartedAt)
-        .all(state.repository().connection())
-        .await
-        .map_err(map_db_error)?;
-    let runs = runs
-        .into_iter()
-        .map(|run| {
-            Ok(RunDto {
-                id: RunId::from_uuid(run.id),
-                job_id: JobId::from_uuid(run.job_id),
-                status: run_status_from_str(&run.status)?,
-                started_at: Some(run.started_at),
-                finished_at: run.finished_at,
-                processed_count: i64_to_u64(run.processed_count, "processed_count")?,
-                synced_count: i64_to_u64(run.synced_count, "synced_count")?,
-                skipped_count: i64_to_u64(run.skipped_count, "skipped_count")?,
-                failed_count: i64_to_u64(run.failed_count, "failed_count")?,
-            })
-        })
-        .collect::<AppResult<Vec<_>>>()?;
+    Ok(Json(ListResponse::new(
+        run_service::list_runs(state.repository()).await?,
+    )))
+}
 
-    Ok(Json(ListResponse::new(runs)))
+async fn get_run_detail(
+    State(state): State<ApiState>,
+    path: Result<Path<RunId>, PathRejection>,
+) -> Result<Json<RunDetailDto>, ApiError> {
+    let Path(run_id) = path?;
+
+    Ok(Json(
+        run_service::get_run_detail(state.repository(), run_id).await?,
+    ))
 }
 
 async fn list_items(
     State(state): State<ApiState>,
+    Query(query): Query<ItemListQuery>,
 ) -> Result<Json<ListResponse<ItemDto>>, ApiError> {
-    let items = sync_item::Entity::find()
-        .order_by_asc(sync_item::Column::SourcePath)
-        .all(state.repository().connection())
-        .await
-        .map_err(map_db_error)?;
-    let items = items
-        .into_iter()
-        .map(|item| {
-            Ok(ItemDto {
-                id: ItemId::from_uuid(item.id),
-                source_id: SourceId::from_uuid(item.source_id),
-                source_path: item.source_path,
-                item_type: item_type_from_str(&item.item_type)?,
-                status: sync_status_from_str(&item.status)?,
-                size: item
-                    .size
-                    .map(|size| i64_to_u64(size, "sync_item.size"))
-                    .transpose()?,
-                etag: item.etag,
-                modified_at: item.modified_at,
-                content_hash: item.content_hash,
-                metadata_json: item.metadata_json,
-            })
-        })
-        .collect::<AppResult<Vec<_>>>()?;
-
-    Ok(Json(ListResponse::new(items)))
+    Ok(Json(ListResponse::new(
+        run_service::list_items(state.repository(), query).await?,
+    )))
 }
 
 async fn list_errors(
     State(state): State<ApiState>,
+    Query(query): Query<ErrorListQuery>,
 ) -> Result<Json<ListResponse<SyncErrorDto>>, ApiError> {
-    let errors = sync_error::Entity::find()
-        .order_by_desc(sync_error::Column::CreatedAt)
-        .all(state.repository().connection())
-        .await
-        .map_err(map_db_error)?;
-    let errors = errors
-        .into_iter()
-        .map(|error| SyncErrorDto {
-            id: error.id.to_string(),
-            run_id: error.run_id.map(RunId::from_uuid),
-            source_id: Some(SourceId::from_uuid(error.source_id)),
-            source_path: error.source_path,
-            code: error.error_kind,
-            message: error.message,
-            created_at: Some(error.created_at),
-        })
-        .collect();
-
-    Ok(Json(ListResponse::new(errors)))
+    Ok(Json(ListResponse::new(
+        run_service::list_errors(state.repository(), query).await?,
+    )))
 }
 
 async fn settings(State(state): State<ApiState>) -> Result<Json<SettingsDto>, ApiError> {
-    Ok(Json(SettingsDto::from(state.config())))
+    Ok(Json(
+        settings_service::get_settings(state.repository(), state.config()).await?,
+    ))
+}
+
+async fn update_settings(
+    State(state): State<ApiState>,
+    payload: Result<Json<UpdateSettingsRequest>, JsonRejection>,
+) -> Result<Json<SettingsDto>, ApiError> {
+    let Json(request) = payload?;
+
+    Ok(Json(
+        settings_service::update_settings(state.repository(), state.config(), request).await?,
+    ))
 }
 
 async fn api_not_found() -> ApiError {
     ApiError::not_found("API route not found")
-}
-
-async fn validate_source_connector(
-    kind: ConnectorKind,
-    source_id: SourceId,
-    config: &crate::connectors::traits::ConnectorConfig,
-) -> AppResult<()> {
-    match kind {
-        ConnectorKind::OpenDal => {
-            OpenDalSourceConnector::new(source_id)
-                .validate(config)
-                .await?;
-            Ok(())
-        }
-        kind => Err(AppError::NotFound(format!(
-            "connector factory not registered for {kind:?}"
-        ))),
-    }
-}
-
-fn source_connector(
-    kind: ConnectorKind,
-    source_id: SourceId,
-) -> AppResult<Arc<dyn SourceConnector>> {
-    match kind {
-        ConnectorKind::OpenDal => {
-            Ok(Arc::new(OpenDalSourceConnector::new(source_id)) as Arc<dyn SourceConnector>)
-        }
-        kind => Err(AppError::NotFound(format!(
-            "connector factory not registered for {kind:?}"
-        ))),
-    }
-}
-
-fn connector_config_from_json(
-    source_id: SourceId,
-    config_json: serde_json::Value,
-) -> AppResult<crate::connectors::traits::ConnectorConfig> {
-    serde_json::from_value(config_json).map_err(|error| {
-        AppError::Database(format!(
-            "invalid connector config for source {source_id}: {error}"
-        ))
-    })
-}
-
-fn item_type_from_str(item_type: &str) -> AppResult<ItemType> {
-    match item_type {
-        "file" => Ok(ItemType::File),
-        "directory" => Ok(ItemType::Directory),
-        "virtual_document" => Ok(ItemType::VirtualDocument),
-        other => Err(AppError::Database(format!(
-            "unknown item type stored in database: {other}"
-        ))),
-    }
-}
-
-fn sync_status_from_str(status: &str) -> AppResult<SyncStatus> {
-    match status {
-        "pending" => Ok(SyncStatus::Pending),
-        "synced" => Ok(SyncStatus::Synced),
-        "failed" => Ok(SyncStatus::Failed),
-        "skipped" => Ok(SyncStatus::Skipped),
-        "deleted_on_source" => Ok(SyncStatus::DeletedOnSource),
-        other => Err(AppError::Database(format!(
-            "unknown sync status stored in database: {other}"
-        ))),
-    }
-}
-
-fn run_status_from_str(status: &str) -> AppResult<SyncStatus> {
-    match status {
-        "running" => Ok(SyncStatus::Pending),
-        "completed" => Ok(SyncStatus::Synced),
-        "completed_with_failures" | "failed" => Ok(SyncStatus::Failed),
-        other => Err(AppError::Database(format!(
-            "unknown run status stored in database: {other}"
-        ))),
-    }
-}
-
-fn job_status_from_str(status: &str) -> AppResult<JobStatus> {
-    match status {
-        "idle" => Ok(JobStatus::Idle),
-        "running" => Ok(JobStatus::Running),
-        "paused" => Ok(JobStatus::Paused),
-        "failed" => Ok(JobStatus::Failed),
-        other => Err(AppError::Database(format!(
-            "unknown job status stored in database: {other}"
-        ))),
-    }
-}
-
-fn i64_to_u64(value: i64, field: &str) -> AppResult<u64> {
-    u64::try_from(value).map_err(|_| AppError::Database(format!("{field} is negative: {value}")))
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn map_db_error(error: sea_orm::DbErr) -> AppError {
-    AppError::Database(error.to_string())
-}
-
-async fn update_source_check(
-    db: &sea_orm::DatabaseConnection,
-    source_id: SourceId,
-    status: &str,
-    checked_at: chrono::DateTime<Utc>,
-) -> AppResult<()> {
-    let source = crate::entity::source::Entity::find_by_id(source_id.as_uuid())
-        .one(db)
-        .await
-        .map_err(map_db_error)?
-        .ok_or_else(|| AppError::NotFound(format!("source not found: {source_id}")))?;
-    let mut active_model: crate::entity::source::ActiveModel = source.into();
-    active_model.last_check_status = sea_orm::ActiveValue::Set(Some(status.to_owned()));
-    active_model.last_checked_at = sea_orm::ActiveValue::Set(Some(checked_at));
-    active_model.updated_at = sea_orm::ActiveValue::Set(Utc::now());
-    active_model.update(db).await.map_err(map_db_error)?;
-
-    Ok(())
 }

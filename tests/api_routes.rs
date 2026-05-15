@@ -18,7 +18,9 @@ use hoarder::{
         },
         schema::sync_schema,
     },
+    entity::sync_job,
 };
+use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::{Value, json};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -67,6 +69,8 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
     let settings = request(test.app.clone(), "GET", "/api/settings", None).await;
     assert_eq!(settings.status, 200);
     assert_eq!(settings.body["listenAddr"], json!("127.0.0.1:4761"));
+    assert_eq!(settings.body["logLevel"], json!("info"));
+    assert_eq!(settings.body["readOnly"]["vaultPath"], json!(true));
 }
 
 #[tokio::test]
@@ -84,6 +88,36 @@ async fn api_routes_run_job_runs_sync_engine() {
     assert_eq!(response.status, 200);
     assert_eq!(response.body["status"], json!("synced"));
     assert!(response.body["runId"].as_str().is_some());
+
+    let run_id = response.body["runId"].as_str().unwrap();
+    let detail = request(
+        test.app.clone(),
+        "GET",
+        &format!("/api/runs/{run_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(detail.status, 200);
+    assert_eq!(detail.body["id"], json!(run_id));
+    assert_eq!(detail.body["sourceName"], json!("Local Docs"));
+    assert_eq!(detail.body["jobName"], json!("Default sync"));
+    assert_eq!(detail.body["status"], json!("completed"));
+
+    let items = request(
+        test.app.clone(),
+        "GET",
+        &format!("/api/items?runId={run_id}&status=synced"),
+        None,
+    )
+    .await;
+    assert_eq!(items.status, 200);
+    assert!(
+        items.body["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["sourcePath"] == json!("readme.md"))
+    );
 }
 
 #[tokio::test]
@@ -105,6 +139,53 @@ async fn api_routes_test_source_checks_repository() {
     assert_eq!(sources.status, 200);
     assert_eq!(sources.body["data"][0]["health"], json!("healthy"));
     assert!(sources.body["data"][0]["lastCheckedAt"].as_str().is_some());
+}
+
+#[tokio::test]
+async fn api_routes_create_job_patches_settings_and_rejects_running_job() {
+    let test = TestApp::new().await;
+    let create_job = request(
+        test.app.clone(),
+        "POST",
+        "/api/jobs",
+        Some(&format!(
+            r#"{{
+                "sourceId":"{}",
+                "name":"Five minute sync",
+                "enabled":true,
+                "schedule":{{"kind":"interval","intervalSeconds":300}}
+            }}"#,
+            test.source_id
+        )),
+    )
+    .await;
+    assert_eq!(create_job.status, 201);
+    assert_eq!(create_job.body["schedule"]["kind"], json!("interval"));
+    assert_eq!(create_job.body["schedule"]["intervalSeconds"], json!(300));
+    assert_eq!(create_job.body["status"], json!("idle"));
+
+    let settings = request(
+        test.app.clone(),
+        "PATCH",
+        "/api/settings",
+        Some(r#"{"jobConcurrency":2,"fileConcurrency":8,"logLevel":"debug"}"#),
+    )
+    .await;
+    assert_eq!(settings.status, 200);
+    assert_eq!(settings.body["jobConcurrency"], json!(2));
+    assert_eq!(settings.body["fileConcurrency"], json!(8));
+    assert_eq!(settings.body["logLevel"], json!("debug"));
+
+    set_job_running(&test.repository, test.job_id).await;
+    let conflict = request(
+        test.app.clone(),
+        "POST",
+        &format!("/api/jobs/{}/run", test.job_id),
+        Some(""),
+    )
+    .await;
+    assert_eq!(conflict.status, 409);
+    assert_eq!(conflict.body["error"]["code"], json!("CONFLICT"));
 }
 
 #[derive(Clone)]
@@ -184,6 +265,7 @@ fn decode_chunked(mut body: &[u8]) -> Vec<u8> {
 
 struct TestApp {
     app: Router,
+    repository: Arc<SeaOrmRepository>,
     source_id: SourceId,
     job_id: JobId,
     source_root: PathBuf,
@@ -224,16 +306,28 @@ impl TestApp {
             vault_path: vault_root,
             ..AppConfig::default()
         };
-        let state = ApiState::new(repository, config);
+        let state = ApiState::new(Arc::clone(&repository), config);
 
         Self {
             app: router(state),
+            repository,
             source_id: source.id,
             job_id: job.id,
             source_root,
             _temp: temp,
         }
     }
+}
+
+async fn set_job_running(repository: &SeaOrmRepository, job_id: JobId) {
+    let job = sync_job::Entity::find_by_id(job_id.as_uuid())
+        .one(repository.connection())
+        .await
+        .unwrap()
+        .unwrap();
+    let mut active_model: sync_job::ActiveModel = job.into();
+    active_model.status = Set("running".to_owned());
+    active_model.update(repository.connection()).await.unwrap();
 }
 
 fn fs_config(root: &Path) -> ConnectorConfig {
