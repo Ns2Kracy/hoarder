@@ -1,13 +1,18 @@
-import { derived, writable } from "svelte/store";
+import { derived, get, writable } from "svelte/store";
 import { api } from "./api";
 import type {
   ApiData,
   ConsoleSummary,
+  ErrorFilters,
+  ItemFilters,
+  JobFormInput,
   Loadable,
   SettingsDto,
   SettingsUpdate,
   SourceDto,
   SourceFormInput,
+  SyncErrorDto,
+  SyncItemDto,
   SyncJobDto,
   SyncRunDto,
 } from "./types";
@@ -41,6 +46,9 @@ const defaultSettings: SettingsDto = {
 export const sources = writable<Loadable<SourceDto[]>>(emptyList());
 export const jobs = writable<Loadable<SyncJobDto[]>>(emptyList());
 export const runs = writable<Loadable<SyncRunDto[]>>(emptyList());
+export const selectedRunDetail = writable<Loadable<SyncRunDto | undefined>>(emptyValue(undefined));
+export const runItems = writable<Loadable<SyncItemDto[]>>(emptyList());
+export const runErrors = writable<Loadable<SyncErrorDto[]>>(emptyList());
 export const settings = writable<Loadable<SettingsDto>>(emptyValue(defaultSettings));
 
 export const summary = derived([sources, jobs, runs], ([$sources, $jobs, $runs]) =>
@@ -127,30 +135,77 @@ export async function testSourceConnection(sourceId: string) {
   }));
 }
 
-export async function triggerJobRun(jobId: string) {
-  const result = await api.runJob(jobId);
-  runs.update((current) => ({
+export async function createJob(input: JobFormInput) {
+  const result = await api.createJob(input, get(sources).data);
+  jobs.update((current) => ({
     ...current,
     status: "ready",
     origin: result.origin,
     error: result.error,
-    data: [result.data, ...current.data],
+    data: [result.data, ...current.data.filter((job) => job.id !== result.data.id)],
     updatedAt: new Date().toISOString(),
   }));
-  jobs.update((current) => ({
-    ...current,
-    origin: result.origin,
-    error: result.error,
-    data: current.data.map((job) =>
-      job.id === jobId
-        ? {
-            ...job,
-            status: "running",
-            lastRunAt: result.data.startedAt,
-            lastRunStatus: result.data.status,
-          }
-        : job,
+}
+
+export async function triggerJobRun(jobId: string) {
+  const runResult = await api.runJob(jobId, get(jobs).data);
+  const jobResult = await api.getJobs(get(sources).data);
+  const runListResult = await api.getRuns(jobResult.data);
+  const refreshedRuns = upsertRun(runListResult.data, runResult.data);
+
+  runs.set(
+    applyResult(
+      {
+        ...runListResult,
+        data: refreshedRuns,
+        error: runListResult.error ?? runResult.error,
+      },
+      statusFor({ ...runListResult, data: refreshedRuns }),
     ),
+  );
+  jobs.set(
+    applyResult(
+      {
+        ...jobResult,
+        error: jobResult.error ?? runResult.error,
+      },
+      statusFor(jobResult),
+    ),
+  );
+}
+
+export async function loadRunDetail(runId: string, filters: Omit<ItemFilters, "runId"> = {}) {
+  selectedRunDetail.update((current) => ({ ...current, status: "loading" }));
+  runItems.update((current) => ({ ...current, status: "loading" }));
+  runErrors.update((current) => ({ ...current, status: "loading" }));
+
+  const itemFilters: ItemFilters = { ...filters, runId };
+  const errorFilters: ErrorFilters = {
+    runId,
+    sourceId: filters.sourceId,
+  };
+  const [detailResult, itemResult, errorResult] = await Promise.all([
+    api.getRunDetail(runId, get(jobs).data, get(runs).data),
+    api.getItems(itemFilters),
+    api.getErrors(errorFilters),
+  ]);
+  const detail = {
+    ...detailResult.data,
+    errors: errorResult.data,
+  };
+
+  selectedRunDetail.set(
+    applyResult({
+      ...detailResult,
+      data: detail,
+      error: detailResult.error ?? errorResult.error,
+    }),
+  );
+  runItems.set(applyResult(itemResult, statusFor(itemResult)));
+  runErrors.set(applyResult(errorResult, statusFor(errorResult)));
+  runs.update((current) => ({
+    ...current,
+    data: upsertRun(current.data, detail),
     updatedAt: new Date().toISOString(),
   }));
 }
@@ -193,4 +248,8 @@ function estimateVaultSize(syncedItems: number) {
 
 export function isEmptyLoadable<T>(loadable: Loadable<T[]>) {
   return loadable.status === "empty" || (loadable.status === "ready" && loadable.data.length === 0);
+}
+
+function upsertRun(runList: SyncRunDto[], run: SyncRunDto) {
+  return [run, ...runList.filter((candidate) => candidate.id !== run.id)];
 }

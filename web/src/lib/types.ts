@@ -94,6 +94,7 @@ export interface SyncJobDto {
   id: string;
   sourceId: string;
   sourceName: string;
+  name: string;
   schedule: JobSchedule;
   scheduleLabel: string;
   enabled: boolean;
@@ -102,6 +103,13 @@ export interface SyncJobDto {
   lastRunAt?: string;
   lastRunStatus?: RunStatus;
   lastRunId?: string;
+}
+
+export interface JobFormInput {
+  sourceId: string;
+  name: string;
+  enabled: boolean;
+  schedule: JobSchedule;
 }
 
 export interface RunCounts {
@@ -114,12 +122,13 @@ export interface RunCounts {
 
 export interface SyncErrorDto {
   id: string;
-  runId: string;
+  runId?: string;
+  sourceId?: string;
   sourcePath?: string;
   code: string;
   message: string;
   details?: Record<string, unknown>;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface SyncRunDto {
@@ -134,6 +143,32 @@ export interface SyncRunDto {
   durationMs?: number;
   counts: RunCounts;
   errors: SyncErrorDto[];
+}
+
+export type ItemType = "file" | "directory" | "virtual_document";
+
+export interface SyncItemDto {
+  id: string;
+  sourceId: string;
+  sourcePath: string;
+  itemType: ItemType;
+  status: ItemSyncStatus;
+  size?: number;
+  etag?: string;
+  modifiedAt?: string;
+  contentHash?: string;
+  metadataJson?: unknown;
+}
+
+export interface ItemFilters {
+  runId?: string;
+  sourceId?: string;
+  status?: ItemSyncStatus;
+}
+
+export interface ErrorFilters {
+  runId?: string;
+  sourceId?: string;
 }
 
 export interface SettingsDto {

@@ -4,14 +4,46 @@
     import RunSummaryTable from "../components/RunSummaryTable.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { formatDateTime, formatDuration } from "../lib/format";
-    import type { Loadable, SyncRunDto } from "../lib/types";
+    import type {
+        Loadable,
+        SyncItemDto,
+        SyncRunDto,
+    } from "../lib/types";
 
-    let { runs }: { runs: Loadable<SyncRunDto[]> } = $props();
+    let {
+        runs,
+        selectedRunDetail,
+        runItems,
+        onSelectRun,
+    }: {
+        runs: Loadable<SyncRunDto[]>;
+        selectedRunDetail: Loadable<SyncRunDto | undefined>;
+        runItems: Loadable<SyncItemDto[]>;
+        onSelectRun: (runId: string) => Promise<void> | void;
+    } = $props();
 
     let selectedRunId = $state<string | undefined>(undefined);
     let selectedRun = $derived(
-        runs.data.find((run) => run.id === selectedRunId) ?? runs.data[0],
+        selectedRunDetail.data ??
+            runs.data.find((run) => run.id === selectedRunId) ??
+            runs.data[0],
     );
+    let loadedRunId = $state<string | undefined>(undefined);
+
+    $effect(() => {
+        const nextRunId = selectedRunId ?? runs.data[0]?.id;
+        if (nextRunId && nextRunId !== loadedRunId) {
+            selectedRunId = nextRunId;
+            loadedRunId = nextRunId;
+            onSelectRun(nextRunId);
+        }
+    });
+
+    function selectRun(run: SyncRunDto) {
+        selectedRunId = run.id;
+        loadedRunId = run.id;
+        onSelectRun(run.id);
+    }
 </script>
 
 <section class="space-y-4">
@@ -36,7 +68,7 @@
             <RunSummaryTable
                 runs={runs.data}
                 selectedRunId={selectedRun?.id}
-                onSelect={(run) => (selectedRunId = run.id)}
+                onSelect={selectRun}
             />
         {/if}
     </section>
@@ -165,8 +197,38 @@
                     </div>
                 </div>
             {/if}
+
+            <div class="border-t border-zinc-200 p-3">
+                <h3 class="mb-2 text-sm font-semibold text-zinc-900">Items</h3>
+                {#if runItems.data.length === 0}
+                    <p class="text-sm text-zinc-500">No item records for this run.</p>
+                {:else}
+                    <div class="max-h-72 overflow-auto rounded-sm border border-zinc-200">
+                        <table class="min-w-full divide-y divide-zinc-200 text-left text-sm">
+                            <thead class="bg-zinc-50 text-xs uppercase tracking-normal text-zinc-500">
+                                <tr>
+                                    <th class="px-2 py-1.5 font-semibold">Path</th>
+                                    <th class="px-2 py-1.5 font-semibold">Type</th>
+                                    <th class="px-2 py-1.5 font-semibold">Status</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold">Size</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-zinc-100">
+                                {#each runItems.data as item (item.id)}
+                                    <tr>
+                                        <td class="max-w-[28rem] truncate px-2 py-1.5 font-mono text-xs text-zinc-800">{item.sourcePath}</td>
+                                        <td class="px-2 py-1.5 text-zinc-600">{item.itemType}</td>
+                                        <td class="px-2 py-1.5"><StatusBadge status={item.status} /></td>
+                                        <td class="px-2 py-1.5 text-right tabular-nums text-zinc-600">{item.size ?? "-"}</td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+            </div>
         </section>
     {/if}
 
-    <FallbackNotice error={runs.error} />
+    <FallbackNotice error={runs.error ?? selectedRunDetail.error ?? runItems.error} />
 </section>

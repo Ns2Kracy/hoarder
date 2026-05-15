@@ -1,12 +1,17 @@
 import type {
   ApiData,
   ApiErrorBody,
+  ErrorFilters,
   FrontendApiError,
+  ItemFilters,
+  JobFormInput,
   SettingsDto,
   SettingsUpdate,
   SourceDto,
   SourceFormInput,
   JobSchedule,
+  SyncErrorDto,
+  SyncItemDto,
   SyncJobDto,
   SyncRunDto,
 } from "./types";
@@ -77,6 +82,7 @@ const mockJobs: SyncJobDto[] = [
     id: "job-notes-hourly",
     sourceId: "src-local-notes",
     sourceName: "Local notes",
+    name: "Notes hourly",
     schedule: { kind: "interval", intervalSeconds: 3600 },
     scheduleLabel: "Every 60 minutes",
     enabled: true,
@@ -89,6 +95,7 @@ const mockJobs: SyncJobDto[] = [
     id: "job-s3-nightly",
     sourceId: "src-team-s3",
     sourceName: "Team S3 archive",
+    name: "S3 nightly",
     schedule: { kind: "interval", intervalSeconds: 86_400 },
     scheduleLabel: "Every 24 hours",
     enabled: true,
@@ -101,6 +108,7 @@ const mockJobs: SyncJobDto[] = [
     id: "job-webdav-paused",
     sourceId: "src-webdav-research",
     sourceName: "Research WebDAV",
+    name: "Research manual",
     schedule: { kind: "manual" },
     scheduleLabel: "Manual",
     enabled: false,
@@ -116,6 +124,7 @@ const mockRuns: SyncRunDto[] = [
     jobId: "job-s3-nightly",
     sourceId: "src-team-s3",
     sourceName: "Team S3 archive",
+    jobName: "S3 nightly",
     status: "running",
     startedAt: isoMinutesAgo(11),
     counts: {
@@ -129,6 +138,7 @@ const mockRuns: SyncRunDto[] = [
       {
         id: "err-s3-reserved-path",
         runId: "run-20260512-012",
+        sourceId: "src-team-s3",
         sourcePath: ".hoarder/tmp/leaked",
         code: "RESERVED_TARGET_PATH",
         message: "Source item cannot write under the reserved .hoarder directory.",
@@ -145,6 +155,7 @@ const mockRuns: SyncRunDto[] = [
     jobId: "job-notes-hourly",
     sourceId: "src-local-notes",
     sourceName: "Local notes",
+    jobName: "Notes hourly",
     status: "completed",
     startedAt: isoMinutesAgo(35),
     finishedAt: isoMinutesAgo(32),
@@ -163,6 +174,7 @@ const mockRuns: SyncRunDto[] = [
     jobId: "job-webdav-paused",
     sourceId: "src-webdav-research",
     sourceName: "Research WebDAV",
+    jobName: "Research manual",
     status: "failed",
     startedAt: isoMinutesAgo(1510),
     finishedAt: isoMinutesAgo(1500),
@@ -178,6 +190,7 @@ const mockRuns: SyncRunDto[] = [
       {
         id: "err-webdav-auth",
         runId: "run-20260511-025",
+        sourceId: "src-webdav-research",
         code: "CONNECTOR_AUTH_FAILED",
         message: "WebDAV token was rejected by the remote server.",
         details: {
@@ -187,6 +200,67 @@ const mockRuns: SyncRunDto[] = [
         createdAt: isoMinutesAgo(1501),
       },
     ],
+  },
+];
+
+const mockItems: SyncItemDto[] = [
+  {
+    id: "item-notes-readme",
+    sourceId: "src-local-notes",
+    sourcePath: "README.md",
+    itemType: "file",
+    status: "synced",
+    size: 8452,
+    modifiedAt: isoMinutesAgo(44),
+    metadataJson: {
+      runId: "run-20260512-011",
+    },
+  },
+  {
+    id: "item-notes-index",
+    sourceId: "src-local-notes",
+    sourcePath: "index.md",
+    itemType: "file",
+    status: "skipped",
+    size: 1298,
+    modifiedAt: isoMinutesAgo(80),
+    metadataJson: {
+      runId: "run-20260512-011",
+    },
+  },
+  {
+    id: "item-s3-reserved",
+    sourceId: "src-team-s3",
+    sourcePath: ".hoarder/tmp/leaked",
+    itemType: "file",
+    status: "failed",
+    size: 128,
+    modifiedAt: isoMinutesAgo(9),
+    metadataJson: {
+      runId: "run-20260512-012",
+    },
+  },
+  {
+    id: "item-s3-archive",
+    sourceId: "src-team-s3",
+    sourcePath: "archive/2026/report.pdf",
+    itemType: "file",
+    status: "synced",
+    size: 2_400_000,
+    modifiedAt: isoMinutesAgo(10),
+    metadataJson: {
+      runId: "run-20260512-012",
+    },
+  },
+  {
+    id: "item-s3-deleted",
+    sourceId: "src-team-s3",
+    sourcePath: "archive/old.csv",
+    itemType: "file",
+    status: "deleted_on_source",
+    metadataJson: {
+      runId: "run-20260512-012",
+    },
   },
 ];
 
@@ -322,9 +396,9 @@ interface BackendSourceDto {
 interface BackendJobDto {
   id: string;
   sourceId: string;
-  name: string;
+  name?: string;
   enabled: boolean;
-  schedule?: JobSchedule | null;
+  schedule?: JobSchedule | string | null;
   status?: SyncJobDto["status"] | null;
   nextRunAt?: string | null;
   lastRunAt?: string | null;
@@ -335,7 +409,7 @@ interface BackendJobDto {
 interface BackendRunDto {
   id: string;
   jobId: string;
-  status: "pending" | "synced" | "failed" | "skipped" | "deleted_on_source";
+  status: SyncRunDto["status"] | "pending" | "synced" | "skipped" | "deleted_on_source";
   startedAt?: string | null;
   finishedAt?: string | null;
   processedCount: number;
@@ -344,9 +418,47 @@ interface BackendRunDto {
   failedCount: number;
 }
 
+interface BackendRunDetailDto {
+  id: string;
+  jobId: string;
+  sourceId: string;
+  sourceName: string;
+  jobName?: string;
+  status: SyncRunDto["status"];
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  durationMs?: number | null;
+  counts: SyncRunDto["counts"];
+  errors: BackendSyncErrorDto[];
+}
+
 interface BackendJobRunResponse {
   runId: string;
-  status: "pending" | "synced" | "failed" | "skipped" | "deleted_on_source";
+  status: SyncRunDto["status"] | "pending" | "synced" | "failed" | "skipped" | "deleted_on_source";
+}
+
+interface BackendItemDto {
+  id: string;
+  sourceId: string;
+  sourcePath: string;
+  itemType: SyncItemDto["itemType"];
+  status: SyncItemDto["status"];
+  size?: number | null;
+  etag?: string | null;
+  modifiedAt?: string | null;
+  contentHash?: string | null;
+  metadataJson?: unknown;
+}
+
+interface BackendSyncErrorDto {
+  id: string;
+  runId?: string | null;
+  sourceId?: string | null;
+  sourcePath?: string | null;
+  code: string;
+  message: string;
+  details?: Record<string, unknown> | null;
+  createdAt?: string | null;
 }
 
 interface BackendSettingsDto {
@@ -431,13 +543,41 @@ export const api = {
       () => [...mockJobs],
     ),
 
-  runJob: async (jobId: string): Promise<ApiData<SyncRunDto>> =>
+  createJob: async (input: JobFormInput, sourceList?: SourceDto[]): Promise<ApiData<SyncJobDto>> =>
+    withMockFallback(
+      async () => {
+        const resolvedSources = sourceList ?? (await api.getSources()).data;
+        const sourceNames = new Map(resolvedSources.map((source) => [source.id, source.name]));
+        const response = await request<BackendJobDto>("/jobs", {
+          method: "POST",
+          body: JSON.stringify(toCreateJobRequest(input)),
+        });
+        return toJobDto(response, sourceNames);
+      },
+      () => {
+        const source = mockSources.find((candidate) => candidate.id === input.sourceId);
+        const created: SyncJobDto = {
+          id: `job-${Date.now()}`,
+          sourceId: input.sourceId,
+          sourceName: source?.name ?? input.sourceId,
+          name: input.name,
+          schedule: input.schedule,
+          scheduleLabel: scheduleLabel(input.schedule),
+          enabled: input.enabled,
+          status: input.enabled ? "idle" : "paused",
+        };
+        mockJobs.unshift(created);
+        return created;
+      },
+    ),
+
+  runJob: async (jobId: string, jobList?: SyncJobDto[]): Promise<ApiData<SyncRunDto>> =>
     withMockFallback(
       async () => {
         const response = await request<BackendJobRunResponse>(`/jobs/${jobId}/run`, {
           method: "POST",
         });
-        return runResponseToRunDto(jobId, response);
+        return runResponseToRunDto(jobId, response, jobList);
       },
       () => {
         const job = mockJobs.find((candidate) => candidate.id === jobId);
@@ -446,6 +586,7 @@ export const api = {
           jobId,
           sourceId: job?.sourceId ?? "unknown-source",
           sourceName: job?.sourceName ?? "Unknown source",
+          jobName: job?.name,
           status: "running",
           startedAt: new Date().toISOString(),
           counts: {
@@ -478,6 +619,43 @@ export const api = {
       () => [...mockRuns],
     ),
 
+  getRunDetail: (runId: string, jobList?: SyncJobDto[], runList?: SyncRunDto[]) =>
+    withMockFallback(
+      async () => {
+        const resolvedJobs = jobList ?? (await api.getJobs()).data;
+        const jobsById = new Map(resolvedJobs.map((job) => [job.id, job]));
+        return toRunDetailDto(await request<BackendRunDetailDto>(`/runs/${runId}`), jobsById);
+      },
+      () => {
+        const run =
+          mockRuns.find((candidate) => candidate.id === runId) ??
+          runList?.find((candidate) => candidate.id === runId);
+        return run ? cloneRun(run) : emptyRunDetail(runId);
+      },
+    ),
+
+  getItems: (filters: ItemFilters = {}) =>
+    withMockFallback(
+      async () => {
+        const response = await request<BackendListResponse<BackendItemDto>>(
+          `/items${queryString(filters)}`,
+        );
+        return response.data.map(toItemDto);
+      },
+      () => filterMockItems(filters),
+    ),
+
+  getErrors: (filters: ErrorFilters = {}) =>
+    withMockFallback(
+      async () => {
+        const response = await request<BackendListResponse<BackendSyncErrorDto>>(
+          `/errors${queryString(filters)}`,
+        );
+        return response.data.map(toSyncErrorDto);
+      },
+      () => filterMockErrors(filters),
+    ),
+
   getSettings: () =>
     withMockFallback(
       async () => toSettingsDto(await request<BackendSettingsDto>("/settings")),
@@ -490,7 +668,7 @@ export const api = {
         toSettingsDto(
           await request<BackendSettingsDto>("/settings", {
             method: "PATCH",
-            body: JSON.stringify(settings),
+            body: JSON.stringify(toSettingsUpdateRequest(settings)),
           }),
         ),
       () => {
@@ -547,13 +725,26 @@ function toSourceDto(source: BackendSourceDto): SourceDto {
   };
 }
 
+function toCreateJobRequest(input: JobFormInput) {
+  return {
+    sourceId: input.sourceId,
+    name: input.name,
+    enabled: input.enabled,
+    schedule: input.schedule,
+  };
+}
+
 function toJobDto(job: BackendJobDto, sourceNames: Map<string, string>): SyncJobDto {
+  const schedule = normalizeSchedule(job.schedule);
+  const sourceName = sourceNames.get(job.sourceId) ?? job.sourceId;
+
   return {
     id: job.id,
     sourceId: job.sourceId,
-    sourceName: sourceNames.get(job.sourceId) ?? job.sourceId,
-    schedule: job.schedule ?? { kind: "manual" },
-    scheduleLabel: scheduleLabel(job.schedule ?? { kind: "manual" }),
+    sourceName,
+    name: job.name ?? sourceName,
+    schedule,
+    scheduleLabel: scheduleLabel(schedule),
     enabled: job.enabled,
     status: job.status ?? (job.enabled ? "idle" : "paused"),
     nextRunAt: job.nextRunAt ?? undefined,
@@ -571,9 +762,11 @@ function toRunDto(run: BackendRunDto, jobsById: Map<string, SyncJobDto>): SyncRu
     jobId: run.jobId,
     sourceId: job?.sourceId ?? "unknown-source",
     sourceName: job?.sourceName ?? "Unknown source",
+    jobName: job?.name,
     status: backendRunStatus(run.status),
     startedAt: run.startedAt ?? new Date().toISOString(),
     finishedAt: run.finishedAt ?? undefined,
+    durationMs: durationMs(run.startedAt, run.finishedAt),
     counts: {
       processed: run.processedCount,
       synced: run.syncedCount,
@@ -585,14 +778,39 @@ function toRunDto(run: BackendRunDto, jobsById: Map<string, SyncJobDto>): SyncRu
   };
 }
 
-function runResponseToRunDto(jobId: string, response: BackendJobRunResponse): SyncRunDto {
-  const job = mockJobs.find((candidate) => candidate.id === jobId);
+function toRunDetailDto(run: BackendRunDetailDto, jobsById: Map<string, SyncJobDto>): SyncRunDto {
+  const job = jobsById.get(run.jobId);
+
+  return {
+    id: run.id,
+    jobId: run.jobId,
+    sourceId: run.sourceId,
+    sourceName: run.sourceName,
+    jobName: run.jobName ?? job?.name,
+    status: backendRunStatus(run.status),
+    startedAt: run.startedAt ?? new Date().toISOString(),
+    finishedAt: run.finishedAt ?? undefined,
+    durationMs: run.durationMs ?? durationMs(run.startedAt, run.finishedAt),
+    counts: run.counts,
+    errors: run.errors.map(toSyncErrorDto),
+  };
+}
+
+function runResponseToRunDto(
+  jobId: string,
+  response: BackendJobRunResponse,
+  jobList?: SyncJobDto[],
+): SyncRunDto {
+  const job =
+    jobList?.find((candidate) => candidate.id === jobId) ??
+    mockJobs.find((candidate) => candidate.id === jobId);
 
   return {
     id: response.runId,
     jobId,
     sourceId: job?.sourceId ?? "unknown-source",
     sourceName: job?.sourceName ?? "Unknown source",
+    jobName: job?.name,
     status: backendRunStatus(response.status),
     startedAt: new Date().toISOString(),
     counts: {
@@ -603,6 +821,34 @@ function runResponseToRunDto(jobId: string, response: BackendJobRunResponse): Sy
       deleted: 0,
     },
     errors: [],
+  };
+}
+
+function toItemDto(item: BackendItemDto): SyncItemDto {
+  return {
+    id: item.id,
+    sourceId: item.sourceId,
+    sourcePath: item.sourcePath,
+    itemType: item.itemType,
+    status: item.status,
+    size: item.size ?? undefined,
+    etag: item.etag ?? undefined,
+    modifiedAt: item.modifiedAt ?? undefined,
+    contentHash: item.contentHash ?? undefined,
+    metadataJson: item.metadataJson ?? undefined,
+  };
+}
+
+function toSyncErrorDto(error: BackendSyncErrorDto): SyncErrorDto {
+  return {
+    id: error.id,
+    runId: error.runId ?? undefined,
+    sourceId: error.sourceId ?? undefined,
+    sourcePath: error.sourcePath ?? undefined,
+    code: error.code,
+    message: error.message,
+    details: error.details ?? undefined,
+    createdAt: error.createdAt ?? undefined,
   };
 }
 
@@ -622,7 +868,27 @@ function toSettingsDto(settings: BackendSettingsDto): SettingsDto {
   };
 }
 
-function backendRunStatus(status: BackendRunDto["status"]): SyncRunDto["status"] {
+function toSettingsUpdateRequest(settings: SettingsUpdate): SettingsUpdate {
+  return {
+    jobConcurrency: settings.jobConcurrency,
+    fileConcurrency: settings.fileConcurrency,
+    logLevel: settings.logLevel,
+  };
+}
+
+function backendRunStatus(
+  status: BackendRunDto["status"] | BackendJobRunResponse["status"] | BackendRunDetailDto["status"],
+): SyncRunDto["status"] {
+  if (
+    status === "running" ||
+    status === "completed" ||
+    status === "completed_with_failures" ||
+    status === "failed" ||
+    status === "cancelled"
+  ) {
+    return status;
+  }
+
   if (status === "pending") {
     return "running";
   }
@@ -632,6 +898,118 @@ function backendRunStatus(status: BackendRunDto["status"]): SyncRunDto["status"]
   }
 
   return "failed";
+}
+
+function normalizeSchedule(schedule: BackendJobDto["schedule"]): JobSchedule {
+  if (typeof schedule === "object" && schedule?.kind === "interval") {
+    return {
+      kind: "interval",
+      intervalSeconds: Math.max(1, Math.trunc(schedule.intervalSeconds)),
+    };
+  }
+
+  return { kind: "manual" };
+}
+
+function queryString(filters: object) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (typeof value === "string" && value) {
+      params.set(key, value);
+    }
+  }
+
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
+function cloneRun(run: SyncRunDto): SyncRunDto {
+  return {
+    ...run,
+    counts: { ...run.counts },
+    errors: run.errors.map((error) => ({
+      ...error,
+      details: error.details ? { ...error.details } : undefined,
+    })),
+  };
+}
+
+function emptyRunDetail(runId: string): SyncRunDto {
+  return {
+    id: runId,
+    jobId: "unknown-job",
+    sourceId: "unknown-source",
+    sourceName: "Unknown source",
+    status: "failed",
+    startedAt: new Date().toISOString(),
+    counts: {
+      processed: 0,
+      synced: 0,
+      skipped: 0,
+      failed: 0,
+      deleted: 0,
+    },
+    errors: [],
+  };
+}
+
+function filterMockItems(filters: ItemFilters): SyncItemDto[] {
+  return mockItems.filter((item) => {
+    if (filters.sourceId && item.sourceId !== filters.sourceId) {
+      return false;
+    }
+
+    if (filters.status && item.status !== filters.status) {
+      return false;
+    }
+
+    if (filters.runId && runIdForItem(item) !== filters.runId) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function filterMockErrors(filters: ErrorFilters): SyncErrorDto[] {
+  return mockRuns
+    .flatMap((run) => run.errors)
+    .filter((error) => {
+      if (filters.runId && error.runId !== filters.runId) {
+        return false;
+      }
+
+      if (filters.sourceId && error.sourceId !== filters.sourceId) {
+        return false;
+      }
+
+      return true;
+    })
+    .map((error) => ({ ...error }));
+}
+
+function runIdForItem(item: SyncItemDto) {
+  const metadata = item.metadataJson;
+  if (metadata && typeof metadata === "object" && "runId" in metadata) {
+    const runId = (metadata as { runId?: unknown }).runId;
+    return typeof runId === "string" ? runId : undefined;
+  }
+
+  return undefined;
+}
+
+function durationMs(startedAt?: string | null, finishedAt?: string | null) {
+  if (!startedAt || !finishedAt) {
+    return undefined;
+  }
+
+  const started = Date.parse(startedAt);
+  const finished = Date.parse(finishedAt);
+  if (Number.isNaN(started) || Number.isNaN(finished) || finished < started) {
+    return undefined;
+  }
+
+  return finished - started;
 }
 
 function redactConfig(input: SourceFormInput) {

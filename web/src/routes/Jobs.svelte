@@ -1,15 +1,25 @@
 <script lang="ts">
     import { Play, TimerReset } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
+    import JobForm from "../components/JobForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { formatDateTime } from "../lib/format";
-    import type { Loadable, SyncJobDto } from "../lib/types";
+    import type {
+        JobFormInput,
+        Loadable,
+        SourceDto,
+        SyncJobDto,
+    } from "../lib/types";
 
     let {
         jobs,
+        sources,
+        onCreateJob,
         onRunJob,
     }: {
         jobs: Loadable<SyncJobDto[]>;
+        sources: Loadable<SourceDto[]>;
+        onCreateJob: (input: JobFormInput) => Promise<void> | void;
         onRunJob: (jobId: string) => Promise<void> | void;
     } = $props();
 </script>
@@ -21,6 +31,8 @@
             Inspect schedules and start one-off sync runs.
         </p>
     </div>
+
+    <JobForm sources={sources} onCreate={onCreateJob} />
 
     <section class="rounded-sm border border-zinc-200 bg-white">
         <div
@@ -67,10 +79,10 @@
                             <tr class="hover:bg-zinc-50">
                                 <td class="px-3 py-2">
                                     <p class="font-medium text-zinc-900">
-                                        {job.sourceName}
+                                        {job.name}
                                     </p>
                                     <p class="font-mono text-xs text-zinc-500">
-                                        {job.id}
+                                        {job.sourceName} · {job.id}
                                     </p>
                                 </td>
                                 <td class="px-3 py-2 text-zinc-700"

@@ -17,11 +17,15 @@
     import {
         addSource,
         consoleOrigin,
+        createJob,
         isRefreshing,
         jobs,
         loadConsoleData,
+        loadRunDetail,
         runs,
+        runItems,
         saveSettings,
+        selectedRunDetail,
         settings,
         sources,
         summary,
@@ -233,9 +237,19 @@
                         onTestSource={testSourceConnection}
                     />
                 {:else if activePage === "jobs"}
-                    <Jobs jobs={$jobs} onRunJob={triggerJobRun} />
+                    <Jobs
+                        jobs={$jobs}
+                        sources={$sources}
+                        onCreateJob={createJob}
+                        onRunJob={triggerJobRun}
+                    />
                 {:else if activePage === "runs"}
-                    <Runs runs={$runs} />
+                    <Runs
+                        runs={$runs}
+                        selectedRunDetail={$selectedRunDetail}
+                        runItems={$runItems}
+                        onSelectRun={loadRunDetail}
+                    />
                 {:else if activePage === "settings"}
                     <Settings settings={$settings} onSave={saveSettings} />
                 {/if}
