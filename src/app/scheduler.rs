@@ -8,7 +8,7 @@ use crate::{
     api::types::{JobDto, JobScheduleDto},
     app::job_service,
     core::types::JobStatus,
-    db::repository::SeaOrmRepository,
+    db::repository::{RuntimeSettingsRepository, SeaOrmRepository},
 };
 
 /// Starts the fixed-interval scheduler loop.
@@ -32,12 +32,15 @@ pub fn spawn_interval_scheduler(
 ///
 /// # Errors
 ///
-/// Returns an error when listing jobs or running a due job fails.
+/// Returns an error when settings or jobs cannot be listed.
 pub async fn run_due_jobs_once(
     repository: Arc<SeaOrmRepository>,
     config: &AppConfig,
 ) -> AppResult<usize> {
-    if config.job_concurrency == 0 {
+    let settings = repository.load_runtime_settings(config).await?;
+    let job_concurrency = settings.job_concurrency;
+
+    if job_concurrency == 0 {
         return Ok(0);
     }
 
@@ -45,12 +48,23 @@ pub async fn run_due_jobs_once(
     let due_jobs = jobs
         .into_iter()
         .filter(is_due_interval_job)
-        .take(config.job_concurrency);
+        .take(job_concurrency);
     let mut started = 0;
 
     for job in due_jobs {
-        job_service::run_job(Arc::clone(&repository), config.vault_path.clone(), job.id).await?;
-        started += 1;
+        match job_service::run_job(Arc::clone(&repository), config.vault_path.clone(), job.id).await
+        {
+            Ok(_) => {
+                started += 1;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    job_id = %job.id,
+                    error = %error,
+                    "scheduled job failed"
+                );
+            }
+        }
     }
 
     Ok(started)

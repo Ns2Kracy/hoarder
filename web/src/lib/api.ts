@@ -278,7 +278,7 @@ const mockSettings: SettingsDto = {
   },
 };
 
-function normalizeApiError(error: unknown, status?: number): FrontendApiError {
+export function normalizeApiError(error: unknown, status?: number): FrontendApiError {
   if (isFrontendApiError(error)) {
     return error;
   }
@@ -347,6 +347,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
+    if (!contentType.includes("application/json")) {
+      throw {
+        code: "API_UNAVAILABLE",
+        message: "The local Hoarder API is not serving JSON yet.",
+        status: response.status,
+      } satisfies FrontendApiError;
+    }
+
     throw normalizeApiError(body, response.status);
   }
 
@@ -368,12 +376,29 @@ async function withMockFallback<T>(
   try {
     return { data: await loader(), origin: "api" };
   } catch (error) {
+    const apiError = normalizeApiError(error);
+    if (!shouldUseMockFallback(apiError)) {
+      throw apiError;
+    }
+
     return {
       data: fallback(),
       origin: "mock",
-      error: normalizeApiError(error),
+      error: apiError,
     };
   }
+}
+
+function shouldUseMockFallback(error: FrontendApiError): boolean {
+  if (error.code === "NETWORK_ERROR" || error.code === "API_UNAVAILABLE") {
+    return true;
+  }
+
+  return (
+    error.status === 404 &&
+    error.code === "NOT_FOUND" &&
+    error.message.toLowerCase().includes("api route not found")
+  );
 }
 
 interface BackendListResponse<T> {

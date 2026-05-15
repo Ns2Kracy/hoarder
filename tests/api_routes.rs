@@ -142,6 +142,52 @@ async fn api_routes_test_source_checks_repository() {
 }
 
 #[tokio::test]
+async fn api_routes_test_source_persists_failed_health() {
+    let test = TestApp::new().await;
+    let source = test
+        .repository
+        .create_source(NewSource {
+            name: "Unsupported archive".to_owned(),
+            kind: ConnectorKind::OpenDal,
+            config_json: serde_json::to_value(ConnectorConfig::OpenDal {
+                service: "s3".to_owned(),
+                options: BTreeMap::from([
+                    ("bucket".to_owned(), "archive".to_owned()),
+                    ("region".to_owned(), "us-east-1".to_owned()),
+                    ("access_key_id".to_owned(), "key".to_owned()),
+                    ("secret_access_key".to_owned(), "secret".to_owned()),
+                ]),
+            })
+            .unwrap(),
+            enabled: true,
+        })
+        .await
+        .unwrap();
+
+    let response = request(
+        test.app.clone(),
+        "POST",
+        &format!("/api/sources/{}/test", source.id),
+        Some(""),
+    )
+    .await;
+
+    assert_eq!(response.status, 502);
+    assert_eq!(response.body["error"]["code"], json!("CONNECTOR_ERROR"));
+
+    let sources = request(test.app.clone(), "GET", "/api/sources", None).await;
+    assert_eq!(sources.status, 200);
+    let tested_source = sources.body["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|candidate| candidate["id"] == json!(source.id.to_string()))
+        .expect("tested source is listed");
+    assert_eq!(tested_source["health"], json!("failed"));
+    assert!(tested_source["lastCheckedAt"].as_str().is_some());
+}
+
+#[tokio::test]
 async fn api_routes_create_job_patches_settings_and_rejects_running_job() {
     let test = TestApp::new().await;
     let create_job = request(

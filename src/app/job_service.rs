@@ -11,7 +11,7 @@ use crate::{
         NewScheduledSyncJob, SeaOrmRepository, SyncJobRecord, SyncJobRepository, SyncJobSchedule,
     },
     entity::sync_job,
-    sync::{engine::SyncEngine, repository::SyncRepository, vault_writer::VaultWriter},
+    sync::{engine::SyncEngine, vault_writer::VaultWriter},
 };
 
 /// Lists all sync jobs.
@@ -85,8 +85,7 @@ pub async fn run_job(
     vault_path: PathBuf,
     job_id: JobId,
 ) -> AppResult<JobRunResponse> {
-    mark_job_running(repository.as_ref(), job_id).await?;
-    let source_id = repository.load_job(job_id).await?.source_id;
+    let source_id = mark_job_running(repository.as_ref(), job_id).await?;
     let engine = SyncEngine::new(
         Arc::clone(&repository),
         Arc::new(move |kind| source_connector(kind, source_id)),
@@ -109,7 +108,7 @@ pub async fn run_job(
     }
 }
 
-async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppResult<()> {
+async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppResult<SourceId> {
     let db = repository.connection();
     let job = sync_job::Entity::find_by_id(job_id.as_uuid())
         .one(db)
@@ -128,12 +127,13 @@ async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppRe
         )));
     }
 
+    let source_id = SourceId::from_uuid(job.source_id);
     let mut active_model: sync_job::ActiveModel = job.into();
     active_model.status = sea_orm::ActiveValue::Set("running".to_owned());
     active_model.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now());
     active_model.update(db).await.map_err(map_db_error)?;
 
-    Ok(())
+    Ok(source_id)
 }
 
 async fn set_job_status(

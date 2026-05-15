@@ -84,7 +84,11 @@ pub async fn test_source(
     let config = connector_config_from_json(source.id, source.config_json)?;
     let checked_at = Utc::now();
 
-    validate_source_connector(source.kind, source.id, &config).await?;
+    if let Err(error) = validate_source_connector(source.kind, source.id, &config).await {
+        update_source_check(repository, source_id, "failed", checked_at).await?;
+        return Err(error);
+    }
+
     update_source_check(repository, source_id, "healthy", checked_at).await?;
 
     Ok(SourceTestResponse {

@@ -78,8 +78,10 @@
                 <span class="text-xs font-medium text-zinc-600">Vault path</span
                 >
                 <input
-                    class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
+                    class="h-9 w-full rounded-sm border border-zinc-300 bg-zinc-50 px-2 font-mono text-sm text-zinc-600"
                     bind:value={vaultPath}
+                    readonly={settings.data.readOnly.vaultPath}
+                    aria-readonly={settings.data.readOnly.vaultPath}
                 />
             </label>
             <label class="space-y-1">
@@ -87,8 +89,10 @@
                     >Database path</span
                 >
                 <input
-                    class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
+                    class="h-9 w-full rounded-sm border border-zinc-300 bg-zinc-50 px-2 font-mono text-sm text-zinc-600"
                     bind:value={databasePath}
+                    readonly={settings.data.readOnly.databasePath}
+                    aria-readonly={settings.data.readOnly.databasePath}
                 />
             </label>
             <label class="space-y-1">
@@ -96,8 +100,10 @@
                     >Listen address</span
                 >
                 <input
-                    class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm"
+                    class="h-9 w-full rounded-sm border border-zinc-300 bg-zinc-50 px-2 font-mono text-sm text-zinc-600"
                     bind:value={listenAddress}
+                    readonly={settings.data.readOnly.listenAddress}
+                    aria-readonly={settings.data.readOnly.listenAddress}
                 />
             </label>
             <label class="space-y-1">

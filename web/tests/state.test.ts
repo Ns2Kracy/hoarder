@@ -1,6 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
 import { get } from "svelte/store";
-import { loadConsoleData, sources, testSourceConnection } from "../src/lib/state";
+import { api } from "../src/lib/api";
+import {
+  loadConsoleData,
+  runs,
+  sources,
+  testSourceConnection,
+  triggerJobRun,
+} from "../src/lib/state";
 
 const originalFetch = globalThis.fetch;
 
@@ -95,6 +102,103 @@ test("testSourceConnection persists healthy status after reload when api returns
   expect(get(sources).data[0]?.lastCheckedAt).toBe("2026-05-12T09:25:00.000Z");
 });
 
+test("api mutating calls reject live business errors instead of using mock fallback", async () => {
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/jobs/job-local/run" && init?.method === "POST") {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "CONFLICT",
+            message: "sync job is already running: job-local",
+          },
+        }),
+        {
+          status: 409,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
+    return new Response(JSON.stringify(responseFor(path)), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }) as typeof fetch;
+
+  try {
+    await api.runJob("job-local");
+    throw new Error("expected api.runJob to reject");
+  } catch (error) {
+    expect(error).toMatchObject({
+      code: "CONFLICT",
+      status: 409,
+    });
+  }
+});
+
+test("api read calls still fall back to mock data when the local endpoint is missing", async () => {
+  globalThis.fetch = (async () =>
+    new Response("not found", {
+      status: 404,
+      headers: {
+        "Content-Type": "text/plain",
+      },
+    })) as typeof fetch;
+
+  const result = await api.getSources();
+
+  expect(result.origin).toBe("mock");
+  expect(result.error).toMatchObject({
+    code: "API_UNAVAILABLE",
+    status: 404,
+  });
+  expect(result.data.length).toBeGreaterThan(0);
+});
+
+test("triggerJobRun keeps refreshed run list data when the live API returns the new run", async () => {
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/jobs/job-local/run" && init?.method === "POST") {
+      return new Response(
+        JSON.stringify({
+          runId: "run-new",
+          status: "synced",
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
+    return new Response(JSON.stringify(responseFor(path, { includeNewRun: true })), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  await triggerJobRun("job-local");
+
+  const [latestRun] = get(runs).data;
+  expect(latestRun.id).toBe("run-new");
+  expect(latestRun.startedAt).toBe("2026-05-12T09:30:00.000Z");
+  expect(latestRun.counts).toMatchObject({
+    processed: 5,
+    synced: 4,
+    skipped: 1,
+    failed: 0,
+  });
+});
+
 function requestPath(input: RequestInfo | URL) {
   if (typeof input === "string") {
     return new URL(input, "http://localhost").pathname;
@@ -107,7 +211,7 @@ function requestPath(input: RequestInfo | URL) {
   return new URL(input.url).pathname;
 }
 
-function responseFor(path: string) {
+function responseFor(path: string, options: { includeNewRun?: boolean } = {}) {
   switch (path) {
     case "/api/sources":
       return {
@@ -141,6 +245,21 @@ function responseFor(path: string) {
     case "/api/runs":
       return {
         data: [
+          ...(options.includeNewRun
+            ? [
+                {
+                  id: "run-new",
+                  jobId: "job-local",
+                  status: "synced",
+                  startedAt: "2026-05-12T09:30:00.000Z",
+                  finishedAt: "2026-05-12T09:30:02.000Z",
+                  processedCount: 5,
+                  syncedCount: 4,
+                  skippedCount: 1,
+                  failedCount: 0,
+                },
+              ]
+            : []),
           {
             id: "run-local",
             jobId: "job-local",

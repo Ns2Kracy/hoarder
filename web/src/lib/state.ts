@@ -1,5 +1,5 @@
 import { derived, get, writable } from "svelte/store";
-import { api } from "./api";
+import { api, normalizeApiError } from "./api";
 import type {
   ApiData,
   ConsoleSummary,
@@ -105,73 +105,92 @@ export async function loadConsoleData() {
 }
 
 export async function addSource(input: SourceFormInput) {
-  const result = await api.createSource(input);
-  sources.update((current) => ({
-    ...current,
-    status: "ready",
-    origin: result.origin,
-    error: result.error,
-    data: [result.data, ...current.data],
-    updatedAt: new Date().toISOString(),
-  }));
+  try {
+    const result = await api.createSource(input);
+    sources.update((current) => ({
+      ...current,
+      status: "ready",
+      origin: result.origin,
+      error: result.error,
+      data: [result.data, ...current.data],
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch (error) {
+    sources.update((current) => loadableWithError(current, error));
+  }
 }
 
 export async function testSourceConnection(sourceId: string) {
-  const result = await api.testSource(sourceId);
-  sources.update((current) => ({
-    ...current,
-    origin: result.origin,
-    error: result.error,
-    data: current.data.map((source) =>
-      source.id === sourceId
-        ? {
-            ...source,
-            health: result.data.ok ? "healthy" : "failed",
-            lastCheckedAt: result.data.checkedAt,
-          }
-        : source,
-    ),
-    updatedAt: new Date().toISOString(),
-  }));
+  try {
+    const result = await api.testSource(sourceId);
+    sources.update((current) => ({
+      ...current,
+      origin: result.origin,
+      error: result.error,
+      data: current.data.map((source) =>
+        source.id === sourceId
+          ? {
+              ...source,
+              health: result.data.ok ? "healthy" : "failed",
+              lastCheckedAt: result.data.checkedAt,
+            }
+          : source,
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch (error) {
+    sources.update((current) => loadableWithError(current, error));
+  }
 }
 
 export async function createJob(input: JobFormInput) {
-  const result = await api.createJob(input, get(sources).data);
-  jobs.update((current) => ({
-    ...current,
-    status: "ready",
-    origin: result.origin,
-    error: result.error,
-    data: [result.data, ...current.data.filter((job) => job.id !== result.data.id)],
-    updatedAt: new Date().toISOString(),
-  }));
+  try {
+    const result = await api.createJob(input, get(sources).data);
+    jobs.update((current) => ({
+      ...current,
+      status: "ready",
+      origin: result.origin,
+      error: result.error,
+      data: [result.data, ...current.data.filter((job) => job.id !== result.data.id)],
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch (error) {
+    jobs.update((current) => loadableWithError(current, error));
+  }
 }
 
 export async function triggerJobRun(jobId: string) {
-  const runResult = await api.runJob(jobId, get(jobs).data);
-  const jobResult = await api.getJobs(get(sources).data);
-  const runListResult = await api.getRuns(jobResult.data);
-  const refreshedRuns = upsertRun(runListResult.data, runResult.data);
+  try {
+    const runResult = await api.runJob(jobId, get(jobs).data);
+    const jobResult = await api.getJobs(get(sources).data);
+    const runListResult = await api.getRuns(jobResult.data);
+    const refreshedRuns = runListResult.data.some((run) => run.id === runResult.data.id)
+      ? runListResult.data
+      : upsertRun(runListResult.data, runResult.data);
 
-  runs.set(
-    applyResult(
-      {
-        ...runListResult,
-        data: refreshedRuns,
-        error: runListResult.error ?? runResult.error,
-      },
-      statusFor({ ...runListResult, data: refreshedRuns }),
-    ),
-  );
-  jobs.set(
-    applyResult(
-      {
-        ...jobResult,
-        error: jobResult.error ?? runResult.error,
-      },
-      statusFor(jobResult),
-    ),
-  );
+    runs.set(
+      applyResult(
+        {
+          ...runListResult,
+          data: refreshedRuns,
+          error: runListResult.error ?? runResult.error,
+        },
+        statusFor({ ...runListResult, data: refreshedRuns }),
+      ),
+    );
+    jobs.set(
+      applyResult(
+        {
+          ...jobResult,
+          error: jobResult.error ?? runResult.error,
+        },
+        statusFor(jobResult),
+      ),
+    );
+  } catch (error) {
+    jobs.update((current) => loadableWithError(current, error));
+    runs.update((current) => loadableWithError(current, error));
+  }
 }
 
 export async function loadRunDetail(runId: string, filters: Omit<ItemFilters, "runId"> = {}) {
@@ -211,8 +230,12 @@ export async function loadRunDetail(runId: string, filters: Omit<ItemFilters, "r
 }
 
 export async function saveSettings(nextSettings: SettingsUpdate) {
-  const result = await api.updateSettings(nextSettings);
-  settings.set(applyResult(result));
+  try {
+    const result = await api.updateSettings(nextSettings);
+    settings.set(applyResult(result));
+  } catch (error) {
+    settings.update((current) => loadableWithError(current, error));
+  }
 }
 
 export function summarizeConsole(
@@ -252,4 +275,13 @@ export function isEmptyLoadable<T>(loadable: Loadable<T[]>) {
 
 function upsertRun(runList: SyncRunDto[], run: SyncRunDto) {
   return [run, ...runList.filter((candidate) => candidate.id !== run.id)];
+}
+
+function loadableWithError<T>(loadable: Loadable<T>, error: unknown): Loadable<T> {
+  return {
+    ...loadable,
+    status: Array.isArray(loadable.data) && loadable.data.length === 0 ? "empty" : "ready",
+    error: normalizeApiError(error),
+    updatedAt: new Date().toISOString(),
+  };
 }

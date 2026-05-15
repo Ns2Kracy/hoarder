@@ -5,11 +5,13 @@ use std::{
     sync::Arc,
 };
 
+use hoarder::db::repository::RuntimeSettingsRepository;
 use hoarder::{
     AppConfig,
     app::{job_service, scheduler},
+    config::RuntimeSettingsPatch,
     connectors::traits::ConnectorConfig,
-    core::types::ConnectorKind,
+    core::types::{ConnectorKind, SourceId},
     db::{
         connect_sqlite,
         repository::{
@@ -42,9 +44,87 @@ async fn scheduler_runs_due_interval_jobs_once() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+#[tokio::test]
+async fn scheduler_uses_persisted_runtime_job_concurrency() -> Result<(), Box<dyn std::error::Error>>
+{
+    let test = TestScheduler::new().await?;
+    test.repository
+        .create_scheduled_job(NewScheduledSyncJob {
+            source_id: test.source_id,
+            name: "second interval sync".to_owned(),
+            enabled: true,
+            schedule: SyncJobSchedule::Interval {
+                interval_seconds: 300,
+            },
+        })
+        .await?;
+    test.repository
+        .patch_runtime_settings(
+            &test.config,
+            RuntimeSettingsPatch {
+                job_concurrency: Some(2),
+                file_concurrency: None,
+                log_level: None,
+            },
+        )
+        .await?;
+
+    let started = scheduler::run_due_jobs_once(Arc::clone(&test.repository), &test.config).await?;
+
+    assert_eq!(started, 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn scheduler_continues_after_one_due_job_fails() -> Result<(), Box<dyn std::error::Error>> {
+    let mut test = TestScheduler::new().await?;
+    test.config.job_concurrency = 2;
+    let failing_source = test
+        .repository
+        .create_source(NewSource {
+            name: "Unsupported archive".to_owned(),
+            kind: ConnectorKind::OpenDal,
+            config_json: serde_json::to_value(ConnectorConfig::OpenDal {
+                service: "s3".to_owned(),
+                options: BTreeMap::from([
+                    ("bucket".to_owned(), "archive".to_owned()),
+                    ("region".to_owned(), "us-east-1".to_owned()),
+                    ("access_key_id".to_owned(), "key".to_owned()),
+                    ("secret_access_key".to_owned(), "secret".to_owned()),
+                ]),
+            })?,
+            enabled: true,
+        })
+        .await?;
+    test.repository
+        .create_scheduled_job(NewScheduledSyncJob {
+            source_id: failing_source.id,
+            name: "bad interval sync".to_owned(),
+            enabled: true,
+            schedule: SyncJobSchedule::Interval {
+                interval_seconds: 300,
+            },
+        })
+        .await?;
+
+    let started = scheduler::run_due_jobs_once(Arc::clone(&test.repository), &test.config).await?;
+
+    assert_eq!(started, 1);
+    let jobs = job_service::list_jobs(test.repository.as_ref()).await?;
+    let good_job = jobs
+        .iter()
+        .find(|job| job.name == "interval sync")
+        .expect("good interval job exists");
+    assert!(good_job.last_run_at.is_some());
+
+    Ok(())
+}
+
 struct TestScheduler {
     repository: Arc<SeaOrmRepository>,
     config: AppConfig,
+    source_id: SourceId,
     _temp: TempDir,
 }
 
@@ -95,6 +175,7 @@ impl TestScheduler {
                 job_concurrency: 1,
                 ..AppConfig::default()
             },
+            source_id: source.id,
             _temp: temp,
         })
     }
