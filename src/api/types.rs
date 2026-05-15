@@ -7,7 +7,9 @@ use serde_json::Value;
 use crate::{
     config::AppConfig,
     connectors::traits::ConnectorConfig,
-    core::types::{ConnectorKind, ItemId, ItemType, JobId, RunId, SourceId, SyncStatus},
+    core::types::{
+        ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
+    },
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -152,7 +154,29 @@ pub struct JobDto {
     pub source_id: SourceId,
     pub name: String,
     pub enabled: bool,
-    pub schedule: Option<String>,
+    pub schedule: JobScheduleDto,
+    pub status: JobStatus,
+    pub last_run_at: Option<DateTime<Utc>>,
+    pub last_run_status: Option<RunStatus>,
+    pub last_run_id: Option<RunId>,
+    pub next_run_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum JobScheduleDto {
+    Manual,
+    Interval { interval_seconds: u64 },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateJobRequest {
+    pub source_id: SourceId,
+    pub name: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    pub schedule: JobScheduleDto,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -167,6 +191,32 @@ pub struct RunDto {
     pub synced_count: u64,
     pub skipped_count: u64,
     pub failed_count: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunCountsDto {
+    pub processed: u64,
+    pub synced: u64,
+    pub skipped: u64,
+    pub failed: u64,
+    pub deleted: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunDetailDto {
+    pub id: RunId,
+    pub job_id: JobId,
+    pub source_id: SourceId,
+    pub source_name: String,
+    pub job_name: String,
+    pub status: RunStatus,
+    pub started_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub duration_ms: Option<u64>,
+    pub counts: RunCountsDto,
+    pub errors: Vec<SyncErrorDto>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -196,6 +246,21 @@ pub struct SyncErrorDto {
     pub created_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemListQuery {
+    pub source_id: Option<SourceId>,
+    pub status: Option<SyncStatus>,
+    pub run_id: Option<RunId>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorListQuery {
+    pub source_id: Option<SourceId>,
+    pub run_id: Option<RunId>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDto {
@@ -204,6 +269,24 @@ pub struct SettingsDto {
     pub listen_addr: SocketAddr,
     pub job_concurrency: usize,
     pub file_concurrency: usize,
+    pub log_level: String,
+    pub read_only: ReadOnlySettingsDto,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadOnlySettingsDto {
+    pub database_path: bool,
+    pub vault_path: bool,
+    pub listen_addr: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSettingsRequest {
+    pub job_concurrency: usize,
+    pub file_concurrency: usize,
+    pub log_level: String,
 }
 
 impl From<&AppConfig> for SettingsDto {
@@ -214,6 +297,12 @@ impl From<&AppConfig> for SettingsDto {
             listen_addr: config.listen_addr,
             job_concurrency: config.job_concurrency,
             file_concurrency: config.file_concurrency,
+            log_level: "info".to_owned(),
+            read_only: ReadOnlySettingsDto {
+                database_path: true,
+                vault_path: true,
+                listen_addr: true,
+            },
         }
     }
 }

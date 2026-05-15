@@ -5,6 +5,7 @@ import type {
   ConsoleSummary,
   Loadable,
   SettingsDto,
+  SettingsUpdate,
   SourceDto,
   SourceFormInput,
   SyncJobDto,
@@ -30,6 +31,11 @@ const defaultSettings: SettingsDto = {
   jobConcurrency: 1,
   fileConcurrency: 4,
   logLevel: "info",
+  readOnly: {
+    vaultPath: true,
+    databasePath: true,
+    listenAddress: true,
+  },
 };
 
 export const sources = writable<Loadable<SourceDto[]>>(emptyList());
@@ -149,7 +155,7 @@ export async function triggerJobRun(jobId: string) {
   }));
 }
 
-export async function saveSettings(nextSettings: SettingsDto) {
+export async function saveSettings(nextSettings: SettingsUpdate) {
   const result = await api.updateSettings(nextSettings);
   settings.set(applyResult(result));
 }

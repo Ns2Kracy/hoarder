@@ -6,6 +6,7 @@ import type {
   SettingsUpdate,
   SourceDto,
   SourceFormInput,
+  JobSchedule,
   SyncJobDto,
   SyncRunDto,
 } from "./types";
@@ -76,9 +77,10 @@ const mockJobs: SyncJobDto[] = [
     id: "job-notes-hourly",
     sourceId: "src-local-notes",
     sourceName: "Local notes",
-    schedule: "Every 60 minutes",
+    schedule: { kind: "interval", intervalSeconds: 3600 },
+    scheduleLabel: "Every 60 minutes",
     enabled: true,
-    status: "scheduled",
+    status: "idle",
     nextRunAt: isoMinutesAhead(26),
     lastRunAt: isoMinutesAgo(32),
     lastRunStatus: "completed",
@@ -87,7 +89,8 @@ const mockJobs: SyncJobDto[] = [
     id: "job-s3-nightly",
     sourceId: "src-team-s3",
     sourceName: "Team S3 archive",
-    schedule: "Daily at 02:00",
+    schedule: { kind: "interval", intervalSeconds: 86_400 },
+    scheduleLabel: "Every 24 hours",
     enabled: true,
     status: "running",
     nextRunAt: isoMinutesAhead(977),
@@ -98,7 +101,8 @@ const mockJobs: SyncJobDto[] = [
     id: "job-webdav-paused",
     sourceId: "src-webdav-research",
     sourceName: "Research WebDAV",
-    schedule: "Manual",
+    schedule: { kind: "manual" },
+    scheduleLabel: "Manual",
     enabled: false,
     status: "paused",
     lastRunAt: isoMinutesAgo(1500),
@@ -193,6 +197,11 @@ const mockSettings: SettingsDto = {
   jobConcurrency: 1,
   fileConcurrency: 4,
   logLevel: "info",
+  readOnly: {
+    vaultPath: true,
+    databasePath: true,
+    listenAddress: true,
+  },
 };
 
 function normalizeApiError(error: unknown, status?: number): FrontendApiError {
@@ -315,7 +324,12 @@ interface BackendJobDto {
   sourceId: string;
   name: string;
   enabled: boolean;
-  schedule?: string | null;
+  schedule?: JobSchedule | null;
+  status?: SyncJobDto["status"] | null;
+  nextRunAt?: string | null;
+  lastRunAt?: string | null;
+  lastRunStatus?: SyncRunDto["status"] | null;
+  lastRunId?: string | null;
 }
 
 interface BackendRunDto {
@@ -341,6 +355,12 @@ interface BackendSettingsDto {
   listenAddr: string;
   jobConcurrency: number;
   fileConcurrency: number;
+  logLevel?: SettingsDto["logLevel"];
+  readOnly?: {
+    databasePath?: boolean;
+    vaultPath?: boolean;
+    listenAddr?: boolean;
+  };
 }
 
 export const api = {
@@ -466,11 +486,13 @@ export const api = {
 
   updateSettings: async (settings: SettingsUpdate): Promise<ApiData<SettingsDto>> =>
     withMockFallback(
-      () =>
-        request<SettingsDto>("/settings", {
-          method: "PATCH",
-          body: JSON.stringify(settings),
-        }),
+      async () =>
+        toSettingsDto(
+          await request<BackendSettingsDto>("/settings", {
+            method: "PATCH",
+            body: JSON.stringify(settings),
+          }),
+        ),
       () => {
         Object.assign(mockSettings, settings);
         return { ...mockSettings };
@@ -530,9 +552,14 @@ function toJobDto(job: BackendJobDto, sourceNames: Map<string, string>): SyncJob
     id: job.id,
     sourceId: job.sourceId,
     sourceName: sourceNames.get(job.sourceId) ?? job.sourceId,
-    schedule: job.schedule ?? "Manual",
+    schedule: job.schedule ?? { kind: "manual" },
+    scheduleLabel: scheduleLabel(job.schedule ?? { kind: "manual" }),
     enabled: job.enabled,
-    status: job.enabled ? "scheduled" : "paused",
+    status: job.status ?? (job.enabled ? "idle" : "paused"),
+    nextRunAt: job.nextRunAt ?? undefined,
+    lastRunAt: job.lastRunAt ?? undefined,
+    lastRunStatus: job.lastRunStatus ?? undefined,
+    lastRunId: job.lastRunId ?? undefined,
   };
 }
 
@@ -586,7 +613,12 @@ function toSettingsDto(settings: BackendSettingsDto): SettingsDto {
     listenAddress: settings.listenAddr,
     jobConcurrency: settings.jobConcurrency,
     fileConcurrency: settings.fileConcurrency,
-    logLevel: "info",
+    logLevel: settings.logLevel ?? "info",
+    readOnly: {
+      databasePath: settings.readOnly?.databasePath ?? true,
+      vaultPath: settings.readOnly?.vaultPath ?? true,
+      listenAddress: settings.readOnly?.listenAddr ?? true,
+    },
   };
 }
 
@@ -615,4 +647,22 @@ function redactConfig(input: SourceFormInput) {
     secret_access_key: config.secretAccessKey ? REDACTED : undefined,
     token: config.token ? REDACTED : undefined,
   };
+}
+
+function scheduleLabel(schedule: JobSchedule) {
+  if (schedule.kind === "manual") {
+    return "Manual";
+  }
+
+  if (schedule.intervalSeconds % 3600 === 0) {
+    const hours = schedule.intervalSeconds / 3600;
+    return hours === 1 ? "Every hour" : `Every ${hours} hours`;
+  }
+
+  if (schedule.intervalSeconds % 60 === 0) {
+    const minutes = schedule.intervalSeconds / 60;
+    return minutes === 1 ? "Every minute" : `Every ${minutes} minutes`;
+  }
+
+  return `Every ${schedule.intervalSeconds} seconds`;
 }

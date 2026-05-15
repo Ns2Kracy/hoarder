@@ -1,6 +1,7 @@
 use chrono::{TimeZone, Utc};
 use hoarder::core::types::{
-    ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId, SyncStatus,
+    ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, JobScheduleKind,
+    JobStatus, RunStatus, SourceId, SyncStatus,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -27,6 +28,18 @@ fn core_types_core_enums_serialize_for_api_payloads() {
     assert_eq!(
         serde_json::to_value(ConnectorKind::OpenDal).unwrap(),
         json!("opendal")
+    );
+    assert_eq!(
+        serde_json::to_value(JobScheduleKind::Interval).unwrap(),
+        json!("interval")
+    );
+    assert_eq!(
+        serde_json::to_value(JobStatus::Idle).unwrap(),
+        json!("idle")
+    );
+    assert_eq!(
+        serde_json::to_value(RunStatus::CompletedWithFailures).unwrap(),
+        json!("completed_with_failures")
     );
 }
 

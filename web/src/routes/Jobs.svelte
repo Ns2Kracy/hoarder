@@ -74,7 +74,7 @@
                                     </p>
                                 </td>
                                 <td class="px-3 py-2 text-zinc-700"
-                                    >{job.schedule}</td
+                                    >{job.scheduleLabel}</td
                                 >
                                 <td class="px-3 py-2">
                                     <StatusBadge status={job.status} />

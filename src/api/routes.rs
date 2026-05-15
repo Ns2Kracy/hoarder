@@ -14,7 +14,7 @@ use std::sync::Arc;
 use crate::{
     AppError, AppResult,
     connectors::{opendal::source::OpenDalSourceConnector, traits::SourceConnector},
-    core::types::{ConnectorKind, ItemId, ItemType, JobId, RunId, SourceId, SyncStatus},
+    core::types::{ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, SourceId, SyncStatus},
     db::repository::{NewSource, SourceRepository},
     entity::{sync_error, sync_item, sync_job, sync_run},
     sync::{engine::SyncEngine, repository::SyncRepository, vault_writer::VaultWriter},
@@ -24,8 +24,9 @@ use super::{
     error::ApiError,
     state::ApiState,
     types::{
-        CreateSourceRequest, HealthResponse, ItemDto, JobDto, JobRunResponse, ListResponse, RunDto,
-        SettingsDto, SourceDto, SourceHealth, SourceTestResponse, SyncErrorDto,
+        CreateSourceRequest, HealthResponse, ItemDto, JobDto, JobRunResponse, JobScheduleDto,
+        ListResponse, RunDto, SettingsDto, SourceDto, SourceHealth, SourceTestResponse,
+        SyncErrorDto,
     },
 };
 
@@ -144,14 +145,21 @@ async fn list_jobs(State(state): State<ApiState>) -> Result<Json<ListResponse<Jo
         .map_err(map_db_error)?;
     let jobs = jobs
         .into_iter()
-        .map(|job| JobDto {
-            id: JobId::from_uuid(job.id),
-            source_id: SourceId::from_uuid(job.source_id),
-            name: job.name,
-            enabled: job.enabled,
-            schedule: None,
+        .map(|job| {
+            Ok(JobDto {
+                id: JobId::from_uuid(job.id),
+                source_id: SourceId::from_uuid(job.source_id),
+                name: job.name,
+                enabled: job.enabled,
+                schedule: JobScheduleDto::Manual,
+                status: job_status_from_str(&job.status)?,
+                last_run_at: job.last_run_at,
+                last_run_status: None,
+                last_run_id: None,
+                next_run_at: None,
+            })
         })
-        .collect();
+        .collect::<AppResult<Vec<_>>>()?;
 
     Ok(Json(ListResponse::new(jobs)))
 }
@@ -344,6 +352,18 @@ fn run_status_from_str(status: &str) -> AppResult<SyncStatus> {
         "completed_with_failures" | "failed" => Ok(SyncStatus::Failed),
         other => Err(AppError::Database(format!(
             "unknown run status stored in database: {other}"
+        ))),
+    }
+}
+
+fn job_status_from_str(status: &str) -> AppResult<JobStatus> {
+    match status {
+        "idle" => Ok(JobStatus::Idle),
+        "running" => Ok(JobStatus::Running),
+        "paused" => Ok(JobStatus::Paused),
+        "failed" => Ok(JobStatus::Failed),
+        other => Err(AppError::Database(format!(
+            "unknown job status stored in database: {other}"
         ))),
     }
 }

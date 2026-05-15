@@ -8,9 +8,25 @@ export type OpenDalServiceKind = "fs" | "s3" | "webdav" | "sftp";
 
 export type SourceHealth = "healthy" | "warning" | "failed" | "untested" | "disabled";
 
-export type JobStatus = "scheduled" | "running" | "paused" | "failed";
+export type JobScheduleKind = "manual" | "interval";
 
-export type RunStatus = "running" | "completed" | "failed" | "cancelled";
+export type JobSchedule =
+  | {
+      kind: "manual";
+    }
+  | {
+      kind: "interval";
+      intervalSeconds: number;
+    };
+
+export type JobStatus = "idle" | "running" | "paused" | "failed";
+
+export type RunStatus =
+  | "running"
+  | "completed"
+  | "completed_with_failures"
+  | "failed"
+  | "cancelled";
 
 export type ItemSyncStatus = "pending" | "synced" | "skipped" | "failed" | "deleted_on_source";
 
@@ -78,12 +94,14 @@ export interface SyncJobDto {
   id: string;
   sourceId: string;
   sourceName: string;
-  schedule: string;
+  schedule: JobSchedule;
+  scheduleLabel: string;
   enabled: boolean;
   status: JobStatus;
   nextRunAt?: string;
   lastRunAt?: string;
   lastRunStatus?: RunStatus;
+  lastRunId?: string;
 }
 
 export interface RunCounts {
@@ -109,6 +127,7 @@ export interface SyncRunDto {
   jobId: string;
   sourceId: string;
   sourceName: string;
+  jobName?: string;
   status: RunStatus;
   startedAt: string;
   finishedAt?: string;
@@ -124,9 +143,14 @@ export interface SettingsDto {
   jobConcurrency: number;
   fileConcurrency: number;
   logLevel: LogLevel;
+  readOnly: {
+    vaultPath: boolean;
+    databasePath: boolean;
+    listenAddress: boolean;
+  };
 }
 
-export type SettingsUpdate = SettingsDto;
+export type SettingsUpdate = Pick<SettingsDto, "jobConcurrency" | "fileConcurrency" | "logLevel">;
 
 export interface Loadable<T> {
   status: "idle" | "loading" | "ready" | "empty" | "error";

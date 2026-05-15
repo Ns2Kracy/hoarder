@@ -1,14 +1,19 @@
 <script lang="ts">
     import { Save, Settings as SettingsIcon } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
-    import type { Loadable, LogLevel, SettingsDto } from "../lib/types";
+    import type {
+        Loadable,
+        LogLevel,
+        SettingsDto,
+        SettingsUpdate,
+    } from "../lib/types";
 
     let {
         settings,
         onSave,
     }: {
         settings: Loadable<SettingsDto>;
-        onSave: (nextSettings: SettingsDto) => Promise<void> | void;
+        onSave: (nextSettings: SettingsUpdate) => Promise<void> | void;
     } = $props();
 
     let vaultPath = $state("");
@@ -36,9 +41,6 @@
         isSaving = true;
         try {
             await onSave({
-                vaultPath,
-                databasePath,
-                listenAddress,
                 jobConcurrency,
                 fileConcurrency,
                 logLevel,

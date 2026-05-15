@@ -86,6 +86,32 @@ pub enum SyncStatus {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+pub enum JobScheduleKind {
+    Manual,
+    Interval,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JobStatus {
+    Idle,
+    Running,
+    Paused,
+    Failed,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunStatus {
+    Running,
+    Completed,
+    CompletedWithFailures,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ConnectorKind {
     #[serde(rename = "opendal")]
     OpenDal,
