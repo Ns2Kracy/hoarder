@@ -17,6 +17,7 @@ use tower_http::{
 use crate::{
     AppConfig, AppError, AppResult,
     api::{routes::router_without_fallback, state::ApiState},
+    app::scheduler,
     assets,
     db::{repository::SeaOrmRepository, schema::sync_schema},
     middleware::logger::logger as middleware_logger,
@@ -38,11 +39,16 @@ pub async fn serve(options: ServeOptions) -> AppResult<()> {
     let config = load_config(options.config_path.as_deref()).await?;
     let config = apply_addr_override(config, options.addr);
     let addr = config.listen_addr;
-    let app = app(config).await?;
+    let (config, repository) = open_repository_with_config(config).await?;
+    let scheduler_handle =
+        scheduler::spawn_interval_scheduler(Arc::clone(&repository), config.clone());
+    let app = app_with_state(ApiState::new(repository, config));
     let listener = TcpListener::bind(addr).await?;
 
     tracing::info!(%addr, "hoarder API listening");
-    axum::serve(listener, app).await?;
+    let result = axum::serve(listener, app).await;
+    scheduler_handle.abort();
+    result?;
 
     Ok(())
 }
@@ -69,6 +75,12 @@ pub async fn open_repository(
     config_path: Option<PathBuf>,
 ) -> AppResult<(AppConfig, Arc<SeaOrmRepository>)> {
     let config = load_config(config_path.as_deref()).await?;
+    open_repository_with_config(config).await
+}
+
+async fn open_repository_with_config(
+    config: AppConfig,
+) -> AppResult<(AppConfig, Arc<SeaOrmRepository>)> {
     let db = connect_sqlite(&config).await?;
     sync_schema(&db).await?;
 
