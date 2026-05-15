@@ -1,6 +1,6 @@
-use std::{collections::BTreeSet, path::PathBuf, sync::Arc};
+use std::{collections::BTreeSet, num::NonZeroUsize, path::PathBuf, sync::Arc};
 
-use futures::StreamExt;
+use futures::{StreamExt, stream::FuturesUnordered};
 
 use crate::{
     AppError, AppResult,
@@ -34,6 +34,7 @@ where
     repository: Arc<R>,
     connector_resolver: ConnectorResolver,
     vault_writer: VaultWriter,
+    options: SyncEngineOptions,
 }
 
 impl<R> SyncEngine<R>
@@ -45,10 +46,26 @@ where
         connector_resolver: ConnectorResolver,
         vault_writer: VaultWriter,
     ) -> Self {
+        Self::with_options(
+            repository,
+            connector_resolver,
+            vault_writer,
+            SyncEngineOptions::default(),
+        )
+    }
+
+    #[must_use]
+    pub fn with_options(
+        repository: Arc<R>,
+        connector_resolver: ConnectorResolver,
+        vault_writer: VaultWriter,
+        options: SyncEngineOptions,
+    ) -> Self {
         Self {
             repository,
             connector_resolver,
             vault_writer,
+            options,
         }
     }
 
@@ -96,6 +113,7 @@ where
         let connector = (self.connector_resolver)(job.connector_kind)?;
         let cursor = job.scan_cursor.as_deref();
         let mut snapshots = connector.scan(&job.connector_config, cursor).await?;
+        let mut pending = FuturesUnordered::new();
         let mut seen_paths = BTreeSet::new();
         let mut summary = SyncRunSummary {
             run_id,
@@ -106,30 +124,40 @@ where
             bytes_written: 0,
         };
 
-        while let Some(snapshot) = snapshots.next().await {
-            let snapshot = snapshot?;
+        let mut scan_error = None;
+        while let Some(snapshot_result) = snapshots.next().await {
+            let snapshot = match snapshot_result {
+                Ok(snapshot) => snapshot,
+                Err(error) => {
+                    scan_error = Some(error);
+                    break;
+                }
+            };
             summary.processed += 1;
             seen_paths.insert(snapshot.source_path.clone());
+            pending.push(self.process_snapshot(
+                run_id,
+                &job.connector_config,
+                connector.as_ref(),
+                snapshot,
+            ));
 
-            match self
-                .process_snapshot(run_id, &job.connector_config, connector.as_ref(), snapshot)
-                .await
-            {
-                Ok(ItemProcess::Synced { bytes_written }) => {
-                    summary.synced += 1;
-                    summary.bytes_written += bytes_written;
-                }
-                Ok(ItemProcess::Skipped) => {
-                    summary.skipped += 1;
-                }
-                Err(error) => {
-                    summary.failed += 1;
-                    let message = error.to_string();
-                    self.repository
-                        .record_item_outcome(run_id, failed_item_outcome(error.snapshot, message))
-                        .await?;
-                }
+            if pending.len() >= self.options.file_concurrency() {
+                let Some(result) = pending.next().await else {
+                    continue;
+                };
+                self.apply_item_process_result(run_id, result, &mut summary)
+                    .await?;
             }
+        }
+
+        while let Some(result) = pending.next().await {
+            self.apply_item_process_result(run_id, result, &mut summary)
+                .await?;
+        }
+
+        if let Some(error) = scan_error {
+            return Err(error);
         }
 
         for stored in self.repository.known_item_states(job.source_id).await? {
@@ -143,6 +171,32 @@ where
         }
 
         Ok(summary)
+    }
+
+    async fn apply_item_process_result(
+        &self,
+        run_id: RunId,
+        result: Result<ItemProcess, ItemFailure>,
+        summary: &mut SyncRunSummary,
+    ) -> AppResult<()> {
+        match result {
+            Ok(ItemProcess::Synced { bytes_written }) => {
+                summary.synced += 1;
+                summary.bytes_written += bytes_written;
+            }
+            Ok(ItemProcess::Skipped) => {
+                summary.skipped += 1;
+            }
+            Err(error) => {
+                summary.failed += 1;
+                let message = error.to_string();
+                self.repository
+                    .record_item_outcome(run_id, failed_item_outcome(error.snapshot, message))
+                    .await?;
+            }
+        }
+
+        Ok(())
     }
 
     async fn process_snapshot(
@@ -219,6 +273,33 @@ where
             .map_err(|source| ItemFailure::new(snapshot, source))?;
 
         Ok(bytes_written)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyncEngineOptions {
+    file_concurrency: NonZeroUsize,
+}
+
+impl SyncEngineOptions {
+    #[must_use]
+    pub fn new(file_concurrency: usize) -> Self {
+        Self {
+            file_concurrency: NonZeroUsize::new(file_concurrency).unwrap_or(NonZeroUsize::MIN),
+        }
+    }
+
+    #[must_use]
+    pub const fn file_concurrency(self) -> usize {
+        self.file_concurrency.get()
+    }
+}
+
+impl Default for SyncEngineOptions {
+    fn default() -> Self {
+        Self {
+            file_concurrency: NonZeroUsize::MIN,
+        }
     }
 }
 

@@ -11,7 +11,10 @@ use crate::{
         NewScheduledSyncJob, SeaOrmRepository, SyncJobRecord, SyncJobRepository, SyncJobSchedule,
     },
     entity::sync_job,
-    sync::{engine::SyncEngine, vault_writer::VaultWriter},
+    sync::{
+        engine::{SyncEngine, SyncEngineOptions},
+        vault_writer::VaultWriter,
+    },
 };
 
 /// Lists all sync jobs.
@@ -84,12 +87,14 @@ pub async fn run_job(
     repository: Arc<SeaOrmRepository>,
     vault_path: PathBuf,
     job_id: JobId,
+    file_concurrency: usize,
 ) -> AppResult<JobRunResponse> {
     let source_id = mark_job_running(repository.as_ref(), job_id).await?;
-    let engine = SyncEngine::new(
+    let engine = SyncEngine::with_options(
         Arc::clone(&repository),
         Arc::new(move |kind| source_connector(kind, source_id)),
         VaultWriter::new(vault_path),
+        SyncEngineOptions::new(file_concurrency),
     );
 
     match engine.run_job(job_id).await {

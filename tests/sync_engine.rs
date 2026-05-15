@@ -1,7 +1,11 @@
 use std::{
     collections::{BTreeMap, VecDeque},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -15,12 +19,13 @@ use hoarder::{
         SourceId, SyncStatus,
     },
     sync::{
-        engine::{SyncEngine, SyncJob, SyncRunStatus, SyncRunSummary},
+        engine::{SyncEngine, SyncEngineOptions, SyncJob, SyncRunStatus, SyncRunSummary},
         planner::StoredItemState,
         repository::{ItemSyncOutcome, SyncRepository},
         vault_writer::VaultWriter,
     },
 };
+use tokio::time::sleep;
 
 #[tokio::test]
 async fn sync_engine_records_item_failure_and_continues_run() {
@@ -214,11 +219,57 @@ async fn sync_engine_marks_unseen_previous_items_deleted_without_removing_local_
     );
 }
 
+#[tokio::test]
+async fn sync_engine_respects_file_concurrency_for_reads() {
+    let source_id = SourceId::new();
+    let job_id = JobId::new();
+    let run_id = RunId::new();
+    let vault_root = temp_vault_root("file-concurrency");
+    let probe = Arc::new(ReadConcurrencyProbe::default());
+    let connector = Arc::new(
+        FakeConnector::new(
+            source_id,
+            [
+                file_snapshot(source_id, "one.txt", 3),
+                file_snapshot(source_id, "two.txt", 3),
+                file_snapshot(source_id, "three.txt", 5),
+            ],
+            BTreeMap::from([
+                ("one.txt".to_owned(), Ok(Bytes::from_static(b"one"))),
+                ("two.txt".to_owned(), Ok(Bytes::from_static(b"two"))),
+                ("three.txt".to_owned(), Ok(Bytes::from_static(b"three"))),
+            ]),
+        )
+        .with_read_probe(Arc::clone(&probe)),
+    );
+    let repository = Arc::new(FakeRepository::new(SyncJob {
+        id: job_id,
+        source_id,
+        connector_kind: ConnectorKind::OpenDal,
+        connector_config: connector_config(),
+        scan_cursor: None,
+    }));
+    repository.set_next_run_id(run_id);
+    let engine = SyncEngine::with_options(
+        repository,
+        Arc::new(move |_kind| Ok(connector.clone() as Arc<dyn SourceConnector>)),
+        VaultWriter::new(vault_root),
+        SyncEngineOptions::new(2),
+    );
+
+    let summary = engine.run_job(job_id).await.unwrap();
+
+    assert_eq!(summary.processed, 3);
+    assert_eq!(summary.synced, 3);
+    assert!(probe.max_active() >= 2);
+}
+
 #[derive(Debug)]
 struct FakeConnector {
     source_id: SourceId,
     snapshots: Vec<ItemSnapshot>,
     reads: BTreeMap<String, Result<Bytes, String>>,
+    read_probe: Option<Arc<ReadConcurrencyProbe>>,
 }
 
 impl FakeConnector {
@@ -231,7 +282,13 @@ impl FakeConnector {
             source_id,
             snapshots: snapshots.into_iter().collect(),
             reads,
+            read_probe: None,
         }
+    }
+
+    fn with_read_probe(mut self, probe: Arc<ReadConcurrencyProbe>) -> Self {
+        self.read_probe = Some(probe);
+        self
     }
 }
 
@@ -265,6 +322,9 @@ impl SourceConnector for FakeConnector {
     ) -> ConnectorFuture<'a, ByteStream> {
         async move {
             assert_eq!(item_ref.source_id, self.source_id);
+            if let Some(probe) = &self.read_probe {
+                probe.observe().await;
+            }
             let result = self.reads.get(&item_ref.source_path).unwrap().clone();
             match result {
                 Ok(bytes) => Ok(Box::pin(stream::iter([Ok(bytes)])) as ByteStream),
@@ -274,6 +334,25 @@ impl SourceConnector for FakeConnector {
             }
         }
         .boxed()
+    }
+}
+
+#[derive(Debug, Default)]
+struct ReadConcurrencyProbe {
+    active: AtomicUsize,
+    max_active: AtomicUsize,
+}
+
+impl ReadConcurrencyProbe {
+    async fn observe(&self) {
+        let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+        self.max_active.fetch_max(active, Ordering::SeqCst);
+        sleep(Duration::from_millis(25)).await;
+        self.active.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    fn max_active(&self) -> usize {
+        self.max_active.load(Ordering::SeqCst)
     }
 }
 

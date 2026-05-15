@@ -52,7 +52,13 @@ pub async fn run_due_jobs_once(
     let mut started = 0;
 
     for job in due_jobs {
-        match job_service::run_job(Arc::clone(&repository), config.vault_path.clone(), job.id).await
+        match job_service::run_job(
+            Arc::clone(&repository),
+            config.vault_path.clone(),
+            job.id,
+            settings.file_concurrency,
+        )
+        .await
         {
             Ok(_) => {
                 started += 1;

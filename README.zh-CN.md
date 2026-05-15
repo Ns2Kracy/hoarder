@@ -91,7 +91,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] `Cargo.toml` 中启用严格 Rust 和 Clippy lint
 - [x] Release profile 启用 LTO 和符号裁剪
 - [x] serve 模式内置后台调度器
-- [x] 运行时设置持久化和修改
+- [x] 运行时设置持久化、修改和即时生效
 - [ ] 远程多用户部署模式
 - [ ] 认证和授权
 
@@ -154,7 +154,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 单个 item 失败不会导致整个 run 失败
 - [x] Connector 级失败会让 run 失败
 - [x] Run summary 记录 processed、synced、skipped、failed 和 byte count
-- [ ] 有界并发文件同步
+- [x] 有界并发文件同步
 - [x] Job 级并发控制
 - [x] 定时同步任务
 - [ ] 从 connector cursor 恢复

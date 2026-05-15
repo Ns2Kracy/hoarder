@@ -8,6 +8,7 @@ use crate::{
     app::{job_service, run_service, source_service},
     connectors::traits::ConnectorConfig,
     core::types::{JobId, RunId, SourceId},
+    db::repository::RuntimeSettingsRepository,
     server,
 };
 
@@ -255,8 +256,14 @@ async fn execute_sync(config_path: Option<PathBuf>, command: SyncCommand) -> App
     match command {
         SyncCommand::Run { job_id } => {
             let job_id = parse_id::<JobId>(&job_id, "job id")?;
-            let response =
-                job_service::run_job(repository, config.vault_path.clone(), job_id).await?;
+            let settings = repository.load_runtime_settings(&config).await?;
+            let response = job_service::run_job(
+                repository,
+                config.vault_path.clone(),
+                job_id,
+                settings.file_concurrency,
+            )
+            .await?;
             println!("runId={} status={:?}", response.run_id, response.status);
         }
         SyncCommand::Status { job_id, run_id } => {

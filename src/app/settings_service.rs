@@ -3,6 +3,7 @@ use crate::{
     api::types::{SettingsDto, UpdateSettingsRequest},
     config::RuntimeSettingsPatch,
     db::repository::{RuntimeSettingsRepository, SeaOrmRepository},
+    logging,
 };
 
 /// Returns boot config merged with persisted runtime settings.
@@ -27,7 +28,7 @@ pub async fn update_settings(
     config: &AppConfig,
     request: UpdateSettingsRequest,
 ) -> AppResult<SettingsDto> {
-    Ok(repository
+    let settings = repository
         .patch_runtime_settings(
             config,
             RuntimeSettingsPatch {
@@ -36,6 +37,8 @@ pub async fn update_settings(
                 log_level: Some(request.log_level),
             },
         )
-        .await?
-        .into())
+        .await?;
+    logging::set_level(&settings.log_level)?;
+
+    Ok(settings.into())
 }

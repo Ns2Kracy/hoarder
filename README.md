@@ -91,7 +91,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Strict Rust and Clippy lints in `Cargo.toml`
 - [x] Release profile with LTO and symbol stripping
 - [x] Background scheduler inside serve mode
-- [x] Runtime settings persistence and mutation
+- [x] Runtime settings persistence, mutation, and live application
 - [ ] Multi-user remote deployment mode
 - [ ] Authentication and authorization
 
@@ -154,7 +154,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Per-item failures recorded without failing the entire run
 - [x] Connector-level failures fail the run
 - [x] Run summaries with processed, synced, skipped, failed, and byte counts
-- [ ] Bounded concurrent file sync execution
+- [x] Bounded concurrent file sync execution
 - [x] Job-level concurrency control
 - [x] Scheduled recurring sync jobs
 - [ ] Resume from connector cursor

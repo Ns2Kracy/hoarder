@@ -16,6 +16,7 @@ use crate::{
     },
     app::{job_service, run_service, settings_service, source_service},
     core::types::{JobId, RunId, SourceId},
+    db::repository::RuntimeSettingsRepository,
 };
 
 use super::{error::ApiError, state::ApiState};
@@ -98,12 +99,17 @@ async fn run_job(
     path: Result<Path<JobId>, PathRejection>,
 ) -> Result<Json<JobRunResponse>, ApiError> {
     let Path(job_id) = path?;
+    let settings = state
+        .repository()
+        .load_runtime_settings(state.config())
+        .await?;
 
     Ok(Json(
         job_service::run_job(
             std::sync::Arc::clone(state.repository()),
             state.vault_path(),
             job_id,
+            settings.file_concurrency,
         )
         .await?,
     ))

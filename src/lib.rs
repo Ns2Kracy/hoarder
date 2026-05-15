@@ -10,6 +10,7 @@ pub mod core;
 pub mod db;
 pub mod entity;
 pub mod error;
+pub mod logging;
 pub mod middleware;
 pub mod server;
 pub mod sync;
