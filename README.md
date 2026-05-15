@@ -166,6 +166,7 @@ cargo run -- --config ./hoarder.config.json serve
 ### API
 
 - [x] `GET /api/health`
+- [x] `GET /api/openapi.json`
 - [x] `GET /api/sources`
 - [x] `POST /api/sources`
 - [x] `GET /api/jobs`
@@ -183,7 +184,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] `GET /api/runs/{id}`
 - [x] Filtered item listing by source or status
 - [x] `PATCH /api/settings`
-- [ ] OpenAPI specification
+- [x] OpenAPI specification
 
 ### Web Console
 

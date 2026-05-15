@@ -74,6 +74,32 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
 }
 
 #[tokio::test]
+async fn api_routes_openapi_spec_lists_current_routes() {
+    let test = TestApp::new().await;
+    let response = request(test.app.clone(), "GET", "/api/openapi.json", None).await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["openapi"], json!("3.1.0"));
+    for path in [
+        "/api/health",
+        "/api/openapi.json",
+        "/api/sources",
+        "/api/sources/{id}/test",
+        "/api/jobs",
+        "/api/jobs/{id}/run",
+        "/api/runs",
+        "/api/runs/{id}",
+        "/api/items",
+        "/api/errors",
+        "/api/settings",
+    ] {
+        assert!(response.body["paths"][path].is_object(), "{path}");
+    }
+    assert!(response.body["components"]["schemas"]["SourceDto"].is_object());
+    assert!(response.body["components"]["schemas"]["ApiErrorBody"].is_object());
+}
+
+#[tokio::test]
 async fn api_routes_run_job_runs_sync_engine() {
     let test = TestApp::new().await;
 

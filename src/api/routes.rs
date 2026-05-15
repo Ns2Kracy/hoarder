@@ -9,10 +9,13 @@ use axum::{
 };
 
 use crate::{
-    api::types::{
-        CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
-        ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
-        SourceDto, SourceTestResponse, SyncErrorDto, UpdateSettingsRequest,
+    api::{
+        openapi,
+        types::{
+            CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
+            ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
+            SourceDto, SourceTestResponse, SyncErrorDto, UpdateSettingsRequest,
+        },
     },
     app::{job_service, run_service, settings_service, source_service},
     core::types::{JobId, RunId, SourceId},
@@ -34,6 +37,7 @@ pub fn router_without_fallback(state: ApiState) -> Router {
 fn api_routes_without_state() -> Router<ApiState> {
     Router::new()
         .route("/api/health", get(health))
+        .route("/api/openapi.json", get(openapi_spec))
         .route("/api/sources", get(list_sources).post(create_source))
         .route("/api/sources/{id}/test", post(test_source))
         .route("/api/jobs", get(list_jobs).post(create_job))
@@ -47,6 +51,10 @@ fn api_routes_without_state() -> Router<ApiState> {
 
 async fn health() -> Json<HealthResponse> {
     Json(HealthResponse::ok())
+}
+
+async fn openapi_spec() -> Json<serde_json::Value> {
+    Json(openapi::spec())
 }
 
 async fn list_sources(
