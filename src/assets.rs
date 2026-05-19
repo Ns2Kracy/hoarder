@@ -3,11 +3,13 @@ use axum::{
     http::{StatusCode, Uri, header},
     response::{IntoResponse, Response},
 };
-use include_dir::{Dir, File, include_dir};
+use rust_embed::RustEmbed;
 
 use crate::api::error::ApiError;
 
-static WEB_DIST: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
+#[derive(RustEmbed)]
+#[folder = "web/dist"]
+struct WebAssets;
 
 pub async fn serve(uri: Uri) -> Response {
     response_for_path(uri.path())
@@ -29,26 +31,26 @@ pub fn response_for_path(path: &str) -> Response {
         return not_found("asset not found");
     }
 
-    WEB_DIST.get_file("index.html").map_or_else(
+    WebAssets::get("index.html").map_or_else(
         || not_found("frontend assets have not been built"),
         |file| file_response("index.html", file),
     )
 }
 
-fn asset_file(path: &str) -> Option<(&str, &'static File<'static>)> {
+fn asset_file(path: &str) -> Option<(&str, rust_embed::EmbeddedFile)> {
     let path = match path {
         "" => "index.html",
         path => path,
     };
 
-    WEB_DIST.get_file(path).map(|file| (path, file))
+    WebAssets::get(path).map(|file| (path, file))
 }
 
-fn file_response(path: &str, file: &File<'_>) -> Response {
+fn file_response(path: &str, file: rust_embed::EmbeddedFile) -> Response {
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, content_type(path))
-        .body(Body::from(file.contents().to_vec()))
+        .body(Body::from(file.data.into_owned()))
         .unwrap()
 }
 

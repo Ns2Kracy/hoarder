@@ -16,11 +16,11 @@ chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
 futures = "0.3.32"
 hex = "0.4.3"
-include_dir = "0.7.4"
 opendal = { version = "0.56.0", default-features = false, features = [
   "executors-tokio",
   "services-fs"
 ] }
+rust-embed = "8.11.0"
 sea-orm = { version = "2.0.0-rc.38", default-features = false, features = [
   "entity-registry",
   "macros",
