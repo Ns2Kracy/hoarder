@@ -219,7 +219,9 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] `cargo build --release`
 - [x] End-to-end local filesystem sync test
 - [x] Static asset fallback tests
+- [x] App service integration tests
 - [x] API route tests
+- [x] CLI command integration tests
 - [x] Connector contract tests
 - [x] Vault writer safety tests
 - [ ] CI workflow
@@ -308,4 +310,4 @@ cargo build --release
 
 ## Current Status
 
-Hoarder is an early local-first MVP. The backend can serve the web console, sync SQLite schema, create sources through the API, run database-backed jobs through the API, and pass an end-to-end filesystem sync test. The next highest-value work is wiring the remaining CLI handlers, adding source test/settings API routes, and implementing more OpenDAL services beyond filesystem.
+Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. The next highest-value work is implementing more OpenDAL services beyond filesystem, adding explicit schema migrations, and preparing CI/release artifacts.

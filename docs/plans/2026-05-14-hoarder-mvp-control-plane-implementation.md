@@ -611,33 +611,37 @@ remaining risks.
 
 ### Checkpoint 1: Contract Foundation
 
-- [ ] Task 1 merged.
-- [ ] Rust and TypeScript contract names align.
-- [ ] No implementation lane has started from stale contracts.
+- [x] Task 1 merged.
+- [x] Rust and TypeScript contract names align.
+- [x] No implementation lane has started from stale contracts.
 
 ### Checkpoint 2: Backend Control Plane
 
-- [ ] Tasks 2-5 merged.
-- [ ] API can create jobs, run jobs, fetch run detail, filter items/errors, and patch settings.
-- [ ] Strict Clippy passes.
+- [x] Tasks 2-5 merged.
+- [x] API can create jobs, run jobs, fetch run detail, filter items/errors, and patch settings.
+- [x] Strict Clippy passes.
 
 ### Checkpoint 3: Interfaces
 
-- [ ] Tasks 6, 8, and 9 merged.
-- [ ] CLI and Web both use the shared MVP workflow.
-- [ ] Bun verification passes.
+- [x] Tasks 6, 8, and 9 merged.
+- [x] CLI and Web both use the shared MVP workflow.
+- [x] Bun verification passes.
 
 ### Checkpoint 4: Scheduler And Release Readiness
 
-- [ ] Task 7 merged.
-- [ ] Task 10 merged.
-- [ ] Full verification passes.
-- [ ] README checklists match actual behavior.
+- [x] Task 7 merged.
+- [x] Task 10 merged.
+- [x] Full verification passes.
+- [x] README checklists match actual behavior.
+
+## Implementation Notes
+
+- Runtime settings persist the desired tracing filter and hot-reload it after a
+  successful update.
 
 ## Open Questions For Later Phases
 
 - Should stale `running` jobs be recovered automatically after a process crash?
 - Should CLI add `--json` output for automation?
-- Should settings hot-reload tracing filters, or only persist the desired value?
 - Should Web remove mock fallback entirely once API coverage is complete?
 - Should explicit schema migrations replace schema sync before wider release?

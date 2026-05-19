@@ -219,7 +219,9 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] `cargo build --release`
 - [x] 本地文件系统端到端同步测试
 - [x] 静态资源 fallback 测试
+- [x] App service 集成测试
 - [x] API route 测试
+- [x] CLI command 集成测试
 - [x] Connector contract 测试
 - [x] Vault writer 安全测试
 - [ ] CI workflow
@@ -308,4 +310,4 @@ cargo build --release
 
 ## 当前状态
 
-Hoarder 目前是早期本地优先 MVP。后端已经可以提供 Web 控制台、同步 SQLite schema、通过 API 创建 source、通过 API 运行数据库中的 job，并通过本地文件系统端到端同步测试。下一步最高价值的工作是补齐剩余 CLI handler、增加 source test/settings API routes，并实现 filesystem 之外的更多 OpenDAL 服务。
+Hoarder 目前是早期本地优先 MVP。后端已经可以提供嵌入式 Web 控制台、同步 SQLite schema、暴露 MVP 控制面 API、执行 source/job/sync CLI 工作流、在 serve 模式下运行固定间隔任务，并通过本地文件系统端到端同步测试。下一步最高价值的工作是实现 filesystem 之外的更多 OpenDAL 服务、增加显式 schema migration，并准备 CI/release artifacts。
