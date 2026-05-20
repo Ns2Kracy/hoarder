@@ -4,12 +4,16 @@ use std::{
     sync::Arc,
 };
 
-use axum::{Router, http::HeaderName, middleware};
+use axum::{
+    Router,
+    http::{HeaderName, HeaderValue, Method, header},
+    middleware,
+};
 use sea_orm::{ConnectOptions, DatabaseConnection};
 use tokio::net::TcpListener;
 use tower_http::{
     compression::CompressionLayer,
-    cors::CorsLayer,
+    cors::{AllowOrigin, CorsLayer},
     propagate_header::PropagateHeaderLayer,
     request_id::{MakeRequestUuid, SetRequestIdLayer},
 };
@@ -171,5 +175,41 @@ fn app_with_state(state: ApiState) -> Router {
             HeaderName::from_static("x-request-id"),
             MakeRequestUuid,
         ))
-        .layer(CorsLayer::permissive())
+        .layer(local_cors_layer())
+}
+
+fn local_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin, _parts| {
+            is_allowed_local_origin(origin)
+        }))
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::OPTIONS,
+            Method::HEAD,
+        ])
+        .allow_headers([header::CONTENT_TYPE])
+}
+
+fn is_allowed_local_origin(origin: &HeaderValue) -> bool {
+    let Ok(origin) = origin.to_str() else {
+        return false;
+    };
+    let Some((scheme, host_port)) = origin.split_once("://") else {
+        return false;
+    };
+    if !matches!(scheme, "http" | "https") {
+        return false;
+    }
+    let Some((host, port)) = host_port.rsplit_once(':') else {
+        return false;
+    };
+    if !matches!(host, "127.0.0.1" | "localhost" | "[::1]") {
+        return false;
+    }
+
+    port.parse::<u16>()
+        .is_ok_and(|port| matches!(port, 4761 | 5173 | 4173))
 }

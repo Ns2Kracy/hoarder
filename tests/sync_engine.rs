@@ -264,10 +264,80 @@ async fn sync_engine_respects_file_concurrency_for_reads() {
     assert!(probe.max_active() >= 2);
 }
 
+#[tokio::test]
+async fn sync_engine_preserves_processed_counts_when_scan_errors_after_items() {
+    let source_id = SourceId::new();
+    let job_id = JobId::new();
+    let run_id = RunId::new();
+    let vault_root = temp_vault_root("scan-error-after-items");
+    let connector = Arc::new(FakeConnector::with_scan_error_after(
+        source_id,
+        [
+            file_snapshot(source_id, "ok.txt", 2),
+            file_snapshot(source_id, "fail.txt", 4),
+        ],
+        "scan failed after partial results",
+        BTreeMap::from([
+            ("ok.txt".to_owned(), Ok(Bytes::from_static(b"ok"))),
+            (
+                "fail.txt".to_owned(),
+                Err("connector read failed".to_owned()),
+            ),
+        ]),
+    ));
+    let repository = Arc::new(FakeRepository::new(SyncJob {
+        id: job_id,
+        source_id,
+        connector_kind: ConnectorKind::OpenDal,
+        connector_config: connector_config(),
+        scan_cursor: None,
+    }));
+    repository.set_next_run_id(run_id);
+    let engine = SyncEngine::new(
+        repository.clone(),
+        Arc::new(move |_kind| Ok(connector.clone() as Arc<dyn SourceConnector>)),
+        VaultWriter::new(vault_root.clone()),
+    );
+
+    let error = engine
+        .run_job(job_id)
+        .await
+        .expect_err("scan error should fail the run");
+
+    assert!(
+        error
+            .to_string()
+            .contains("scan failed after partial results"),
+        "{error}"
+    );
+    assert_eq!(
+        tokio::fs::read(vault_root.join(source_id.to_string()).join("ok.txt"))
+            .await
+            .unwrap(),
+        b"ok"
+    );
+    let expected_summary = SyncRunSummary {
+        run_id,
+        processed: 2,
+        synced: 1,
+        skipped: 0,
+        failed: 1,
+        bytes_written: 2,
+    };
+    assert_eq!(
+        repository.events().last(),
+        Some(&RepoEvent::FinishRun(
+            run_id,
+            SyncRunStatus::Failed,
+            expected_summary
+        ))
+    );
+}
+
 #[derive(Debug)]
 struct FakeConnector {
     source_id: SourceId,
-    snapshots: Vec<ItemSnapshot>,
+    snapshots: Vec<ScanEvent>,
     reads: BTreeMap<String, Result<Bytes, String>>,
     read_probe: Option<Arc<ReadConcurrencyProbe>>,
 }
@@ -280,7 +350,7 @@ impl FakeConnector {
     ) -> Self {
         Self {
             source_id,
-            snapshots: snapshots.into_iter().collect(),
+            snapshots: snapshots.into_iter().map(ScanEvent::Snapshot).collect(),
             reads,
             read_probe: None,
         }
@@ -289,6 +359,24 @@ impl FakeConnector {
     fn with_read_probe(mut self, probe: Arc<ReadConcurrencyProbe>) -> Self {
         self.read_probe = Some(probe);
         self
+    }
+
+    fn with_scan_error_after<const N: usize>(
+        source_id: SourceId,
+        snapshots: [ItemSnapshot; N],
+        error: &str,
+        reads: BTreeMap<String, Result<Bytes, String>>,
+    ) -> Self {
+        let mut snapshots: Vec<ScanEvent> =
+            snapshots.into_iter().map(ScanEvent::Snapshot).collect();
+        snapshots.push(ScanEvent::Error(error.to_owned()));
+
+        Self {
+            source_id,
+            snapshots,
+            reads,
+            read_probe: None,
+        }
     }
 }
 
@@ -310,7 +398,12 @@ impl SourceConnector for FakeConnector {
         _cursor: Option<&'a str>,
     ) -> ConnectorFuture<'a, ScanStream> {
         async move {
-            Ok(Box::pin(stream::iter(self.snapshots.clone().into_iter().map(Ok))) as ScanStream)
+            let snapshots = self.snapshots.clone().into_iter().map(|event| match event {
+                ScanEvent::Snapshot(snapshot) => Ok(snapshot),
+                ScanEvent::Error(message) => Err(hoarder::AppError::Connector(message)),
+            });
+
+            Ok(Box::pin(stream::iter(snapshots)) as ScanStream)
         }
         .boxed()
     }
@@ -335,6 +428,12 @@ impl SourceConnector for FakeConnector {
         }
         .boxed()
     }
+}
+
+#[derive(Clone, Debug)]
+enum ScanEvent {
+    Snapshot(ItemSnapshot),
+    Error(String),
 }
 
 #[derive(Debug, Default)]

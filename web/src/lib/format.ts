@@ -21,7 +21,7 @@ export function formatDateTime(value?: string) {
 }
 
 export function formatDuration(milliseconds?: number) {
-  if (!milliseconds) {
+  if (milliseconds === undefined) {
     return "Running";
   }
 

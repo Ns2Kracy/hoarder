@@ -96,6 +96,43 @@ async fn opendal_fs_connector_reads_file_contents_as_stream() {
     assert_eq!(body, b"hello from fs");
 }
 
+#[tokio::test]
+async fn opendal_fs_connector_streams_file_without_single_buffering() {
+    let root = TempDir::new("read-streaming");
+    fs::create_dir_all(root.path.join("docs")).unwrap();
+    fs::write(root.path.join("docs/large.bin"), vec![b'x'; 256 * 1024]).unwrap();
+
+    let connector = OpenDalSourceConnector::new(source_id());
+    let config = fs_config(&root);
+    let snapshot = {
+        let mut scan = connector.scan(&config, None).await.unwrap();
+        let mut found = None;
+        while let Some(snapshot) = scan.next().await {
+            let snapshot = snapshot.unwrap();
+            if snapshot.source_path == "docs/large.bin" {
+                found = Some(snapshot);
+                break;
+            }
+        }
+        found.expect("large file snapshot should be listed")
+    };
+
+    let mut stream = connector.read(&config, &snapshot.item_ref()).await.unwrap();
+    let mut chunk_count = 0;
+    let mut bytes_read = 0;
+    while let Some(chunk) = stream.next().await {
+        let chunk: Bytes = chunk.unwrap();
+        chunk_count += 1;
+        bytes_read += chunk.len();
+    }
+
+    assert_eq!(bytes_read, 256 * 1024);
+    assert!(
+        chunk_count > 1,
+        "streaming reads should yield multiple chunks for large files"
+    );
+}
+
 fn fs_config(root: &TempDir) -> ConnectorConfig {
     ConnectorConfig::OpenDal {
         service: "fs".to_owned(),

@@ -51,6 +51,8 @@ export const runItems = writable<Loadable<SyncItemDto[]>>(emptyList());
 export const runErrors = writable<Loadable<SyncErrorDto[]>>(emptyList());
 export const settings = writable<Loadable<SettingsDto>>(emptyValue(defaultSettings));
 
+let runDetailRequestSequence = 0;
+
 export const summary = derived([sources, jobs, runs], ([$sources, $jobs, $runs]) =>
   summarizeConsole($sources.data, $jobs.data, $runs.data),
 );
@@ -194,20 +196,41 @@ export async function triggerJobRun(jobId: string) {
 }
 
 export async function loadRunDetail(runId: string, filters: Omit<ItemFilters, "runId"> = {}) {
-  selectedRunDetail.update((current) => ({ ...current, status: "loading" }));
-  runItems.update((current) => ({ ...current, status: "loading" }));
-  runErrors.update((current) => ({ ...current, status: "loading" }));
+  const requestSequence = ++runDetailRequestSequence;
+
+  selectedRunDetail.update((current) => ({ ...current, status: "loading", data: undefined }));
+  runItems.update((current) => ({ ...current, status: "loading", data: [] }));
+  runErrors.update((current) => ({ ...current, status: "loading", data: [] }));
 
   const itemFilters: ItemFilters = { ...filters, runId };
   const errorFilters: ErrorFilters = {
     runId,
     sourceId: filters.sourceId,
   };
-  const [detailResult, itemResult, errorResult] = await Promise.all([
-    api.getRunDetail(runId, get(jobs).data, get(runs).data),
-    api.getItems(itemFilters),
-    api.getErrors(errorFilters),
-  ]);
+  let detailResult: Awaited<ReturnType<typeof api.getRunDetail>>;
+  let itemResult: Awaited<ReturnType<typeof api.getItems>>;
+  let errorResult: Awaited<ReturnType<typeof api.getErrors>>;
+
+  try {
+    [detailResult, itemResult, errorResult] = await Promise.all([
+      api.getRunDetail(runId, get(jobs).data, get(runs).data),
+      api.getItems(itemFilters),
+      api.getErrors(errorFilters),
+    ]);
+  } catch (error) {
+    if (requestSequence === runDetailRequestSequence) {
+      selectedRunDetail.update((current) => loadableWithError(current, error));
+      runItems.update((current) => loadableWithError(current, error));
+      runErrors.update((current) => loadableWithError(current, error));
+    }
+
+    return;
+  }
+
+  if (requestSequence !== runDetailRequestSequence) {
+    return;
+  }
+
   const detail = {
     ...detailResult.data,
     errors: errorResult.data,

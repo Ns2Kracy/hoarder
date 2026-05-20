@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::{
     AppError, AppResult,
@@ -115,7 +115,8 @@ pub async fn run_job(
 
 async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppResult<SourceId> {
     let db = repository.connection();
-    let job = sync_job::Entity::find_by_id(job_id.as_uuid())
+    let job_id_uuid = job_id.as_uuid();
+    let job = sync_job::Entity::find_by_id(job_id_uuid)
         .one(db)
         .await
         .map_err(map_db_error)?
@@ -133,10 +134,26 @@ async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppRe
     }
 
     let source_id = SourceId::from_uuid(job.source_id);
-    let mut active_model: sync_job::ActiveModel = job.into();
-    active_model.status = sea_orm::ActiveValue::Set("running".to_owned());
-    active_model.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now());
-    active_model.update(db).await.map_err(map_db_error)?;
+    let result = sync_job::Entity::update_many()
+        .col_expr(
+            sync_job::Column::Status,
+            sea_orm::sea_query::Expr::value("running"),
+        )
+        .col_expr(
+            sync_job::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(chrono::Utc::now()),
+        )
+        .filter(sync_job::Column::Id.eq(job_id_uuid))
+        .filter(sync_job::Column::Enabled.eq(true))
+        .filter(sync_job::Column::Status.ne("running"))
+        .exec(db)
+        .await
+        .map_err(map_db_error)?;
+    if result.rows_affected == 0 {
+        return Err(AppError::Conflict(format!(
+            "sync job is already running: {job_id}"
+        )));
+    }
 
     Ok(source_id)
 }
@@ -280,4 +297,113 @@ fn run_status_from_str(status: &str) -> AppResult<RunStatus> {
 #[allow(clippy::needless_pass_by_value)]
 fn map_db_error(error: sea_orm::DbErr) -> AppError {
     AppError::Database(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, fs, path::PathBuf};
+
+    use tokio::task::yield_now;
+    use uuid::Uuid;
+
+    use crate::{
+        AppError,
+        connectors::traits::ConnectorConfig,
+        core::types::ConnectorKind,
+        db::{
+            connect_sqlite,
+            repository::{
+                NewScheduledSyncJob, NewSource, SeaOrmRepository, SourceRepository,
+                SyncJobRepository, SyncJobSchedule,
+            },
+            schema::sync_schema,
+        },
+    };
+
+    use super::mark_job_running;
+
+    #[tokio::test]
+    async fn mark_job_running_allows_only_one_concurrent_claim_across_connections()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = TempDir::new("atomic-job-claim");
+        let database_path = temp.path.join("hoarder.sqlite");
+        let database_url = database_path.to_string_lossy().into_owned();
+        let setup_db = connect_sqlite(&database_url).await?;
+        sync_schema(&setup_db).await?;
+        let setup_repository = SeaOrmRepository::new(setup_db);
+        let source = setup_repository
+            .create_source(NewSource {
+                name: "Local Docs".to_owned(),
+                kind: ConnectorKind::OpenDal,
+                config_json: serde_json::to_value(fs_config(&temp.path))?,
+                enabled: true,
+            })
+            .await?;
+        let job = setup_repository
+            .create_scheduled_job(NewScheduledSyncJob {
+                source_id: source.id,
+                name: "Concurrent sync".to_owned(),
+                enabled: true,
+                schedule: SyncJobSchedule::Manual,
+            })
+            .await?;
+
+        let first_repository = SeaOrmRepository::new(connect_sqlite(&database_url).await?);
+        let second_repository = SeaOrmRepository::new(connect_sqlite(&database_url).await?);
+        let first_job_id = job.id;
+        let second_job_id = job.id;
+        let first = tokio::spawn(async move {
+            yield_now().await;
+            mark_job_running(&first_repository, first_job_id).await
+        });
+        let second = tokio::spawn(async move {
+            yield_now().await;
+            mark_job_running(&second_repository, second_job_id).await
+        });
+
+        let results = [first.await?, second.await?];
+        let successful = results.iter().filter(|result| result.is_ok()).count();
+        let conflicts = results
+            .iter()
+            .filter(|result| matches!(result, Err(AppError::Conflict(_))))
+            .count();
+
+        assert_eq!(
+            successful, 1,
+            "exactly one concurrent attempt should claim the job: {results:?}"
+        );
+        assert_eq!(
+            conflicts, 1,
+            "the losing concurrent attempt should see a running conflict: {results:?}"
+        );
+
+        Ok(())
+    }
+
+    fn fs_config(root: &std::path::Path) -> ConnectorConfig {
+        ConnectorConfig::OpenDal {
+            service: "fs".to_owned(),
+            options: BTreeMap::from([("root".to_owned(), root.to_string_lossy().into_owned())]),
+        }
+    }
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let path =
+                std::env::temp_dir().join(format!("hoarder-job-service-{name}-{}", Uuid::new_v4()));
+            fs::create_dir_all(&path).unwrap();
+
+            Self { path }
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
 }

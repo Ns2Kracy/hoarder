@@ -1,8 +1,7 @@
 use std::time::SystemTime;
 
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use futures::{FutureExt, StreamExt, stream};
+use futures::{FutureExt, StreamExt};
 use opendal::{Entry, EntryMode, Operator, services::Fs};
 
 use crate::{
@@ -15,6 +14,8 @@ use crate::{
     },
     error::{AppError, AppResult},
 };
+
+const READ_CHUNK_SIZE: usize = 64 * 1024;
 
 #[derive(Clone, Debug)]
 pub struct OpenDalSourceConnector {
@@ -96,15 +97,17 @@ impl SourceConnector for OpenDalSourceConnector {
 
             let config = validate_connector_config(config)?;
             let operator = build_operator(&config)?;
-            let buffer = operator
-                .read(&item_ref.source_path)
+            let stream = operator
+                .reader_with(&item_ref.source_path)
+                .chunk(READ_CHUNK_SIZE)
                 .await
-                .map_err(|error| opendal_error("read filesystem source item", error))?;
+                .map_err(|error| opendal_error("open filesystem source item reader", error))?
+                .into_bytes_stream(..)
+                .await
+                .map_err(|error| opendal_error("stream filesystem source item", error))?
+                .map(|chunk| chunk.map_err(|error| io_error("read filesystem source item", error)));
 
-            Ok(Box::pin(stream::iter(Iterator::map(
-                buffer.into_iter(),
-                Ok::<Bytes, AppError>,
-            ))) as ByteStream)
+            Ok(Box::pin(stream) as ByteStream)
         }
         .boxed()
     }
@@ -168,5 +171,10 @@ fn snapshot_from_entry(source_id: SourceId, entry: Entry) -> Option<AppResult<It
 
 #[allow(clippy::needless_pass_by_value)]
 fn opendal_error(context: &str, error: opendal::Error) -> AppError {
+    AppError::Connector(format!("{context}: {error}"))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn io_error(context: &str, error: std::io::Error) -> AppError {
     AppError::Connector(format!("{context}: {error}"))
 }

@@ -93,28 +93,15 @@ where
                 Ok(summary)
             }
             Err(error) => {
-                let summary = SyncRunSummary {
-                    run_id,
-                    processed: 0,
-                    synced: 0,
-                    skipped: 0,
-                    failed: 0,
-                    bytes_written: 0,
-                };
                 self.repository
-                    .finish_run(run_id, SyncRunStatus::Failed, summary)
+                    .finish_run(run_id, SyncRunStatus::Failed, error.summary)
                     .await?;
-                Err(error)
+                Err(error.source)
             }
         }
     }
 
-    async fn run_started_job(&self, run_id: RunId, job: &SyncJob) -> AppResult<SyncRunSummary> {
-        let connector = (self.connector_resolver)(job.connector_kind)?;
-        let cursor = job.scan_cursor.as_deref();
-        let mut snapshots = connector.scan(&job.connector_config, cursor).await?;
-        let mut pending = FuturesUnordered::new();
-        let mut seen_paths = BTreeSet::new();
+    async fn run_started_job(&self, run_id: RunId, job: &SyncJob) -> SyncRunResult {
         let mut summary = SyncRunSummary {
             run_id,
             processed: 0,
@@ -123,6 +110,15 @@ where
             failed: 0,
             bytes_written: 0,
         };
+        let connector = (self.connector_resolver)(job.connector_kind)
+            .map_err(|source| SyncRunError::new(source, summary.clone()))?;
+        let cursor = job.scan_cursor.as_deref();
+        let mut snapshots = connector
+            .scan(&job.connector_config, cursor)
+            .await
+            .map_err(|source| SyncRunError::new(source, summary.clone()))?;
+        let mut pending = FuturesUnordered::new();
+        let mut seen_paths = BTreeSet::new();
 
         let mut scan_error = None;
         while let Some(snapshot_result) = snapshots.next().await {
@@ -147,26 +143,34 @@ where
                     continue;
                 };
                 self.apply_item_process_result(run_id, result, &mut summary)
-                    .await?;
+                    .await
+                    .map_err(|source| SyncRunError::new(source, summary.clone()))?;
             }
         }
 
         while let Some(result) = pending.next().await {
             self.apply_item_process_result(run_id, result, &mut summary)
-                .await?;
+                .await
+                .map_err(|source| SyncRunError::new(source, summary.clone()))?;
         }
 
         if let Some(error) = scan_error {
-            return Err(error);
+            return Err(SyncRunError::new(error, summary));
         }
 
-        for stored in self.repository.known_item_states(job.source_id).await? {
+        for stored in self
+            .repository
+            .known_item_states(job.source_id)
+            .await
+            .map_err(|source| SyncRunError::new(source, summary.clone()))?
+        {
             if !seen_paths.contains(&stored.source_path)
                 && SyncPlanner::plan(None, Some(&stored)) == PlanDecision::MarkDeleted
             {
                 self.repository
                     .mark_deleted(run_id, job.source_id, &stored.source_path)
-                    .await?;
+                    .await
+                    .map_err(|source| SyncRunError::new(source, summary.clone()))?;
             }
         }
 
@@ -317,6 +321,20 @@ pub struct SyncRunSummary {
     pub skipped: u64,
     pub failed: u64,
     pub bytes_written: u64,
+}
+
+type SyncRunResult = Result<SyncRunSummary, SyncRunError>;
+
+#[derive(Debug)]
+struct SyncRunError {
+    source: AppError,
+    summary: SyncRunSummary,
+}
+
+impl SyncRunError {
+    const fn new(source: AppError, summary: SyncRunSummary) -> Self {
+        Self { source, summary }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

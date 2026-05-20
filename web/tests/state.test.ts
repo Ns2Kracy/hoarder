@@ -3,7 +3,9 @@ import { get } from "svelte/store";
 import { api } from "../src/lib/api";
 import {
   loadConsoleData,
+  loadRunDetail,
   runs,
+  selectedRunDetail,
   sources,
   testSourceConnection,
   triggerJobRun,
@@ -199,6 +201,150 @@ test("triggerJobRun keeps refreshed run list data when the live API returns the 
   });
 });
 
+test("loadRunDetail keeps the latest selected run when detail responses resolve out of order", async () => {
+  const detailResolvers = new Map<string, (response: Response) => void>();
+
+  globalThis.fetch = (async (input) => {
+    const path = requestPath(input);
+
+    if (path === "/api/runs/run-old" || path === "/api/runs/run-new") {
+      return new Promise<Response>((resolve) => {
+        detailResolvers.set(path, resolve);
+      });
+    }
+
+    if (path === "/api/items" || path === "/api/errors") {
+      return jsonResponse({ data: [] });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+
+  const oldRequest = loadRunDetail("run-old");
+  const newRequest = loadRunDetail("run-new");
+
+  detailResolvers.get("/api/runs/run-new")?.(jsonResponse(runDetailResponse("run-new")));
+  await newRequest;
+  expect(get(selectedRunDetail).data?.id).toBe("run-new");
+
+  detailResolvers.get("/api/runs/run-old")?.(jsonResponse(runDetailResponse("run-old")));
+  await oldRequest;
+  expect(get(selectedRunDetail).data?.id).toBe("run-new");
+});
+
+test("loadRunDetail clears stale selected run data while the next detail loads", async () => {
+  const detailResolvers = new Map<string, (response: Response) => void>();
+
+  globalThis.fetch = (async (input) => {
+    const path = requestPath(input);
+
+    if (path === "/api/runs/run-old" || path === "/api/runs/run-new") {
+      return new Promise<Response>((resolve) => {
+        detailResolvers.set(path, resolve);
+      });
+    }
+
+    if (path === "/api/items" || path === "/api/errors") {
+      return jsonResponse({ data: [] });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+
+  const oldRequest = loadRunDetail("run-old");
+  detailResolvers.get("/api/runs/run-old")?.(jsonResponse(runDetailResponse("run-old")));
+  await oldRequest;
+  expect(get(selectedRunDetail).data?.id).toBe("run-old");
+
+  const newRequest = loadRunDetail("run-new");
+  expect(get(selectedRunDetail).status).toBe("loading");
+  expect(get(selectedRunDetail).data).toBeUndefined();
+
+  detailResolvers.get("/api/runs/run-new")?.(jsonResponse(runDetailResponse("run-new")));
+  await newRequest;
+  expect(get(selectedRunDetail).data?.id).toBe("run-new");
+});
+
+test("loadRunDetail ignores stale failures after a newer detail selection", async () => {
+  const detailResolvers = new Map<string, (response: Response) => void>();
+
+  globalThis.fetch = (async (input) => {
+    const path = requestPath(input);
+
+    if (path === "/api/runs/run-old" || path === "/api/runs/run-new") {
+      return new Promise<Response>((resolve) => {
+        detailResolvers.set(path, resolve);
+      });
+    }
+
+    if (path === "/api/items" || path === "/api/errors") {
+      return jsonResponse({ data: [] });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+
+  const oldRequest = loadRunDetail("run-old");
+  const newRequest = loadRunDetail("run-new");
+
+  detailResolvers.get("/api/runs/run-new")?.(jsonResponse(runDetailResponse("run-new")));
+  await newRequest;
+
+  detailResolvers.get("/api/runs/run-old")?.(
+    jsonResponse(
+      {
+        error: {
+          code: "NOT_FOUND",
+          message: "run-old missing",
+        },
+      },
+      404,
+    ),
+  );
+  await oldRequest;
+
+  expect(get(selectedRunDetail).data?.id).toBe("run-new");
+  expect(get(selectedRunDetail).error).toBeUndefined();
+});
+
+test("loadRunDetail records errors for the latest failed detail request", async () => {
+  globalThis.fetch = (async (input) => {
+    const path = requestPath(input);
+
+    if (path === "/api/runs/run-missing") {
+      return jsonResponse(
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "run-missing missing",
+          },
+        },
+        404,
+      );
+    }
+
+    if (path === "/api/items" || path === "/api/errors") {
+      return jsonResponse({ data: [] });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  await loadRunDetail("run-missing");
+
+  expect(get(selectedRunDetail).error).toMatchObject({
+    code: "NOT_FOUND",
+    status: 404,
+  });
+});
+
 function requestPath(input: RequestInfo | URL) {
   if (typeof input === "string") {
     return new URL(input, "http://localhost").pathname;
@@ -209,6 +355,37 @@ function requestPath(input: RequestInfo | URL) {
   }
 
   return new URL(input.url).pathname;
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+function runDetailResponse(id: string) {
+  return {
+    id,
+    jobId: "job-local",
+    sourceId: "src-local",
+    sourceName: "Local source",
+    jobName: "Local job",
+    status: "completed",
+    startedAt: "2026-05-12T09:30:00.000Z",
+    finishedAt: "2026-05-12T09:30:01.000Z",
+    durationMs: 1000,
+    counts: {
+      processed: 1,
+      synced: 1,
+      skipped: 0,
+      failed: 0,
+      deleted: 0,
+    },
+    errors: [],
+  };
 }
 
 function responseFor(path: string, options: { includeNewRun?: boolean } = {}) {

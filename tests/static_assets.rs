@@ -42,17 +42,18 @@ async fn static_assets_keep_unmatched_api_routes_json() {
 
 #[tokio::test]
 async fn static_assets_server_sets_request_id_and_cors_headers() {
+    let origin = "http://localhost:4173";
     let response = request_with_headers(
         test_app().await,
         "GET",
         "/api/health",
-        &[("Origin", "http://localhost:4173")],
+        &[("Origin", origin)],
     )
     .await;
 
     assert_eq!(response.status, 200);
     assert!(!response.header("x-request-id").is_empty());
-    assert_eq!(response.header("access-control-allow-origin"), "*");
+    assert_eq!(response.header("access-control-allow-origin"), origin);
 }
 
 async fn test_app() -> Router {

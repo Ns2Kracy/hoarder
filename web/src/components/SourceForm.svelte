@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Plus } from "lucide-svelte";
+  import { canSubmitSourceForm, sourceServiceOptions } from "../lib/sourceServices";
   import type { OpenDalServiceKind, SourceFormInput } from "../lib/types";
 
   let { onSubmit }: { onSubmit: (input: SourceFormInput) => Promise<void> | void } = $props();
@@ -17,7 +18,7 @@
   let token = $state("");
   let isSaving = $state(false);
 
-  let canSubmit = $derived(name.trim().length > 0 && (serviceKind !== "fs" || root.trim().length > 0));
+  let canSubmit = $derived(canSubmitSourceForm({ name, serviceKind, root }));
 
   async function submit() {
     if (!canSubmit || isSaving) {
@@ -75,10 +76,11 @@
     <label class="space-y-1">
       <span class="text-xs font-medium text-zinc-600">Service</span>
       <select class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={serviceKind}>
-        <option value="fs">Filesystem</option>
-        <option value="s3">S3</option>
-        <option value="webdav">WebDAV</option>
-        <option value="sftp">SFTP</option>
+        {#each sourceServiceOptions as option (option.value)}
+          <option value={option.value} disabled={!option.implemented}>
+            {option.label}{option.implemented ? "" : " (not available)"}
+          </option>
+        {/each}
       </select>
     </label>
 
