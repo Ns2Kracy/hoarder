@@ -4,7 +4,6 @@ use hoarder::core::types::{
     JobStatus, RunStatus, SourceId, SyncStatus,
 };
 use serde_json::json;
-use uuid::Uuid;
 
 #[test]
 fn core_types_item_type_serializes_to_stable_snake_case_values() {
@@ -44,9 +43,27 @@ fn core_types_core_enums_serialize_for_api_payloads() {
 }
 
 #[test]
+fn core_types_local_ids_serialize_parse_and_display_as_numbers() {
+    let source_id = SourceId::from_i64(42);
+
+    assert_eq!(serde_json::to_value(source_id).unwrap(), json!(42));
+    assert_eq!(
+        serde_json::from_value::<SourceId>(json!(42)).unwrap(),
+        source_id
+    );
+    assert_eq!("42".parse::<SourceId>().unwrap(), source_id);
+    assert_eq!(source_id.to_string(), "42");
+    assert!("0".parse::<SourceId>().is_err());
+    assert!("-1".parse::<SourceId>().is_err());
+    assert!(serde_json::from_value::<SourceId>(json!(0)).is_err());
+    assert!(serde_json::from_value::<SourceId>(json!(-1)).is_err());
+    assert!(serde_json::from_value::<SourceId>(json!("42")).is_err());
+    assert!(serde_json::from_value::<SourceId>(json!(42.5)).is_err());
+}
+
+#[test]
 fn core_types_item_snapshot_serializes_with_camel_case_fields() {
-    let source_id =
-        SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
+    let source_id = SourceId::from_i64(42);
     let snapshot = ItemSnapshot {
         source_id,
         source_path: "notes/today.md".to_owned(),
@@ -60,7 +77,7 @@ fn core_types_item_snapshot_serializes_with_camel_case_fields() {
 
     let encoded = serde_json::to_value(snapshot).unwrap();
 
-    assert_eq!(encoded["sourceId"], json!(source_id));
+    assert_eq!(encoded["sourceId"], json!(42));
     assert_eq!(encoded["sourcePath"], json!("notes/today.md"));
     assert_eq!(encoded["itemType"], json!("virtual_document"));
     assert_eq!(encoded["metadataJson"]["title"], json!("Today"));
@@ -68,8 +85,7 @@ fn core_types_item_snapshot_serializes_with_camel_case_fields() {
 
 #[test]
 fn core_types_item_ref_and_capabilities_are_plain_contract_data() {
-    let source_id =
-        SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
+    let source_id = SourceId::from_i64(42);
     let item_ref = ItemRef {
         source_id,
         source_path: "archive/report.pdf".to_owned(),
