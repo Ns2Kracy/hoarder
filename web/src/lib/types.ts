@@ -2,6 +2,8 @@ export type PageId = "overview" | "sources" | "jobs" | "runs" | "settings";
 
 export type DataOrigin = "api" | "mock";
 
+export type LocalId = number;
+
 export type ConnectorKind = "opendal";
 
 export type OpenDalServiceKind = "fs" | "s3" | "webdav" | "sftp";
@@ -61,7 +63,7 @@ export interface RedactedConfig {
 }
 
 export interface SourceDto {
-  id: string;
+  id: LocalId;
   name: string;
   connectorKind: ConnectorKind;
   serviceKind: OpenDalServiceKind;
@@ -91,8 +93,8 @@ export interface SourceFormInput {
 }
 
 export interface SyncJobDto {
-  id: string;
-  sourceId: string;
+  id: LocalId;
+  sourceId: LocalId;
   sourceName: string;
   name: string;
   schedule: JobSchedule;
@@ -102,11 +104,11 @@ export interface SyncJobDto {
   nextRunAt?: string;
   lastRunAt?: string;
   lastRunStatus?: RunStatus;
-  lastRunId?: string;
+  lastRunId?: LocalId;
 }
 
 export interface JobFormInput {
-  sourceId: string;
+  sourceId: LocalId;
   name: string;
   enabled: boolean;
   schedule: JobSchedule;
@@ -121,9 +123,9 @@ export interface RunCounts {
 }
 
 export interface SyncErrorDto {
-  id: string;
-  runId?: string;
-  sourceId?: string;
+  id: LocalId;
+  runId?: LocalId;
+  sourceId?: LocalId;
   sourcePath?: string;
   code: string;
   message: string;
@@ -132,9 +134,9 @@ export interface SyncErrorDto {
 }
 
 export interface SyncRunDto {
-  id: string;
-  jobId: string;
-  sourceId: string;
+  id: LocalId;
+  jobId?: LocalId;
+  sourceId?: LocalId;
   sourceName: string;
   jobName?: string;
   status: RunStatus;
@@ -148,8 +150,8 @@ export interface SyncRunDto {
 export type ItemType = "file" | "directory" | "virtual_document";
 
 export interface SyncItemDto {
-  id: string;
-  sourceId: string;
+  id: LocalId;
+  sourceId: LocalId;
   sourcePath: string;
   itemType: ItemType;
   status: ItemSyncStatus;
@@ -161,14 +163,14 @@ export interface SyncItemDto {
 }
 
 export interface ItemFilters {
-  runId?: string;
-  sourceId?: string;
+  runId?: LocalId;
+  sourceId?: LocalId;
   status?: ItemSyncStatus;
 }
 
 export interface ErrorFilters {
-  runId?: string;
-  sourceId?: string;
+  runId?: LocalId;
+  sourceId?: LocalId;
 }
 
 export interface SettingsDto {

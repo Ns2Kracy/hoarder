@@ -2,6 +2,7 @@
 
 Date: 2026-05-27
 Status: Accepted
+Implementation: Completed on 2026-05-27 in `docs/simple-database-design`
 Scope: SQLite schema, persistence model, sync write path, API/CLI ID shape
 
 ## Context
@@ -81,6 +82,7 @@ Stores one sync execution. It carries display snapshots so run history remains r
 | `synced_count` | integer not null | Items written |
 | `skipped_count` | integer not null | Items skipped |
 | `failed_count` | integer not null | Item failures |
+| `deleted_count` | integer not null default 0 | Items marked deleted on source |
 | `bytes_written` | integer not null default 0 | Bytes written to vault |
 | `created_at` | datetime not null | Row creation time |
 | `updated_at` | datetime not null | Row update time |
@@ -207,8 +209,9 @@ After scan:
      AND (last_run_id IS NULL OR last_run_id != ?);
    ```
 
-2. Finish `sync_run` with final counters and `bytes_written`.
-3. Reset job status and last-run snapshot fields.
+2. Store the deleted row count on `sync_run.deleted_count` so run history is stable after later item updates.
+3. Finish `sync_run` with final counters and `bytes_written`.
+4. Reset job status and last-run snapshot fields.
 
 This removes the need to load all known item states into memory only to detect deletions.
 

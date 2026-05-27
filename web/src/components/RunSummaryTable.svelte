@@ -1,7 +1,7 @@
 <script lang="ts">
   import StatusBadge from "./StatusBadge.svelte";
   import { formatCount, formatDateTime, formatDuration } from "../lib/format";
-  import type { SyncRunDto } from "../lib/types";
+  import type { LocalId, SyncRunDto } from "../lib/types";
 
   let {
     runs,
@@ -9,7 +9,7 @@
     onSelect
   }: {
     runs: SyncRunDto[];
-    selectedRunId?: string;
+    selectedRunId?: LocalId;
     onSelect?: (run: SyncRunDto) => void;
   } = $props();
 </script>

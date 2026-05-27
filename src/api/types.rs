@@ -187,6 +187,9 @@ pub struct CreateJobRequest {
 pub struct RunDto {
     pub id: RunId,
     pub job_id: JobId,
+    pub source_id: SourceId,
+    pub source_name: String,
+    pub job_name: String,
     pub status: SyncStatus,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
@@ -194,6 +197,7 @@ pub struct RunDto {
     pub synced_count: u64,
     pub skipped_count: u64,
     pub failed_count: u64,
+    pub deleted_count: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -240,7 +244,7 @@ pub struct ItemDto {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncErrorDto {
-    pub id: String,
+    pub id: i64,
     pub run_id: Option<RunId>,
     pub source_id: Option<SourceId>,
     pub source_path: Option<String>,

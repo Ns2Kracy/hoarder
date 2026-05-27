@@ -4,6 +4,10 @@
 
 **Goal:** Replace the UUID/foreign-key-style SQLite model with a flat, indexed, local-integer schema.
 
+**Status:** Completed on 2026-05-27 in `docs/simple-database-design`.
+
+**Verification:** `cargo fmt --check`, `cargo clippy --all-targets --all-features`, `cargo test`, `cd web && bun run verify`, and `cargo build`.
+
 **Architecture:** Keep the current table concepts, but remove SeaORM relationship fields and database foreign keys. Use local integer ID newtypes across Rust, explicit SQLite indexes in `sync_schema`, repository-level reference checks, and a bulk deletion mark keyed by `sync_item.last_run_id`.
 
 **Tech Stack:** Rust 2024, SeaORM 2.0 entity-first, SQLite, Axum, Clap, Svelte 5, Bun.
@@ -220,6 +224,7 @@ async fn db_schema_creates_flat_tables_without_foreign_keys_and_with_indexes()
     let sync_run_columns = table_columns(&db, "sync_run").await?;
     assert!(sync_run_columns.contains("source_name"));
     assert!(sync_run_columns.contains("job_name"));
+    assert!(sync_run_columns.contains("deleted_count"));
     assert!(sync_run_columns.contains("bytes_written"));
 
     let sync_item_columns = table_columns(&db, "sync_item").await?;
@@ -274,7 +279,7 @@ pub struct Model {
 Apply the same pattern:
 
 - `source.id: i64`, no relationship fields.
-- `sync_run.id/job_id/source_id: i64`, add `source_name`, `job_name`, `bytes_written`.
+- `sync_run.id/job_id/source_id: i64`, add `source_name`, `job_name`, `deleted_count`, `bytes_written`.
 - `sync_item.id/source_id: i64`, replace `run_id` with `last_run_id: Option<i64>`.
 - `sync_error.id: i64`, ids become `Option<i64>` where nullable, remove `item_id`.
 
@@ -562,11 +567,11 @@ Keep `seen_paths` only if another path still needs it. If nothing uses it after 
 In `src/db/repository.rs`:
 
 - `load_job` uses integer ids and fills `source_name` / `job_name`.
-- `start_run` inserts with `id: NotSet`, `job_name`, `source_name`, `bytes_written: Set(0)`, then returns `RunId::from_i64(model.id)`.
+- `start_run` inserts with `id: NotSet`, `job_name`, `source_name`, `deleted_count: Set(0)`, `bytes_written: Set(0)`, then returns `RunId::from_i64(model.id)`.
 - `item_state` filters `SourceId.as_i64()` and `DeletedOnSourceAt.is_null()`.
 - `record_item_outcome` writes `sync_item.last_run_id = run_id.as_i64()`.
 - `insert_sync_error` no longer needs `item_id`.
-- `finish_run` writes `bytes_written`.
+- `finish_run` writes `deleted_count` and `bytes_written`.
 
 For `mark_missing_items_deleted`, use `update_many`:
 

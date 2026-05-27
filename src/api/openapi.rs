@@ -100,7 +100,7 @@ fn source_test_path() -> Value {
         "post": {
             "tags": ["sources"],
             "operationId": "testSource",
-            "parameters": [path_uuid_parameter("id", "Source identifier")],
+            "parameters": [path_local_id_parameter("id", "Source identifier")],
             "responses": {
                 "200": json_response("SourceTestResponse"),
                 "400": error_response(),
@@ -142,7 +142,7 @@ fn job_run_path() -> Value {
         "post": {
             "tags": ["jobs"],
             "operationId": "runJob",
-            "parameters": [path_uuid_parameter("id", "Job identifier")],
+            "parameters": [path_local_id_parameter("id", "Job identifier")],
             "responses": {
                 "200": json_response("JobRunResponse"),
                 "404": error_response(),
@@ -174,7 +174,7 @@ fn run_detail_path() -> Value {
         "get": {
             "tags": ["runs"],
             "operationId": "getRunDetail",
-            "parameters": [path_uuid_parameter("id", "Run identifier")],
+            "parameters": [path_local_id_parameter("id", "Run identifier")],
             "responses": {
                 "200": json_response("RunDetailDto"),
                 "404": error_response(),
@@ -191,9 +191,9 @@ fn items_path() -> Value {
             "tags": ["items"],
             "operationId": "listItems",
             "parameters": [
-                query_uuid_parameter("sourceId", "Filter by source identifier"),
+                query_local_id_parameter("sourceId", "Filter by source identifier"),
                 query_enum_parameter("status", "SyncStatus", "Filter by item sync status"),
-                query_uuid_parameter("runId", "Filter by run identifier")
+                query_local_id_parameter("runId", "Filter by run identifier")
             ],
             "responses": {
                 "200": list_response("ItemDto"),
@@ -211,8 +211,8 @@ fn errors_path() -> Value {
             "tags": ["errors"],
             "operationId": "listErrors",
             "parameters": [
-                query_uuid_parameter("sourceId", "Filter by source identifier"),
-                query_uuid_parameter("runId", "Filter by run identifier")
+                query_local_id_parameter("sourceId", "Filter by source identifier"),
+                query_local_id_parameter("runId", "Filter by run identifier")
             ],
             "responses": {
                 "200": list_response("SyncErrorDto"),
@@ -295,7 +295,7 @@ fn create_job_request_schema() -> Value {
         "type": "object",
         "required": ["sourceId", "name", "schedule"],
         "properties": {
-            "sourceId": uuid_schema(),
+            "sourceId": local_id_schema(),
             "name": {"type": "string"},
             "enabled": {"type": "boolean", "default": true},
             "schedule": ref_schema("JobScheduleDto")
@@ -333,8 +333,8 @@ fn item_schema() -> Value {
         "type": "object",
         "required": ["id", "sourceId", "sourcePath", "itemType", "status"],
         "properties": {
-            "id": uuid_schema(),
-            "sourceId": uuid_schema(),
+            "id": local_id_schema(),
+            "sourceId": local_id_schema(),
             "sourcePath": {"type": "string"},
             "itemType": {"type": "string", "enum": ["file", "directory", "virtual_document"]},
             "status": sync_status_schema(),
@@ -353,15 +353,15 @@ fn job_schema() -> Value {
         "type": "object",
         "required": ["id", "sourceId", "name", "enabled", "schedule", "status"],
         "properties": {
-            "id": uuid_schema(),
-            "sourceId": uuid_schema(),
+            "id": local_id_schema(),
+            "sourceId": local_id_schema(),
             "name": {"type": "string"},
             "enabled": {"type": "boolean"},
             "schedule": ref_schema("JobScheduleDto"),
             "status": job_status_schema(),
             "lastRunAt": nullable_datetime_schema(),
             "lastRunStatus": nullable_run_status_schema(),
-            "lastRunId": nullable_uuid_schema(),
+            "lastRunId": nullable_local_id_schema(),
             "nextRunAt": nullable_datetime_schema()
         }
     })
@@ -373,7 +373,7 @@ fn job_run_response_schema() -> Value {
         "type": "object",
         "required": ["runId", "status"],
         "properties": {
-            "runId": uuid_schema(),
+            "runId": local_id_schema(),
             "status": sync_status_schema()
         }
     })
@@ -452,9 +452,9 @@ fn run_detail_schema() -> Value {
         "type": "object",
         "required": ["id", "jobId", "sourceId", "sourceName", "jobName", "status", "counts", "errors"],
         "properties": {
-            "id": uuid_schema(),
-            "jobId": uuid_schema(),
-            "sourceId": uuid_schema(),
+            "id": local_id_schema(),
+            "jobId": local_id_schema(),
+            "sourceId": local_id_schema(),
             "sourceName": {"type": "string"},
             "jobName": {"type": "string"},
             "status": run_status_schema(),
@@ -471,17 +471,21 @@ fn run_detail_schema() -> Value {
 fn run_schema() -> Value {
     json!({
         "type": "object",
-        "required": ["id", "jobId", "status", "processedCount", "syncedCount", "skippedCount", "failedCount"],
+        "required": ["id", "jobId", "sourceId", "sourceName", "jobName", "status", "processedCount", "syncedCount", "skippedCount", "failedCount", "deletedCount"],
         "properties": {
-            "id": uuid_schema(),
-            "jobId": uuid_schema(),
+            "id": local_id_schema(),
+            "jobId": local_id_schema(),
+            "sourceId": local_id_schema(),
+            "sourceName": {"type": "string"},
+            "jobName": {"type": "string"},
             "status": sync_status_schema(),
             "startedAt": nullable_datetime_schema(),
             "finishedAt": nullable_datetime_schema(),
             "processedCount": {"type": "integer", "minimum": 0},
             "syncedCount": {"type": "integer", "minimum": 0},
             "skippedCount": {"type": "integer", "minimum": 0},
-            "failedCount": {"type": "integer", "minimum": 0}
+            "failedCount": {"type": "integer", "minimum": 0},
+            "deletedCount": {"type": "integer", "minimum": 0}
         }
     })
 }
@@ -509,7 +513,7 @@ fn source_schema() -> Value {
         "type": "object",
         "required": ["id", "name", "connectorKind", "config", "enabled", "health"],
         "properties": {
-            "id": uuid_schema(),
+            "id": local_id_schema(),
             "name": {"type": "string"},
             "connectorKind": {"type": "string", "enum": ["opendal"]},
             "config": ref_schema("RedactedConnectorConfig"),
@@ -538,9 +542,9 @@ fn sync_error_schema() -> Value {
         "type": "object",
         "required": ["id", "code", "message"],
         "properties": {
-            "id": {"type": "string"},
-            "runId": nullable_uuid_schema(),
-            "sourceId": nullable_uuid_schema(),
+            "id": local_id_schema(),
+            "runId": nullable_local_id_schema(),
+            "sourceId": nullable_local_id_schema(),
             "sourcePath": nullable_string_schema(),
             "code": {"type": "string"},
             "message": {"type": "string"},
@@ -617,24 +621,24 @@ fn error_response() -> Value {
 }
 
 #[must_use]
-fn path_uuid_parameter(name: &str, description: &str) -> Value {
+fn path_local_id_parameter(name: &str, description: &str) -> Value {
     json!({
         "name": name,
         "in": "path",
         "required": true,
         "description": description,
-        "schema": uuid_schema()
+        "schema": local_id_schema()
     })
 }
 
 #[must_use]
-fn query_uuid_parameter(name: &str, description: &str) -> Value {
+fn query_local_id_parameter(name: &str, description: &str) -> Value {
     json!({
         "name": name,
         "in": "query",
         "required": false,
         "description": description,
-        "schema": uuid_schema()
+        "schema": local_id_schema()
     })
 }
 
@@ -663,13 +667,13 @@ fn array_ref_schema(schema_name: &str) -> Value {
 }
 
 #[must_use]
-fn uuid_schema() -> Value {
-    json!({"type": "string", "format": "uuid"})
+fn local_id_schema() -> Value {
+    json!({"type": "integer", "minimum": 1})
 }
 
 #[must_use]
-fn nullable_uuid_schema() -> Value {
-    json!({"type": ["string", "null"], "format": "uuid"})
+fn nullable_local_id_schema() -> Value {
+    json!({"type": ["integer", "null"], "minimum": 1})
 }
 
 #[must_use]

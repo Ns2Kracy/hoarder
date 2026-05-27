@@ -37,13 +37,6 @@ fn positive_local_id(value: i64) -> Result<i64, ParseLocalIdError> {
     Ok(value)
 }
 
-fn positive_local_id_from_uuid(uuid: uuid::Uuid) -> i64 {
-    let value = uuid.as_u128() & (i64::MAX as u128);
-    let value = i64::try_from(value).unwrap_or(i64::MAX);
-
-    value.max(1)
-}
-
 macro_rules! local_id_newtype {
     ($name:ident) => {
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
@@ -52,7 +45,9 @@ macro_rules! local_id_newtype {
 
         impl $name {
             pub fn new() -> Self {
-                Self(positive_local_id_from_uuid(uuid::Uuid::new_v4()))
+                static NEXT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
+
+                Self(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
             }
 
             pub const fn from_i64(value: i64) -> Self {
@@ -61,18 +56,6 @@ macro_rules! local_id_newtype {
 
             pub const fn as_i64(self) -> i64 {
                 self.0
-            }
-
-            // Temporary UUID bridge for the migration branch. Remove when entities/repositories use integer IDs directly.
-            pub fn from_uuid(uuid: uuid::Uuid) -> Self {
-                Self(positive_local_id_from_uuid(uuid))
-            }
-
-            // Temporary UUID bridge for the migration branch. Remove when entities/repositories use integer IDs directly.
-            pub fn as_uuid(self) -> uuid::Uuid {
-                let value = u128::try_from(self.0).unwrap_or_default();
-
-                uuid::Uuid::from_u128(value)
             }
         }
 

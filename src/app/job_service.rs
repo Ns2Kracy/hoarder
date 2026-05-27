@@ -32,8 +32,8 @@ pub async fn list_jobs(repository: &SeaOrmRepository) -> AppResult<Vec<JobDto>> 
     jobs.into_iter()
         .map(|job| {
             let record = SyncJobRecord {
-                id: JobId::from_uuid(job.id),
-                source_id: SourceId::from_uuid(job.source_id),
+                id: JobId::from_i64(job.id),
+                source_id: SourceId::from_i64(job.source_id),
                 name: job.name,
                 enabled: job.enabled,
                 schedule: schedule_from_storage(&job.schedule_kind, job.schedule_interval_seconds)?,
@@ -45,7 +45,7 @@ pub async fn list_jobs(repository: &SeaOrmRepository) -> AppResult<Vec<JobDto>> 
                     .as_deref()
                     .map(run_status_from_str)
                     .transpose()?,
-                last_run_id: job.last_run_id.map(RunId::from_uuid),
+                last_run_id: job.last_run_id.map(RunId::from_i64),
                 created_at: job.created_at,
                 updated_at: job.updated_at,
             };
@@ -115,8 +115,8 @@ pub async fn run_job(
 
 async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppResult<SourceId> {
     let db = repository.connection();
-    let job_id_uuid = job_id.as_uuid();
-    let job = sync_job::Entity::find_by_id(job_id_uuid)
+    let job_id_value = job_id.as_i64();
+    let job = sync_job::Entity::find_by_id(job_id_value)
         .one(db)
         .await
         .map_err(map_db_error)?
@@ -133,7 +133,7 @@ async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppRe
         )));
     }
 
-    let source_id = SourceId::from_uuid(job.source_id);
+    let source_id = SourceId::from_i64(job.source_id);
     let result = sync_job::Entity::update_many()
         .col_expr(
             sync_job::Column::Status,
@@ -143,9 +143,13 @@ async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppRe
             sync_job::Column::UpdatedAt,
             sea_orm::sea_query::Expr::value(chrono::Utc::now()),
         )
-        .filter(sync_job::Column::Id.eq(job_id_uuid))
+        .filter(sync_job::Column::Id.eq(job_id_value))
         .filter(sync_job::Column::Enabled.eq(true))
         .filter(sync_job::Column::Status.ne("running"))
+        .filter(sea_orm::sea_query::Expr::cust(format!(
+            "NOT EXISTS (SELECT 1 FROM sync_job AS running_job WHERE running_job.source_id = {} AND running_job.status = 'running' AND running_job.id != {})",
+            job.source_id, job_id_value
+        )))
         .exec(db)
         .await
         .map_err(map_db_error)?;
@@ -164,7 +168,7 @@ async fn set_job_status(
     status: JobStatus,
 ) -> AppResult<()> {
     let db = repository.connection();
-    let job = sync_job::Entity::find_by_id(job_id.as_uuid())
+    let job = sync_job::Entity::find_by_id(job_id.as_i64())
         .one(db)
         .await
         .map_err(map_db_error)?
@@ -309,7 +313,7 @@ mod tests {
     use crate::{
         AppError,
         connectors::traits::ConnectorConfig,
-        core::types::ConnectorKind,
+        core::types::{ConnectorKind, JobId, SourceId},
         db::{
             connect_sqlite,
             repository::{
@@ -361,7 +365,65 @@ mod tests {
             mark_job_running(&second_repository, second_job_id).await
         });
 
-        let results = [first.await?, second.await?];
+        assert_one_claim_succeeds_and_one_conflicts(&[first.await?, second.await?]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn mark_job_running_allows_only_one_running_job_per_source()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = TempDir::new("source-job-claim");
+        let database_path = temp.path.join("hoarder.sqlite");
+        let database_url = database_path.to_string_lossy().into_owned();
+        let setup_db = connect_sqlite(&database_url).await?;
+        sync_schema(&setup_db).await?;
+        let setup_repository = SeaOrmRepository::new(setup_db);
+        let source = setup_repository
+            .create_source(NewSource {
+                name: "Local Docs".to_owned(),
+                kind: ConnectorKind::OpenDal,
+                config_json: serde_json::to_value(fs_config(&temp.path))?,
+                enabled: true,
+            })
+            .await?;
+        let first_job = create_manual_job(&setup_repository, source.id, "First sync").await?;
+        let second_job = create_manual_job(&setup_repository, source.id, "Second sync").await?;
+
+        let first_repository = SeaOrmRepository::new(connect_sqlite(&database_url).await?);
+        let second_repository = SeaOrmRepository::new(connect_sqlite(&database_url).await?);
+        let first = tokio::spawn(async move {
+            yield_now().await;
+            mark_job_running(&first_repository, first_job).await
+        });
+        let second = tokio::spawn(async move {
+            yield_now().await;
+            mark_job_running(&second_repository, second_job).await
+        });
+
+        assert_one_claim_succeeds_and_one_conflicts(&[first.await?, second.await?]);
+
+        Ok(())
+    }
+
+    async fn create_manual_job(
+        repository: &SeaOrmRepository,
+        source_id: SourceId,
+        name: &str,
+    ) -> Result<JobId, Box<dyn std::error::Error>> {
+        let job = repository
+            .create_scheduled_job(NewScheduledSyncJob {
+                source_id,
+                name: name.to_owned(),
+                enabled: true,
+                schedule: SyncJobSchedule::Manual,
+            })
+            .await?;
+
+        Ok(job.id)
+    }
+
+    fn assert_one_claim_succeeds_and_one_conflicts(results: &[Result<SourceId, AppError>; 2]) {
         let successful = results.iter().filter(|result| result.is_ok()).count();
         let conflicts = results
             .iter()
@@ -376,8 +438,6 @@ mod tests {
             conflicts, 1,
             "the losing concurrent attempt should see a running conflict: {results:?}"
         );
-
-        Ok(())
     }
 
     fn fs_config(root: &std::path::Path) -> ConnectorConfig {

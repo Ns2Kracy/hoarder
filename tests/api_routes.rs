@@ -57,7 +57,7 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
     let jobs = request(test.app.clone(), "GET", "/api/jobs", None).await;
 
     assert_eq!(jobs.status, 200);
-    assert_eq!(jobs.body["data"][0]["id"], json!(test.job_id.to_string()));
+    assert_eq!(jobs.body["data"][0]["id"], json!(test.job_id.as_i64()));
 
     for path in ["/api/runs", "/api/items", "/api/errors"] {
         let response = request(test.app.clone(), "GET", path, None).await;
@@ -97,6 +97,35 @@ async fn api_routes_openapi_spec_lists_current_routes() {
     }
     assert!(response.body["components"]["schemas"]["SourceDto"].is_object());
     assert!(response.body["components"]["schemas"]["ApiErrorBody"].is_object());
+    assert_eq!(
+        response.body["components"]["schemas"]["SourceDto"]["properties"]["id"]["type"],
+        json!("integer")
+    );
+    assert_eq!(
+        response.body["components"]["schemas"]["JobDto"]["properties"]["sourceId"]["type"],
+        json!("integer")
+    );
+    assert_eq!(
+        response.body["components"]["schemas"]["RunDto"]["properties"]["sourceName"]["type"],
+        json!("string")
+    );
+    assert_eq!(
+        response.body["components"]["schemas"]["RunDto"]["properties"]["deletedCount"]["type"],
+        json!("integer")
+    );
+    assert_eq!(
+        response.body["components"]["schemas"]["RunDetailDto"]["properties"]["runId"],
+        Value::Null,
+        "runId should not be an undeclared RunDetail property"
+    );
+    assert_eq!(
+        response.body["components"]["schemas"]["SyncErrorDto"]["properties"]["runId"]["type"],
+        json!(["integer", "null"])
+    );
+    assert_eq!(
+        response.body["paths"]["/api/jobs/{id}/run"]["post"]["parameters"][0]["schema"]["type"],
+        json!("integer")
+    );
 }
 
 #[tokio::test]
@@ -113,9 +142,9 @@ async fn api_routes_run_job_runs_sync_engine() {
 
     assert_eq!(response.status, 200);
     assert_eq!(response.body["status"], json!("synced"));
-    assert!(response.body["runId"].as_str().is_some());
+    assert!(response.body["runId"].as_i64().is_some());
 
-    let run_id = response.body["runId"].as_str().unwrap();
+    let run_id = response.body["runId"].as_i64().unwrap();
     let detail = request(
         test.app.clone(),
         "GET",
@@ -128,6 +157,13 @@ async fn api_routes_run_job_runs_sync_engine() {
     assert_eq!(detail.body["sourceName"], json!("Local Docs"));
     assert_eq!(detail.body["jobName"], json!("Default sync"));
     assert_eq!(detail.body["status"], json!("completed"));
+
+    let runs = request(test.app.clone(), "GET", "/api/runs", None).await;
+    assert_eq!(runs.status, 200);
+    assert_eq!(runs.body["data"][0]["id"], json!(run_id));
+    assert_eq!(runs.body["data"][0]["sourceName"], json!("Local Docs"));
+    assert_eq!(runs.body["data"][0]["jobName"], json!("Default sync"));
+    assert_eq!(runs.body["data"][0]["deletedCount"], json!(0));
 
     let items = request(
         test.app.clone(),
@@ -207,7 +243,7 @@ async fn api_routes_test_source_persists_failed_health() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|candidate| candidate["id"] == json!(source.id.to_string()))
+        .find(|candidate| candidate["id"] == json!(source.id.as_i64()))
         .expect("tested source is listed");
     assert_eq!(tested_source["health"], json!("failed"));
     assert!(tested_source["lastCheckedAt"].as_str().is_some());
@@ -222,7 +258,7 @@ async fn api_routes_create_job_patches_settings_and_rejects_running_job() {
         "/api/jobs",
         Some(&format!(
             r#"{{
-                "sourceId":"{}",
+                "sourceId":{},
                 "name":"Five minute sync",
                 "enabled":true,
                 "schedule":{{"kind":"interval","intervalSeconds":300}}
@@ -392,7 +428,7 @@ impl TestApp {
 }
 
 async fn set_job_running(repository: &SeaOrmRepository, job_id: JobId) {
-    let job = sync_job::Entity::find_by_id(job_id.as_uuid())
+    let job = sync_job::Entity::find_by_id(job_id.as_i64())
         .one(repository.connection())
         .await
         .unwrap()

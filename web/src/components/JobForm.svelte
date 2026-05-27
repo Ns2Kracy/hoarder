@@ -2,6 +2,7 @@
     import { Plus } from "lucide-svelte";
     import type {
         JobFormInput,
+        LocalId,
         Loadable,
         SourceDto,
     } from "../lib/types";
@@ -14,7 +15,7 @@
         onCreate: (input: JobFormInput) => Promise<void> | void;
     } = $props();
 
-    let sourceId = $state("");
+    let sourceId = $state<LocalId | undefined>(undefined);
     let name = $state("");
     let enabled = $state(true);
     let scheduleKind = $state<"manual" | "interval">("interval");
@@ -22,13 +23,13 @@
     let isSaving = $state(false);
 
     $effect(() => {
-        if (!sourceId && sources.data[0]) {
+        if (sourceId === undefined && sources.data[0]) {
             sourceId = sources.data[0].id;
         }
     });
 
     async function submit() {
-        if (!sourceId || !name.trim()) {
+        if (sourceId === undefined || !name.trim()) {
             return;
         }
 
@@ -112,7 +113,7 @@
             <button
                 class="inline-flex h-9 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
                 type="submit"
-                disabled={isSaving || !sourceId || !name.trim()}
+                disabled={isSaving || sourceId === undefined || !name.trim()}
             >
                 <Plus aria-hidden="true" size={15} />
                 Add

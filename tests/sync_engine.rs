@@ -52,6 +52,8 @@ async fn sync_engine_records_item_failure_and_continues_run() {
     let repository = Arc::new(FakeRepository::new(SyncJob {
         id: job_id,
         source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
         connector_kind: ConnectorKind::OpenDal,
         connector_config: connector_config(),
         scan_cursor: None,
@@ -73,6 +75,7 @@ async fn sync_engine_records_item_failure_and_continues_run() {
             synced: 2,
             skipped: 0,
             failed: 1,
+            deleted: 1,
             bytes_written: 7,
         }
     );
@@ -124,6 +127,8 @@ async fn sync_engine_skips_unchanged_items_and_counts_summary() {
     let repository = Arc::new(FakeRepository::new(SyncJob {
         id: job_id,
         source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
         connector_kind: ConnectorKind::OpenDal,
         connector_config: connector_config(),
         scan_cursor: None,
@@ -153,6 +158,7 @@ async fn sync_engine_skips_unchanged_items_and_counts_summary() {
             synced: 0,
             skipped: 1,
             failed: 0,
+            deleted: 1,
             bytes_written: 0,
         }
     );
@@ -187,19 +193,13 @@ async fn sync_engine_marks_unseen_previous_items_deleted_without_removing_local_
     let repository = Arc::new(FakeRepository::new(SyncJob {
         id: job_id,
         source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
         connector_kind: ConnectorKind::OpenDal,
         connector_config: connector_config(),
         scan_cursor: None,
     }));
     repository.set_next_run_id(run_id);
-    repository.set_all_known_item_states([StoredItemState {
-        source_path: "old.txt".to_owned(),
-        item_type: ItemType::File,
-        size: Some(6),
-        etag: Some("old-etag".to_owned()),
-        modified_at: None,
-        content_hash: None,
-    }]);
     let engine = SyncEngine::new(
         repository.clone(),
         Arc::new(move |_kind| Ok(connector.clone() as Arc<dyn SourceConnector>)),
@@ -215,7 +215,7 @@ async fn sync_engine_marks_unseen_previous_items_deleted_without_removing_local_
     assert!(
         repository
             .events()
-            .contains(&RepoEvent::MarkDeleted("old.txt".to_owned()))
+            .contains(&RepoEvent::MarkMissingItemsDeleted(run_id, source_id))
     );
 }
 
@@ -245,6 +245,8 @@ async fn sync_engine_respects_file_concurrency_for_reads() {
     let repository = Arc::new(FakeRepository::new(SyncJob {
         id: job_id,
         source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
         connector_kind: ConnectorKind::OpenDal,
         connector_config: connector_config(),
         scan_cursor: None,
@@ -288,6 +290,8 @@ async fn sync_engine_preserves_processed_counts_when_scan_errors_after_items() {
     let repository = Arc::new(FakeRepository::new(SyncJob {
         id: job_id,
         source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
         connector_kind: ConnectorKind::OpenDal,
         connector_config: connector_config(),
         scan_cursor: None,
@@ -322,6 +326,7 @@ async fn sync_engine_preserves_processed_counts_when_scan_errors_after_items() {
         synced: 1,
         skipped: 0,
         failed: 1,
+        deleted: 0,
         bytes_written: 2,
     };
     assert_eq!(
@@ -459,7 +464,6 @@ struct FakeRepository {
     job: SyncJob,
     next_run_ids: Mutex<VecDeque<RunId>>,
     item_states: Mutex<BTreeMap<String, StoredItemState>>,
-    all_known_item_states: Mutex<Vec<StoredItemState>>,
     events: Mutex<Vec<RepoEvent>>,
 }
 
@@ -469,7 +473,6 @@ impl FakeRepository {
             job,
             next_run_ids: Mutex::new(VecDeque::new()),
             item_states: Mutex::new(BTreeMap::new()),
-            all_known_item_states: Mutex::new(Vec::new()),
             events: Mutex::new(Vec::new()),
         }
     }
@@ -483,10 +486,6 @@ impl FakeRepository {
             .lock()
             .unwrap()
             .insert(state.source_path.clone(), state);
-    }
-
-    fn set_all_known_item_states<const N: usize>(&self, states: [StoredItemState; N]) {
-        *self.all_known_item_states.lock().unwrap() = states.into_iter().collect();
     }
 
     fn events(&self) -> Vec<RepoEvent> {
@@ -528,10 +527,6 @@ impl SyncRepository for FakeRepository {
         async move { Ok(self.item_states.lock().unwrap().get(source_path).cloned()) }.boxed()
     }
 
-    fn known_item_states(&self, _source_id: SourceId) -> ConnectorFuture<'_, Vec<StoredItemState>> {
-        async move { Ok(self.all_known_item_states.lock().unwrap().clone()) }.boxed()
-    }
-
     fn record_item_outcome(
         &self,
         _run_id: RunId,
@@ -550,19 +545,18 @@ impl SyncRepository for FakeRepository {
         .boxed()
     }
 
-    fn mark_deleted<'a>(
-        &'a self,
-        _run_id: RunId,
+    fn mark_missing_items_deleted(
+        &self,
+        run_id: RunId,
         source_id: SourceId,
-        source_path: &'a str,
-    ) -> ConnectorFuture<'a, ()> {
+    ) -> ConnectorFuture<'_, u64> {
         async move {
             assert_eq!(source_id, self.job.source_id);
             self.events
                 .lock()
                 .unwrap()
-                .push(RepoEvent::MarkDeleted(source_path.to_owned()));
-            Ok(())
+                .push(RepoEvent::MarkMissingItemsDeleted(run_id, source_id));
+            Ok(1)
         }
         .boxed()
     }
@@ -590,7 +584,7 @@ enum RepoEvent {
     RecordSynced(String),
     RecordSkipped(String),
     RecordFailure(String),
-    MarkDeleted(String),
+    MarkMissingItemsDeleted(RunId, SourceId),
     FinishRun(RunId, SyncRunStatus, SyncRunSummary),
 }
 

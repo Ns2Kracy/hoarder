@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use futures::{StreamExt, stream::FuturesUnordered};
 
@@ -21,6 +21,8 @@ pub type ConnectorResolver =
 pub struct SyncJob {
     pub id: JobId,
     pub source_id: SourceId,
+    pub source_name: String,
+    pub job_name: String,
     pub connector_kind: ConnectorKind,
     pub connector_config: ConnectorConfig,
     pub scan_cursor: Option<String>,
@@ -108,6 +110,7 @@ where
             synced: 0,
             skipped: 0,
             failed: 0,
+            deleted: 0,
             bytes_written: 0,
         };
         let connector = (self.connector_resolver)(job.connector_kind)
@@ -118,7 +121,6 @@ where
             .await
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
         let mut pending = FuturesUnordered::new();
-        let mut seen_paths = BTreeSet::new();
 
         let mut scan_error = None;
         while let Some(snapshot_result) = snapshots.next().await {
@@ -130,7 +132,6 @@ where
                 }
             };
             summary.processed += 1;
-            seen_paths.insert(snapshot.source_path.clone());
             pending.push(self.process_snapshot(
                 run_id,
                 &job.connector_config,
@@ -158,21 +159,11 @@ where
             return Err(SyncRunError::new(error, summary));
         }
 
-        for stored in self
+        summary.deleted = self
             .repository
-            .known_item_states(job.source_id)
+            .mark_missing_items_deleted(run_id, job.source_id)
             .await
-            .map_err(|source| SyncRunError::new(source, summary.clone()))?
-        {
-            if !seen_paths.contains(&stored.source_path)
-                && SyncPlanner::plan(None, Some(&stored)) == PlanDecision::MarkDeleted
-            {
-                self.repository
-                    .mark_deleted(run_id, job.source_id, &stored.source_path)
-                    .await
-                    .map_err(|source| SyncRunError::new(source, summary.clone()))?;
-            }
-        }
+            .map_err(|source| SyncRunError::new(source, summary.clone()))?;
 
         Ok(summary)
     }
@@ -320,6 +311,7 @@ pub struct SyncRunSummary {
     pub synced: u64,
     pub skipped: u64,
     pub failed: u64,
+    pub deleted: u64,
     pub bytes_written: u64,
 }
 

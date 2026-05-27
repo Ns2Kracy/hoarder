@@ -140,6 +140,6 @@ fn fs_config(root: &TempDir) -> ConnectorConfig {
     }
 }
 
-fn source_id() -> SourceId {
-    SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap())
+const fn source_id() -> SourceId {
+    SourceId::from_i64(42)
 }

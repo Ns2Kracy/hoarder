@@ -6,6 +6,7 @@ import type {
   ErrorFilters,
   ItemFilters,
   JobFormInput,
+  LocalId,
   Loadable,
   SettingsDto,
   SettingsUpdate,
@@ -97,7 +98,7 @@ export async function loadConsoleData() {
 
   const sourceResult = await sourceResultPromise;
   const jobResult = await api.getJobs(sourceResult.data);
-  const runResult = await api.getRuns(jobResult.data);
+  const runResult = await api.getRuns();
   const settingsResult = await settingsResultPromise;
 
   sources.set(applyResult(sourceResult, statusFor(sourceResult)));
@@ -122,7 +123,7 @@ export async function addSource(input: SourceFormInput) {
   }
 }
 
-export async function testSourceConnection(sourceId: string) {
+export async function testSourceConnection(sourceId: LocalId) {
   try {
     const result = await api.testSource(sourceId);
     sources.update((current) => ({
@@ -161,11 +162,11 @@ export async function createJob(input: JobFormInput) {
   }
 }
 
-export async function triggerJobRun(jobId: string) {
+export async function triggerJobRun(jobId: LocalId) {
   try {
     const runResult = await api.runJob(jobId, get(jobs).data);
     const jobResult = await api.getJobs(get(sources).data);
-    const runListResult = await api.getRuns(jobResult.data);
+    const runListResult = await api.getRuns();
     const refreshedRuns = runListResult.data.some((run) => run.id === runResult.data.id)
       ? runListResult.data
       : upsertRun(runListResult.data, runResult.data);
@@ -195,7 +196,7 @@ export async function triggerJobRun(jobId: string) {
   }
 }
 
-export async function loadRunDetail(runId: string, filters: Omit<ItemFilters, "runId"> = {}) {
+export async function loadRunDetail(runId: LocalId, filters: Omit<ItemFilters, "runId"> = {}) {
   const requestSequence = ++runDetailRequestSequence;
 
   selectedRunDetail.update((current) => ({ ...current, status: "loading", data: undefined }));

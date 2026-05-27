@@ -79,10 +79,10 @@ Create and run a local filesystem workflow from the CLI:
 ```bash
 cargo run -- source add --name docs --service fs --root ./docs
 cargo run -- source list
-cargo run -- source test --id <source-id>
-cargo run -- job add --source-id <source-id> --name docs --interval 300
+cargo run -- source test --id 1
+cargo run -- job add --source-id 1 --name docs --interval 300
 cargo run -- job list
-cargo run -- sync run --job-id <job-id>
+cargo run -- sync run --job-id 1
 cargo run -- sync status
 ```
 

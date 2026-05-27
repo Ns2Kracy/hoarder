@@ -6,6 +6,7 @@
     import { formatDateTime, formatDuration } from "../lib/format";
     import type {
         Loadable,
+        LocalId,
         SyncItemDto,
         SyncRunDto,
     } from "../lib/types";
@@ -19,16 +20,16 @@
         runs: Loadable<SyncRunDto[]>;
         selectedRunDetail: Loadable<SyncRunDto | undefined>;
         runItems: Loadable<SyncItemDto[]>;
-        onSelectRun: (runId: string) => Promise<void> | void;
+        onSelectRun: (runId: LocalId) => Promise<void> | void;
     } = $props();
 
-    let selectedRunId = $state<string | undefined>(undefined);
+    let selectedRunId = $state<LocalId | undefined>(undefined);
     let selectedRun = $derived(
         selectedRunDetail.data ??
             runs.data.find((run) => run.id === selectedRunId) ??
             runs.data[0],
     );
-    let loadedRunId = $state<string | undefined>(undefined);
+    let loadedRunId = $state<LocalId | undefined>(undefined);
 
     $effect(() => {
         const nextRunId = selectedRunId ?? runs.data[0]?.id;
