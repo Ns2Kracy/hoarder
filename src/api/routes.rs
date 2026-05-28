@@ -5,7 +5,7 @@ use axum::{
         rejection::{JsonRejection, PathRejection},
     },
     http::StatusCode,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
             CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
             ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
             SourceDto, SourceTestResponse, SyncErrorDto, UpdateSettingsRequest,
+            UpdateSourceRequest,
         },
     },
     app::{job_service, run_service, settings_service, source_service},
@@ -39,6 +40,7 @@ fn api_routes_without_state() -> Router<ApiState> {
         .route("/api/health", get(health))
         .route("/api/openapi.json", get(openapi_spec))
         .route("/api/sources", get(list_sources).post(create_source))
+        .route("/api/sources/{id}", patch(update_source))
         .route("/api/sources/{id}/test", post(test_source))
         .route("/api/jobs", get(list_jobs).post(create_job))
         .route("/api/jobs/{id}/run", post(run_job))
@@ -73,6 +75,19 @@ async fn create_source(
     let source = source_service::create_source(state.repository(), request).await?;
 
     Ok((StatusCode::CREATED, Json(source)))
+}
+
+async fn update_source(
+    State(state): State<ApiState>,
+    path: Result<Path<SourceId>, PathRejection>,
+    payload: Result<Json<UpdateSourceRequest>, JsonRejection>,
+) -> Result<Json<SourceDto>, ApiError> {
+    let Path(source_id) = path?;
+    let Json(request) = payload?;
+
+    Ok(Json(
+        source_service::update_source(state.repository(), source_id, request).await?,
+    ))
 }
 
 async fn test_source(

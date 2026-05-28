@@ -123,6 +123,32 @@ export async function addSource(input: SourceFormInput) {
   }
 }
 
+export async function updateSource(sourceId: LocalId, input: SourceFormInput) {
+  try {
+    const result = await api.updateSource(sourceId, input);
+    const updatedAt = new Date().toISOString();
+    sources.update((current) => ({
+      ...current,
+      status: "ready",
+      origin: result.origin,
+      error: result.error,
+      data: current.data.some((source) => source.id === sourceId)
+        ? current.data.map((source) => (source.id === sourceId ? result.data : source))
+        : [result.data, ...current.data],
+      updatedAt,
+    }));
+    jobs.update((current) => ({
+      ...current,
+      data: current.data.map((job) =>
+        job.sourceId === sourceId ? { ...job, sourceName: result.data.name } : job,
+      ),
+      updatedAt,
+    }));
+  } catch (error) {
+    sources.update((current) => loadableWithError(current, error));
+  }
+}
+
 export async function testSourceConnection(sourceId: LocalId) {
   try {
     const result = await api.testSource(sourceId);

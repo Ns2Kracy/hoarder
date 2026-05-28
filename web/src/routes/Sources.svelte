@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Cable, CheckCircle2, FlaskConical } from "lucide-svelte";
+    import { Cable, CheckCircle2, FlaskConical, Pencil } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
     import SourceForm from "../components/SourceForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
@@ -10,11 +10,18 @@
         sources,
         onAddSource,
         onTestSource,
+        onUpdateSource,
     }: {
         sources: Loadable<SourceDto[]>;
         onAddSource: (input: SourceFormInput) => Promise<void> | void;
         onTestSource: (sourceId: LocalId) => Promise<void> | void;
+        onUpdateSource: (
+            sourceId: LocalId,
+            input: SourceFormInput,
+        ) => Promise<void> | void;
     } = $props();
+
+    let editingSourceId = $state<LocalId | undefined>(undefined);
 
     function configLine(source: SourceDto) {
         if (source.config.root) {
@@ -26,6 +33,30 @@
         }
 
         return source.config.endpoint ?? "No endpoint configured";
+    }
+
+    function sourceToFormInput(source: SourceDto): SourceFormInput {
+        const config = source.config;
+
+        return {
+            name: source.name,
+            serviceKind: source.serviceKind,
+            enabled: source.enabled,
+            config: {
+                root: stringOption(config.root),
+                endpoint: stringOption(config.endpoint),
+                bucket: stringOption(config.bucket),
+                region: stringOption(config.region),
+                username: stringOption(config.username),
+                accessKeyId: stringOption(config.access_key_id),
+                secretAccessKey: stringOption(config.secret_access_key),
+                token: stringOption(config.token),
+            },
+        };
+    }
+
+    function stringOption(value: unknown) {
+        return typeof value === "string" ? value : undefined;
     }
 </script>
 
@@ -143,6 +174,18 @@
                                 >
                                 <td class="px-3 py-2 text-right">
                                     <button
+                                        class="mr-2 inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                                        type="button"
+                                        onclick={() =>
+                                            (editingSourceId =
+                                                editingSourceId === source.id
+                                                    ? undefined
+                                                    : source.id)}
+                                    >
+                                        <Pencil aria-hidden="true" size={14} />
+                                        Edit
+                                    </button>
+                                    <button
                                         class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
                                         type="button"
                                         onclick={() => onTestSource(source.id)}
@@ -155,6 +198,30 @@
                                     </button>
                                 </td>
                             </tr>
+                            {#if editingSourceId === source.id}
+                                <tr class="bg-zinc-50">
+                                    <td class="px-3 py-3" colspan="7">
+                                        {#key source.id}
+                                            <SourceForm
+                                                mode="edit"
+                                                initialValue={sourceToFormInput(
+                                                    source,
+                                                )}
+                                                onSubmit={async (input) => {
+                                                    await onUpdateSource(
+                                                        source.id,
+                                                        input,
+                                                    );
+                                                    editingSourceId = undefined;
+                                                }}
+                                                onCancel={() =>
+                                                    (editingSourceId =
+                                                        undefined)}
+                                            />
+                                        {/key}
+                                    </td>
+                                </tr>
+                            {/if}
                         {/each}
                     </tbody>
                 </table>

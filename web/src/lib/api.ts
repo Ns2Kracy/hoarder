@@ -544,6 +544,46 @@ export const api = {
       },
     ),
 
+  updateSource: async (sourceId: LocalId, input: SourceFormInput): Promise<ApiData<SourceDto>> =>
+    withMockFallback(
+      async () => {
+        const response = await request<BackendSourceDto>(`/sources/${sourceId}`, {
+          method: "PATCH",
+          body: JSON.stringify(toSourceRequest(input)),
+        });
+        return toSourceDto(response);
+      },
+      () => {
+        const index = mockSources.findIndex((candidate) => candidate.id === sourceId);
+        const current = index >= 0 ? mockSources[index] : undefined;
+        const updated: SourceDto = {
+          id: sourceId,
+          name: input.name,
+          connectorKind: "opendal",
+          serviceKind: input.serviceKind,
+          enabled: input.enabled,
+          config: redactConfig(input),
+          health: input.enabled ? "untested" : "disabled",
+          itemCount: current?.itemCount ?? 0,
+          lastRunAt: current?.lastRunAt,
+        };
+
+        if (index >= 0) {
+          mockSources[index] = updated;
+        } else {
+          mockSources.unshift(updated);
+        }
+
+        for (const job of mockJobs) {
+          if (job.sourceId === sourceId) {
+            job.sourceName = updated.name;
+          }
+        }
+
+        return updated;
+      },
+    ),
+
   testSource: async (sourceId: LocalId): Promise<ApiData<{ ok: boolean; checkedAt: string }>> =>
     withMockFallback(
       () =>

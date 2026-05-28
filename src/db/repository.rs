@@ -64,6 +64,14 @@ pub struct NewSource {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UpdateSource {
+    pub name: String,
+    pub kind: ConnectorKind,
+    pub config_json: Value,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceRecord {
     pub id: SourceId,
     pub name: String,
@@ -116,6 +124,12 @@ pub struct SyncJobRecord {
 pub trait SourceRepository: Send + Sync {
     fn create_source(&self, input: NewSource) -> RepositoryFuture<'_, SourceRecord>;
 
+    fn update_source(
+        &self,
+        source_id: SourceId,
+        input: UpdateSource,
+    ) -> RepositoryFuture<'_, SourceRecord>;
+
     fn list_sources(&self) -> RepositoryFuture<'_, Vec<SourceRecord>>;
 }
 
@@ -160,6 +174,31 @@ impl SourceRepository for SeaOrmRepository {
             };
 
             let model = active_model.insert(&self.db).await.map_err(map_db_error)?;
+            source_record_from_model(model)
+        })
+    }
+
+    fn update_source(
+        &self,
+        source_id: SourceId,
+        input: UpdateSource,
+    ) -> RepositoryFuture<'_, SourceRecord> {
+        Box::pin(async move {
+            let model = source::Entity::find_by_id(source_id.as_i64())
+                .one(&self.db)
+                .await
+                .map_err(map_db_error)?
+                .ok_or_else(|| AppError::NotFound(format!("source not found: {source_id}")))?;
+            let mut active_model: source::ActiveModel = model.into();
+            active_model.name = Set(input.name);
+            active_model.kind = Set(connector_kind_to_str(input.kind).to_owned());
+            active_model.config_json = Set(input.config_json);
+            active_model.enabled = Set(input.enabled);
+            active_model.last_check_status = Set(None);
+            active_model.last_checked_at = Set(None);
+            active_model.updated_at = Set(Utc::now());
+
+            let model = active_model.update(&self.db).await.map_err(map_db_error)?;
             source_record_from_model(model)
         })
     }

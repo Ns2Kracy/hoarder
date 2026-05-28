@@ -142,6 +142,15 @@ pub struct CreateSourceRequest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateSourceRequest {
+    pub name: String,
+    pub config: ConnectorConfig,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SourceTestResponse {
     pub ok: bool,
     pub checked_at: DateTime<Utc>,

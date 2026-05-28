@@ -18,7 +18,7 @@ use hoarder::{
         },
         schema::sync_schema,
     },
-    entity::sync_job,
+    entity::{source, sync_job},
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::{Value, json};
@@ -48,6 +48,100 @@ async fn api_routes_sources_returns_repository_list() {
     assert_eq!(
         response.body["data"][0]["config"]["options"]["root"],
         json!(test.source_root.to_string_lossy())
+    );
+}
+
+#[tokio::test]
+async fn api_routes_updates_source_and_preserves_redacted_secrets() {
+    let test = TestApp::new().await;
+    let source_config = ConnectorConfig::OpenDal {
+        service: "s3".to_owned(),
+        options: BTreeMap::from([
+            ("bucket".to_owned(), "archive".to_owned()),
+            ("region".to_owned(), "WNAM".to_owned()),
+            (
+                "endpoint".to_owned(),
+                "https://account.r2.cloudflarestorage.com".to_owned(),
+            ),
+            ("access_key_id".to_owned(), "real-access-key".to_owned()),
+            ("secret_access_key".to_owned(), "real-secret-key".to_owned()),
+        ]),
+    };
+    let source = test
+        .repository
+        .create_source(NewSource {
+            name: "R2 archive".to_owned(),
+            kind: ConnectorKind::OpenDal,
+            config_json: serde_json::to_value(source_config).unwrap(),
+            enabled: true,
+        })
+        .await
+        .unwrap();
+
+    let source_model = source::Entity::find_by_id(source.id.as_i64())
+        .one(test.repository.connection())
+        .await
+        .unwrap()
+        .unwrap();
+    let mut active_source: source::ActiveModel = source_model.into();
+    active_source.last_check_status = Set(Some("healthy".to_owned()));
+    active_source.last_checked_at = Set(Some(chrono::Utc::now()));
+    active_source
+        .update(test.repository.connection())
+        .await
+        .unwrap();
+
+    let response = request(
+        test.app.clone(),
+        "PATCH",
+        &format!("/api/sources/{}", source.id),
+        Some(
+            r#"{
+                "name":"R2 archive edited",
+                "enabled":false,
+                "config":{
+                    "kind":"opendal",
+                    "service":"s3",
+                    "options":{
+                        "bucket":"archive",
+                        "region":"auto",
+                        "endpoint":"https://account.r2.cloudflarestorage.com",
+                        "access_key_id":"<redacted>",
+                        "secret_access_key":"<redacted>"
+                    }
+                }
+            }"#,
+        ),
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["name"], json!("R2 archive edited"));
+    assert_eq!(response.body["enabled"], json!(false));
+    assert_eq!(response.body["health"], json!("disabled"));
+    assert_eq!(response.body["lastCheckedAt"], Value::Null);
+    assert_eq!(
+        response.body["config"]["options"]["access_key_id"],
+        json!("<redacted>")
+    );
+
+    let stored = source::Entity::find_by_id(source.id.as_i64())
+        .one(test.repository.connection())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.name, "R2 archive edited");
+    assert!(!stored.enabled);
+    assert_eq!(stored.last_check_status, None);
+    assert_eq!(stored.last_checked_at, None);
+    assert_eq!(stored.config_json["options"]["region"], json!("auto"));
+    assert_eq!(
+        stored.config_json["options"]["access_key_id"],
+        json!("real-access-key")
+    );
+    assert_eq!(
+        stored.config_json["options"]["secret_access_key"],
+        json!("real-secret-key")
     );
 }
 
@@ -84,6 +178,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
         "/api/health",
         "/api/openapi.json",
         "/api/sources",
+        "/api/sources/{id}",
         "/api/sources/{id}/test",
         "/api/jobs",
         "/api/jobs/{id}/run",
@@ -121,6 +216,10 @@ async fn api_routes_openapi_spec_lists_current_routes() {
     assert_eq!(
         response.body["components"]["schemas"]["SyncErrorDto"]["properties"]["runId"]["type"],
         json!(["integer", "null"])
+    );
+    assert_eq!(
+        response.body["paths"]["/api/sources/{id}"]["patch"]["parameters"][0]["schema"]["type"],
+        json!("integer")
     );
     assert_eq!(
         response.body["paths"]["/api/jobs/{id}/run"]["post"]["parameters"][0]["schema"]["type"],

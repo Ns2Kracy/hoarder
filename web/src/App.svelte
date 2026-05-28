@@ -31,6 +31,7 @@
         summary,
         testSourceConnection,
         triggerJobRun,
+        updateSource,
     } from "./lib/state";
     import { formatDateTime } from "./lib/format";
     import type { PageId } from "./lib/types";
@@ -235,6 +236,7 @@
                         sources={$sources}
                         onAddSource={addSource}
                         onTestSource={testSourceConnection}
+                        onUpdateSource={updateSource}
                     />
                 {:else if activePage === "jobs"}
                     <Jobs

@@ -24,6 +24,7 @@ fn paths() -> Value {
         "/api/health": health_path(),
         "/api/openapi.json": openapi_path(),
         "/api/sources": sources_path(),
+        "/api/sources/{id}": source_path(),
         "/api/sources/{id}/test": source_test_path(),
         "/api/jobs": jobs_path(),
         "/api/jobs/{id}/run": job_run_path(),
@@ -88,6 +89,24 @@ fn sources_path() -> Value {
             "responses": {
                 "201": json_response("SourceDto"),
                 "400": error_response(),
+                "500": error_response()
+            }
+        }
+    })
+}
+
+#[must_use]
+fn source_path() -> Value {
+    json!({
+        "patch": {
+            "tags": ["sources"],
+            "operationId": "updateSource",
+            "parameters": [path_local_id_parameter("id", "Source identifier")],
+            "requestBody": request_body("UpdateSourceRequest"),
+            "responses": {
+                "200": json_response("SourceDto"),
+                "400": error_response(),
+                "404": error_response(),
                 "500": error_response()
             }
         }
@@ -267,7 +286,8 @@ fn schemas() -> Value {
         "SourceDto": source_schema(),
         "SourceTestResponse": source_test_response_schema(),
         "SyncErrorDto": sync_error_schema(),
-        "UpdateSettingsRequest": update_settings_request_schema()
+        "UpdateSettingsRequest": update_settings_request_schema(),
+        "UpdateSourceRequest": update_source_request_schema()
     })
 }
 
@@ -314,6 +334,11 @@ fn create_source_request_schema() -> Value {
             "enabled": {"type": "boolean", "default": true}
         }
     })
+}
+
+#[must_use]
+fn update_source_request_schema() -> Value {
+    create_source_request_schema()
 }
 
 #[must_use]

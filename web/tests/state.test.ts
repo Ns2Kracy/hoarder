@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { get } from "svelte/store";
 import { api } from "../src/lib/api";
 import {
+  jobs,
   loadConsoleData,
   loadRunDetail,
   runs,
@@ -9,6 +10,7 @@ import {
   sources,
   testSourceConnection,
   triggerJobRun,
+  updateSource,
 } from "../src/lib/state";
 
 const originalFetch = globalThis.fetch;
@@ -160,6 +162,82 @@ test("api read calls still fall back to mock data when the local endpoint is mis
     status: 404,
   });
   expect(result.data.length).toBeGreaterThan(0);
+});
+
+test("updateSource patches the live source and refreshes dependent job names", async () => {
+  const patchBodies: unknown[] = [];
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/sources/src-local" && init?.method === "PATCH") {
+      patchBodies.push(JSON.parse(String(init.body)));
+      return jsonResponse({
+        id: "src-local",
+        name: "Edited source",
+        connectorKind: "opendal",
+        config: {
+          service: "s3",
+          options: {
+            bucket: "edited-archive",
+            region: "auto",
+            access_key_id: "<redacted>",
+            secret_access_key: "<redacted>",
+          },
+        },
+        enabled: false,
+        health: "disabled",
+        lastCheckedAt: null,
+      });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  await updateSource("src-local", {
+    name: "Edited source",
+    serviceKind: "s3",
+    enabled: false,
+    config: {
+      bucket: "edited-archive",
+      region: "auto",
+      accessKeyId: "<redacted>",
+      secretAccessKey: "<redacted>",
+    },
+  });
+
+  expect(patchBodies).toEqual([
+    {
+      name: "Edited source",
+      config: {
+        kind: "opendal",
+        service: "s3",
+        options: {
+          bucket: "edited-archive",
+          region: "auto",
+          access_key_id: "<redacted>",
+          secret_access_key: "<redacted>",
+        },
+      },
+      enabled: false,
+    },
+  ]);
+  expect(get(sources).data[0]).toMatchObject({
+    id: "src-local",
+    name: "Edited source",
+    serviceKind: "s3",
+    enabled: false,
+    health: "disabled",
+  });
+  expect(get(sources).data[0]?.config).toMatchObject({
+    bucket: "edited-archive",
+    region: "auto",
+    access_key_id: "<redacted>",
+  });
+  expect(get(sources).data[0]?.lastCheckedAt).toBeUndefined();
+  expect(get(sources).data[0]?.lastError).toBeUndefined();
+  expect(get(jobs).data[0]?.sourceName).toBe("Edited source");
 });
 
 test("triggerJobRun keeps refreshed run list data when the live API returns the new run", async () => {

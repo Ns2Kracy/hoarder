@@ -1,9 +1,21 @@
 <script lang="ts">
-  import { Plus } from "lucide-svelte";
+  import { Check, Plus, X } from "lucide-svelte";
   import { canSubmitSourceForm, sourceServiceOptions } from "../lib/sourceServices";
   import type { OpenDalServiceKind, SourceFormInput } from "../lib/types";
 
-  let { onSubmit }: { onSubmit: (input: SourceFormInput) => Promise<void> | void } = $props();
+  type SourceFormMode = "create" | "edit";
+
+  let {
+    initialValue,
+    mode = "create",
+    onSubmit,
+    onCancel
+  }: {
+    initialValue?: SourceFormInput;
+    mode?: SourceFormMode;
+    onSubmit: (input: SourceFormInput) => Promise<void> | void;
+    onCancel?: () => void;
+  } = $props();
 
   let name = $state("");
   let serviceKind = $state<OpenDalServiceKind>("fs");
@@ -17,6 +29,12 @@
   let secretAccessKey = $state("");
   let token = $state("");
   let isSaving = $state(false);
+  let submitLabel = $derived(mode === "edit" ? "Save Source" : "Add Source");
+  let savingLabel = $derived(mode === "edit" ? "Saving" : "Adding");
+
+  $effect(() => {
+    resetFields(initialValue);
+  });
 
   let canSubmit = $derived(
     canSubmitSourceForm({
@@ -54,15 +72,9 @@
           token: blankToUndefined(token)
         }
       });
-      name = "";
-      root = "";
-      endpoint = "";
-      bucket = "";
-      region = "";
-      username = "";
-      accessKeyId = "";
-      secretAccessKey = "";
-      token = "";
+      if (mode === "create") {
+        resetFields(undefined);
+      }
     } finally {
       isSaving = false;
     }
@@ -71,6 +83,20 @@
   function blankToUndefined(value: string) {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  function resetFields(value: SourceFormInput | undefined) {
+    name = value?.name ?? "";
+    serviceKind = value?.serviceKind ?? "fs";
+    enabled = value?.enabled ?? true;
+    root = value?.config.root ?? "";
+    endpoint = value?.config.endpoint ?? "";
+    bucket = value?.config.bucket ?? "";
+    region = value?.config.region ?? "";
+    username = value?.config.username ?? "";
+    accessKeyId = value?.config.accessKeyId ?? "";
+    secretAccessKey = value?.config.secretAccessKey ?? "";
+    token = value?.config.token ?? "";
   }
 </script>
 
@@ -165,13 +191,27 @@
   {/if}
 
   <div class="flex justify-end border-t border-zinc-200 pt-3">
+    {#if onCancel}
+      <button
+        class="mr-2 inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+        type="button"
+        onclick={onCancel}
+      >
+        <X aria-hidden="true" size={15} />
+        Cancel
+      </button>
+    {/if}
     <button
       class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
       type="submit"
       disabled={!canSubmit || isSaving}
     >
-      <Plus aria-hidden="true" size={15} />
-      {isSaving ? "Adding" : "Add Source"}
+      {#if mode === "edit"}
+        <Check aria-hidden="true" size={15} />
+      {:else}
+        <Plus aria-hidden="true" size={15} />
+      {/if}
+      {isSaving ? savingLabel : submitLabel}
     </button>
   </div>
 </form>
