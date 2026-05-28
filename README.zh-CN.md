@@ -108,7 +108,6 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 面向同步引擎测试的 repository 抽象
 - [x] SeaORM repository 实现
 - [x] 配置文件之外的持久化 app settings
-- [ ] 显式 schema migration
 - [ ] 数据库清理或保留策略
 
 ### 连接器
@@ -310,4 +309,4 @@ cargo build --release
 
 ## 当前状态
 
-Hoarder 目前是早期本地优先 MVP。后端已经可以提供嵌入式 Web 控制台、同步 SQLite schema、暴露 MVP 控制面 API、执行 source/job/sync CLI 工作流、在 serve 模式下运行固定间隔任务，并通过本地文件系统端到端同步测试。下一步最高价值的工作是实现 filesystem 之外的更多 OpenDAL 服务、增加显式 schema migration，并准备 CI/release artifacts。
+Hoarder 目前是早期本地优先 MVP。后端已经可以提供嵌入式 Web 控制台、同步 SQLite schema、暴露 MVP 控制面 API、执行 source/job/sync CLI 工作流、在 serve 模式下运行固定间隔任务，并通过本地文件系统端到端同步测试。下一步最高价值的工作是实现 filesystem 之外的更多 OpenDAL 服务，并准备 CI/release artifacts。

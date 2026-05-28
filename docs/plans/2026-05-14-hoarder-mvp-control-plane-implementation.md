@@ -644,4 +644,3 @@ remaining risks.
 - Should stale `running` jobs be recovered automatically after a process crash?
 - Should CLI add `--json` output for automation?
 - Should Web remove mock fallback entirely once API coverage is complete?
-- Should explicit schema migrations replace schema sync before wider release?

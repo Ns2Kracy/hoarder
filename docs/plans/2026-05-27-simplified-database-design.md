@@ -7,7 +7,7 @@ Scope: SQLite schema, persistence model, sync write path, API/CLI ID shape
 
 ## Context
 
-The current database model uses SeaORM entity relationships to describe source, job, run, item, and error links. That makes the local schema look like an application domain graph, but Hoarder is a local-first sync index. The database should optimize for fast append/update operations, simple migrations, and clear query paths, not for enforcing a relational business model.
+The current database model uses SeaORM entity relationships to describe source, job, run, item, and error links. That makes the local schema look like an application domain graph, but Hoarder is a local-first sync index. The database should optimize for fast append/update operations and clear query paths, not for enforcing a relational business model.
 
 The main friction is not the number of tables. The friction is that tables are strongly coupled through database-level relationships and UUID identifiers even where local integer identifiers are enough.
 
@@ -239,9 +239,9 @@ The repository should distinguish three cases:
 
 Foreign-key absence should not hide logical corruption. It only moves enforcement from SQLite constraints to repository checks where Hoarder can give domain-specific errors.
 
-## Migration Strategy
+## Reset Strategy
 
-Because this changes primary key types, relationship shape, and public ID format, treat it as a schema reset unless compatibility becomes a hard requirement.
+Because this changes primary key types, relationship shape, and public ID format, treat it as a schema reset.
 
 Recommended implementation path:
 
@@ -249,15 +249,6 @@ Recommended implementation path:
 2. Update schema sync and explicit index creation.
 3. Update tests to use integer IDs.
 4. Document that existing development databases should be recreated.
-
-Optional compatibility path:
-
-1. Create new tables with integer ids.
-2. Copy old rows while building UUID-to-integer maps for source, job, run, and item.
-3. Rename old tables to backups.
-4. Rename new tables into place.
-
-Do not start with the compatibility path unless there is real user data to preserve. It adds substantial complexity for a pre-1.0 local database.
 
 ## Testing Strategy
 
@@ -285,7 +276,7 @@ Rejected because local integer IDs fit Hoarder better and simplify CLI usage.
 
 ### Keep a few core foreign keys
 
-This would preserve database-enforced integrity for source/job/run. It also keeps schema migrations, deletion behavior, and SeaORM relationship generation more complex.
+This would preserve database-enforced integrity for source/job/run. It also keeps deletion behavior and SeaORM relationship generation more complex.
 
 Rejected because Hoarder benefits more from soft historical references and simple local schema evolution.
 
@@ -299,7 +290,7 @@ Rejected because it makes queries and tests less clear. The problem is coupling,
 
 Positive consequences:
 
-- The schema is easier to understand and migrate.
+- The schema is easier to understand and evolve.
 - Local IDs are shorter and easier to use in CLI workflows.
 - Sync item planning can rely on targeted indexes.
 - Historical run detail is more resilient because it stores display snapshots.
@@ -309,5 +300,5 @@ Trade-offs:
 
 - The database no longer enforces cross-table integrity.
 - Repository tests become more important.
-- Existing UUID-based local databases need reset or explicit migration.
+- Existing UUID-based local databases need reset.
 - API clients and scripts must update to integer IDs.

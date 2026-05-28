@@ -17,7 +17,7 @@
 ## Prerequisites
 
 - Work from the branch that contains `docs/plans/2026-05-27-simplified-database-design.md`.
-- Treat this as a pre-1.0 breaking schema/API change. Do not preserve UUID database compatibility unless a later task explicitly adds migration support.
+- Treat this as a pre-1.0 breaking schema/API change. Do not preserve UUID database compatibility.
 - Use @superpowers:test-driven-development for each task.
 - Use @superpowers:verification-before-completion before reporting completion.
 
@@ -933,7 +933,7 @@ Expected: PASS.
 
 ```bash
 git add src tests Cargo.toml
-git commit -m "test: update id migration coverage"
+git commit -m "test: update id coverage"
 ```
 
 Skip this commit if Task 7 finds no changes.
@@ -1025,6 +1025,6 @@ Expected: no unstaged/untracked implementation changes except intentionally gene
 
 - Prefer integer `i64` in Rust entity columns because SQLite `INTEGER` is signed 64-bit.
 - Use typed wrappers at Rust/API boundaries rather than passing raw `i64` everywhere.
-- Do not introduce database foreign keys in migrations, SeaORM relations, or raw SQL.
+- Do not introduce database foreign keys in SeaORM relations or raw SQL.
 - Keep `sync_error` independent from `sync_item`; use `source_path` for item-level error context.
 - Do not add `sync_item_event` in this implementation. The accepted design keeps `sync_item` as the current index and stores run-level history in `sync_run` plus errors in `sync_error`.

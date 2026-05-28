@@ -108,7 +108,6 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Repository abstraction for sync engine tests
 - [x] SeaORM repository implementation
 - [x] Durable app settings beyond the config file
-- [ ] Explicit schema migrations
 - [ ] Database pruning or retention policies
 
 ### Connectors
@@ -310,4 +309,4 @@ cargo build --release
 
 ## Current Status
 
-Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. The next highest-value work is implementing more OpenDAL services beyond filesystem, adding explicit schema migrations, and preparing CI/release artifacts.
+Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. The next highest-value work is implementing more OpenDAL services beyond filesystem and preparing CI/release artifacts.
