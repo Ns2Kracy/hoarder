@@ -68,7 +68,8 @@
         </p>
     </div>
 
-    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
+    <div class="grid gap-3 xl:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.28fr)]">
+        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] xl:sticky xl:top-20 xl:h-fit">
         <div class="flex items-center gap-2 border-b border-line px-3 py-2">
             <Cable aria-hidden="true" size={16} class="text-subtle" />
             <h2 class="text-sm font-bold text-ink">Add Source</h2>
@@ -76,9 +77,9 @@
         <div class="p-3">
             <SourceForm onSubmit={onAddSource} />
         </div>
-    </section>
+        </section>
 
-    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
+        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
         <div
             class="flex items-center justify-between gap-3 border-b border-line px-3 py-2"
         >
@@ -225,7 +226,8 @@
                 </table>
             </div>
         {/if}
-    </section>
+        </section>
+    </div>
 
     <FallbackNotice error={sources.error} />
 </section>

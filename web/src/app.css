@@ -123,3 +123,12 @@
     transform: scale(1.16);
   }
 }
+
+@keyframes media-drift {
+  from {
+    transform: scale(1.02) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.08) translate3d(-1.5%, 1%, 0);
+  }
+}

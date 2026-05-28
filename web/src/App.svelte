@@ -46,7 +46,6 @@
     ] satisfies { id: PageId; label: string; icon: typeof Gauge }[];
 
     let activePage = $state<PageId>(pageFromHash());
-    let sidebarOpen = $state(false);
 
     onMount(() => {
         loadConsoleData();
@@ -79,145 +78,74 @@
 </svelte:head>
 
 <div class="min-h-[100dvh] bg-canvas text-ink [background-image:radial-gradient(circle_at_top_right,var(--accent-soft),transparent_34rem),linear-gradient(90deg,var(--surface-grid)_1px,transparent_1px),linear-gradient(180deg,var(--surface-grid)_1px,transparent_1px)] [background-size:auto,48px_48px,48px_48px]">
-    <div class="flex min-h-[100dvh]">
-        <aside class="hidden w-60 shrink-0 border-r border-line bg-panel-strong shadow-panel lg:block">
-            <div class="flex h-12 items-center gap-2 border-b border-line px-3">
-                <FolderCog aria-hidden="true" size={19} class="text-accent" />
-                <div>
-                    <p class="text-sm font-semibold leading-4">
-                        Hoarder
-                    </p>
-                    <p class="text-xs leading-4 text-subtle">
-                        Connector Console
-                    </p>
+    <header class="sticky top-0 z-10 border-b border-line bg-panel-strong/90 shadow-panel backdrop-blur-xl">
+        <div class="mx-auto flex h-16 max-w-[1500px] items-center gap-3 px-3 lg:px-5">
+            <div class="flex min-w-0 shrink-0 items-center gap-2">
+                <FolderCog aria-hidden="true" size={20} class="text-accent" />
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-bold leading-4">Hoarder</p>
+                    <p class="truncate text-xs leading-4 text-subtle">Connector Console</p>
                 </div>
             </div>
-            <nav class="space-y-1 p-2" aria-label="Primary">
+
+            <nav class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" aria-label="Primary">
                 {#each navigation as item (item.id)}
                     {@const Icon = item.icon}
                     <button
-                        class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-semibold transition duration-150 hover:translate-x-0.5 ${
+                        class={`inline-flex h-9 min-w-max items-center gap-1.5 rounded-sm px-2.5 text-sm font-semibold transition duration-150 hover:-translate-y-px ${
                             activePage === item.id
-                                ? "bg-ink text-panel-strong"
+                                ? "bg-ink text-panel-strong shadow-panel"
                                 : "text-muted hover:bg-panel-muted hover:text-ink"
                         }`}
                         type="button"
                         onclick={() => selectPage(item.id)}
                     >
-                        <Icon aria-hidden="true" size={16} />
+                        <Icon aria-hidden="true" size={15} />
                         {item.label}
                     </button>
                 {/each}
             </nav>
-        </aside>
 
-        {#if sidebarOpen}
-            <button
-                class="fixed inset-0 z-20 bg-zinc-950/40 lg:hidden"
-                type="button"
-                aria-label="Close navigation"
-                onclick={() => (sidebarOpen = false)}
-            ></button>
-            <aside class="fixed inset-y-0 left-0 z-30 w-64 border-r border-line bg-panel-strong shadow-panel lg:hidden">
-                <div class="flex h-12 items-center gap-2 border-b border-line px-3">
-                    <FolderCog
-                        aria-hidden="true"
-                        size={19}
-                        class="text-accent"
-                    />
-                    <div>
-                        <p class="text-sm font-semibold leading-4">
-                            Hoarder
-                        </p>
-                        <p class="text-xs leading-4 text-subtle">
-                            Connector Console
-                        </p>
-                    </div>
+            <div class="hidden min-w-0 items-center gap-2 md:flex">
+                <div class="min-w-0 text-right">
+                    <p class="truncate text-xs font-semibold text-muted">Local API - 127.0.0.1:4761</p>
+                    <p class="truncate text-xs leading-4 text-subtle">
+                        {$consoleOrigin === "api" ? "Live API data" : "Mock data fallback"} - refreshed
+                        {formatDateTime(
+                            $sources.updatedAt ??
+                                $jobs.updatedAt ??
+                                $runs.updatedAt,
+                        )}
+                    </p>
                 </div>
-                <nav class="space-y-1 p-2" aria-label="Mobile primary">
-                    {#each navigation as item (item.id)}
-                        {@const Icon = item.icon}
-                        <button
-                            class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-semibold transition duration-150 hover:translate-x-0.5 ${
-                                activePage === item.id
-                                    ? "bg-ink text-panel-strong"
-                                    : "text-muted hover:bg-panel-muted hover:text-ink"
-                            }`}
-                            type="button"
-                            onclick={() => {
-                                selectPage(item.id);
-                                sidebarOpen = false;
-                            }}
-                        >
-                            <Icon aria-hidden="true" size={16} />
-                            {item.label}
-                        </button>
-                    {/each}
-                </nav>
-            </aside>
-        {/if}
-
-        <div class="min-w-0 flex-1">
-            <header class="sticky top-0 z-10 border-b border-line bg-panel-strong/90 shadow-panel backdrop-blur-xl">
-                <div
-                    class="flex h-12 items-center justify-between gap-3 px-3 lg:px-4"
+                <span
+                    class={`inline-flex h-6 items-center rounded-sm border px-2 text-xs font-bold ${
+                        $consoleOrigin === "api"
+                            ? "border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+                            : "border-amber-300/60 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                    }`}
                 >
-                    <div class="flex min-w-0 items-center gap-2">
-                        <button
-                            class="inline-flex size-8 items-center justify-center rounded-sm border border-line bg-panel-strong text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px lg:hidden"
-                            type="button"
-                            aria-label="Open navigation"
-                            onclick={() => (sidebarOpen = true)}
-                        >
-                            <FolderCog aria-hidden="true" size={16} />
-                        </button>
-                        <div class="min-w-0">
-                            <p
-                                class="truncate text-sm font-semibold"
-                            >
-                                Local API - 127.0.0.1:4761
-                            </p>
-                            <p class="truncate text-xs leading-4 text-subtle">
-                                {$consoleOrigin === "api"
-                                    ? "Live API data"
-                                    : "Mock data fallback"} - refreshed
-                                {formatDateTime(
-                                    $sources.updatedAt ??
-                                        $jobs.updatedAt ??
-                                        $runs.updatedAt,
-                                )}
-                            </p>
-                        </div>
-                    </div>
+                    {$consoleOrigin === "api" ? "API" : "Mock"}
+                </span>
+            </div>
 
-                    <div class="flex items-center gap-2">
-                        <span
-                            class={`inline-flex h-6 items-center rounded-sm border px-2 text-xs font-bold ${
-                                $consoleOrigin === "api"
-                                    ? "border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
-                                    : "border-amber-300/60 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-                            }`}
-                        >
-                            {$consoleOrigin === "api" ? "API" : "Mock"}
-                        </span>
-                        <button
-                            class="inline-flex size-8 items-center justify-center rounded-sm border border-line bg-panel-strong text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px disabled:cursor-not-allowed disabled:bg-panel-muted disabled:text-subtle"
-                            type="button"
-                            aria-label="Refresh console data"
-                            disabled={$isRefreshing}
-                            onclick={loadConsoleData}
-                        >
-                            <RefreshCcw
-                                aria-hidden="true"
-                                size={15}
-                                class={$isRefreshing ? "animate-refreshing" : ""}
-                            />
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <button
+                class="inline-flex size-9 shrink-0 items-center justify-center rounded-sm border border-line bg-panel-strong text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px disabled:cursor-not-allowed disabled:bg-panel-muted disabled:text-subtle"
+                type="button"
+                aria-label="Refresh console data"
+                disabled={$isRefreshing}
+                onclick={loadConsoleData}
+            >
+                <RefreshCcw
+                    aria-hidden="true"
+                    size={15}
+                    class={$isRefreshing ? "animate-refreshing" : ""}
+                />
+            </button>
+        </div>
+    </header>
 
-            <main class="mx-auto max-w-[1440px] p-3 lg:p-4">
+    <main class="mx-auto max-w-[1500px] p-3 lg:p-5">
                 {#if activePage === "overview"}
                     <Overview
                         summary={$summary}
@@ -251,7 +179,5 @@
                 {:else if activePage === "settings"}
                     <Settings settings={$settings} onSave={saveSettings} />
                 {/if}
-            </main>
-        </div>
-    </div>
+    </main>
 </div>

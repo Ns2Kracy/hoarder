@@ -36,24 +36,46 @@
 </script>
 
 <section class="grid gap-3 motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-[clamp(1.25rem,1.6vw,1.65rem)] font-bold leading-tight text-ink">Overview</h1>
-            <p class="mt-1 max-w-[65ch] text-sm leading-snug text-muted">
-                Local connector sync status and recent activity.
-            </p>
+    <section class="grid overflow-hidden rounded-sm border border-line bg-panel-strong shadow-panel lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)]">
+        <div class="flex min-h-[18rem] flex-col justify-between gap-6 p-4 lg:p-5">
+            <div>
+                <h1 class="max-w-[12ch] text-[clamp(2.25rem,5vw,4.75rem)] font-bold leading-[0.95] text-ink">
+                    Local sync control
+                </h1>
+                <p class="mt-3 max-w-[42ch] text-sm leading-snug text-muted">
+                    Connect sources, run jobs, and audit recent activity from this local console.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <button
+                    class="inline-flex h-9 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-3 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px"
+                    type="button"
+                    onclick={onRefresh}
+                >
+                    <RefreshCcw aria-hidden="true" size={15} />
+                    Refresh
+                </button>
+                <div class="grid gap-1 text-right text-xs text-subtle">
+                    <span>{formatCount(summary.sourceCount)} sources</span>
+                    <span>{formatCount(summary.activeJobCount)} active jobs</span>
+                </div>
+            </div>
         </div>
-        <button
-            class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-3 text-sm font-semibold text-muted shadow-panel transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
-            type="button"
-            onclick={onRefresh}
-        >
-            <RefreshCcw aria-hidden="true" size={15} />
-            Refresh
-        </button>
-    </div>
 
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr_0.85fr]">
+        <div class="relative min-h-[18rem] overflow-hidden border-t border-line lg:border-l lg:border-t-0">
+            <img
+                class="h-full min-h-[18rem] w-full object-cover motion-safe:animate-[media-drift_16s_ease-in-out_infinite_alternate]"
+                src="https://picsum.photos/seed/hoarder-local-archive-console/1200/720"
+                alt="Archive shelves used as a local storage visual"
+            />
+            <div class="absolute inset-0 bg-[linear-gradient(90deg,rgb(0_0_0_/_0.45),transparent_55%)]"></div>
+            <div class="absolute bottom-3 left-3 right-3 rounded-sm border border-white/20 bg-black/35 px-3 py-2 text-xs text-white backdrop-blur-md">
+                One-way source capture into a readable local vault.
+            </div>
+        </div>
+    </section>
+
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.35fr_0.85fr_1fr_0.8fr]">
         <div class="relative min-h-28 overflow-hidden rounded-sm border border-line bg-panel-strong p-3 shadow-panel after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-[linear-gradient(90deg,var(--accent),transparent)] motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
             <div class="flex items-center justify-between gap-2">
                 <p class="text-xs font-semibold text-subtle">Sources</p>

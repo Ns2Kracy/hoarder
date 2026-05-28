@@ -55,7 +55,8 @@
         </p>
     </div>
 
-    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
+    <div class="grid gap-3 2xl:grid-cols-[minmax(32rem,0.92fr)_minmax(0,1.08fr)]">
+        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] 2xl:sticky 2xl:top-20 2xl:h-fit">
         <div class="flex items-center gap-2 border-b border-line px-3 py-2">
             <ListChecks aria-hidden="true" size={16} class="text-subtle" />
             <h2 class="text-sm font-bold text-ink">Run History</h2>
@@ -72,7 +73,7 @@
                 onSelect={selectRun}
             />
         {/if}
-    </section>
+        </section>
 
     {#if selectedRun}
         <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
@@ -230,6 +231,7 @@
             </div>
         </section>
     {/if}
+    </div>
 
     <FallbackNotice error={runs.error ?? selectedRunDetail.error ?? runItems.error} />
 </section>
