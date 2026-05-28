@@ -1,5 +1,6 @@
 <script lang="ts">
   import { AlertTriangle, Ban, CheckCircle2, CircleDashed, Clock3, PlayCircle, XCircle } from "lucide-svelte";
+  import { Tooltip } from "bits-ui";
   import type { ItemSyncStatus, JobStatus, RunStatus, SourceHealth } from "../lib/types";
 
   type Status = SourceHealth | JobStatus | RunStatus | ItemSyncStatus;
@@ -20,6 +21,24 @@
     synced: "Synced",
     skipped: "Skipped",
     deleted_on_source: "Deleted on source"
+  };
+
+  const descriptionByStatus: Record<Status, string> = {
+    healthy: "The source responded successfully on its last check.",
+    warning: "The source is reachable but needs attention.",
+    failed: "The latest operation recorded a failure.",
+    untested: "This source has not been validated yet.",
+    disabled: "This source or job is disabled.",
+    idle: "The job is enabled and waiting for its next run.",
+    running: "A sync operation is currently in progress.",
+    paused: "This job is paused and will not run automatically.",
+    completed: "The run completed without recorded item failures.",
+    completed_with_failures: "The run completed, but at least one item failed.",
+    cancelled: "The run was cancelled before completion.",
+    pending: "The item is queued or waiting to be processed.",
+    synced: "The item was written to the local vault.",
+    skipped: "The item was already current and did not need writing.",
+    deleted_on_source: "The source no longer reports this item. Local data is retained."
   };
 
   const classByStatus: Record<Status, string> = {
@@ -63,9 +82,22 @@
   let Icon = $derived(iconByStatus[status]);
 </script>
 
-<span
-  class={`inline-flex min-w-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-bold leading-4 ${classByStatus[status]}`}
->
-  <Icon aria-hidden="true" size={12} strokeWidth={2.2} />
-  <span class="truncate">{displayLabel}</span>
-</span>
+<Tooltip.Root delayDuration={250}>
+  <Tooltip.Trigger>
+    {#snippet child({ props })}
+      <span
+        {...props}
+        class={`inline-flex min-w-0 cursor-help items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-bold leading-4 ${classByStatus[status]}`}
+      >
+        <Icon aria-hidden="true" size={12} strokeWidth={2.2} />
+        <span class="truncate">{displayLabel}</span>
+      </span>
+    {/snippet}
+  </Tooltip.Trigger>
+  <Tooltip.Content
+    sideOffset={6}
+    class="z-50 max-w-64 rounded-sm border border-line bg-panel-strong px-2 py-1.5 text-xs leading-snug text-ink shadow-panel"
+  >
+    {descriptionByStatus[status]}
+  </Tooltip.Content>
+</Tooltip.Root>

@@ -7,6 +7,7 @@
         RefreshCcw,
     } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
+    import RunTrendChart from "../components/RunTrendChart.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import RunSummaryTable from "../components/RunSummaryTable.svelte";
     import { formatCount, formatDateTime } from "../lib/format";
@@ -131,8 +132,16 @@
         </div>
     </div>
 
-    <div class="grid gap-3 xl:grid-cols-[1.25fr_0.75fr]">
-        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
+    <div class="grid gap-3 xl:grid-cols-[0.72fr_1.15fr_0.78fr]">
+        <section class="rounded-sm border border-line bg-panel-strong p-3 shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
+            <div class="mb-2 flex items-center justify-between gap-3">
+                <h2 class="text-sm font-bold text-ink">Run Trend</h2>
+                <span class="text-xs text-subtle">Last {Math.min(runs.data.length, 8)}</span>
+            </div>
+            <RunTrendChart runs={runs.data} />
+        </section>
+
+        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
             <div class="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
                 <h2 class="text-sm font-bold text-ink">Recent Runs</h2>
                 {#if summary.lastRun}
@@ -156,7 +165,7 @@
             {/if}
         </section>
 
-        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
+        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:80ms]">
             <div class="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
                 <h2 class="text-sm font-bold text-ink">
                     Source Health

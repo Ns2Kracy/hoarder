@@ -15,6 +15,8 @@
     "verify": "bun run fmt:check && bun run lint && bun run check && bun run build"
   },
   "dependencies": {
+    "bits-ui": "^2.18.1",
+    "layerchart": "^1.0.13",
     "lucide-svelte": "^1.0.1"
   },
   "devDependencies": {
