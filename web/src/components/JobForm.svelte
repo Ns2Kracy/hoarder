@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Plus } from "lucide-svelte";
+    import { Check, Plus, X } from "lucide-svelte";
     import type {
         JobFormInput,
         LocalId,
@@ -9,10 +9,16 @@
 
     let {
         sources,
-        onCreate,
+        initialValue,
+        mode = "create",
+        onSubmit,
+        onCancel,
     }: {
         sources: Loadable<SourceDto[]>;
-        onCreate: (input: JobFormInput) => Promise<void> | void;
+        initialValue?: JobFormInput;
+        mode?: "create" | "edit";
+        onSubmit: (input: JobFormInput) => Promise<void> | void;
+        onCancel?: () => void;
     } = $props();
 
     let sourceId = $state<LocalId | undefined>(undefined);
@@ -21,9 +27,13 @@
     let scheduleKind = $state<"manual" | "interval">("interval");
     let intervalSeconds = $state(300);
     let isSaving = $state(false);
+    let submitLabel = $derived(mode === "edit" ? "Save" : "Add");
+    let savingLabel = $derived(mode === "edit" ? "Saving" : "Adding");
 
     $effect(() => {
-        if (sourceId === undefined && sources.data[0]) {
+        if (mode === "edit") {
+            resetFields(initialValue, sources.data[0]?.id);
+        } else if (sourceId === undefined && sources.data[0]) {
             sourceId = sources.data[0].id;
         }
     });
@@ -35,7 +45,7 @@
 
         isSaving = true;
         try {
-            await onCreate({
+            await onSubmit({
                 sourceId,
                 name: name.trim(),
                 enabled,
@@ -50,10 +60,21 @@
                               ),
                           },
             });
-            name = "";
+            if (mode === "create") {
+                name = "";
+            }
         } finally {
             isSaving = false;
         }
+    }
+
+    function resetFields(value: JobFormInput | undefined, fallbackSourceId: LocalId | undefined) {
+        sourceId = value?.sourceId ?? fallbackSourceId;
+        name = value?.name ?? "";
+        enabled = value?.enabled ?? true;
+        scheduleKind = value?.schedule.kind ?? "interval";
+        intervalSeconds =
+            value?.schedule.kind === "interval" ? value.schedule.intervalSeconds : 300;
     }
 </script>
 
@@ -110,13 +131,27 @@
                 <input type="checkbox" bind:checked={enabled} />
                 Enabled
             </label>
+            {#if onCancel}
+                <button
+                    class="inline-flex h-9 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                    type="button"
+                    onclick={onCancel}
+                >
+                    <X aria-hidden="true" size={15} />
+                    Cancel
+                </button>
+            {/if}
             <button
                 class="inline-flex h-9 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
                 type="submit"
                 disabled={isSaving || sourceId === undefined || !name.trim()}
             >
-                <Plus aria-hidden="true" size={15} />
-                Add
+                {#if mode === "edit"}
+                    <Check aria-hidden="true" size={15} />
+                {:else}
+                    <Plus aria-hidden="true" size={15} />
+                {/if}
+                {isSaving ? savingLabel : submitLabel}
             </button>
         </div>
     </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Play, TimerReset } from "lucide-svelte";
+    import { Pencil, Play, TimerReset } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
     import JobForm from "../components/JobForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
@@ -16,13 +16,26 @@
         jobs,
         sources,
         onCreateJob,
+        onUpdateJob,
         onRunJob,
     }: {
         jobs: Loadable<SyncJobDto[]>;
         sources: Loadable<SourceDto[]>;
         onCreateJob: (input: JobFormInput) => Promise<void> | void;
+        onUpdateJob: (jobId: LocalId, input: JobFormInput) => Promise<void> | void;
         onRunJob: (jobId: LocalId) => Promise<void> | void;
     } = $props();
+
+    let editingJobId = $state<LocalId | undefined>(undefined);
+
+    function jobToFormInput(job: SyncJobDto): JobFormInput {
+        return {
+            sourceId: job.sourceId,
+            name: job.name,
+            enabled: job.enabled,
+            schedule: job.schedule,
+        };
+    }
 </script>
 
 <section class="space-y-4">
@@ -33,7 +46,7 @@
         </p>
     </div>
 
-    <JobForm sources={sources} onCreate={onCreateJob} />
+    <JobForm sources={sources} onSubmit={onCreateJob} />
 
     <section class="rounded-sm border border-zinc-200 bg-white">
         <div
@@ -102,6 +115,19 @@
                                 >
                                 <td class="px-3 py-2 text-right">
                                     <button
+                                        class="mr-2 inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+                                        type="button"
+                                        disabled={job.status === "running"}
+                                        onclick={() =>
+                                            (editingJobId =
+                                                editingJobId === job.id
+                                                    ? undefined
+                                                    : job.id)}
+                                    >
+                                        <Pencil aria-hidden="true" size={14} />
+                                        Edit
+                                    </button>
+                                    <button
                                         class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
                                         type="button"
                                         disabled={!job.enabled ||
@@ -113,6 +139,30 @@
                                     </button>
                                 </td>
                             </tr>
+                            {#if editingJobId === job.id}
+                                <tr class="bg-zinc-50">
+                                    <td class="px-3 py-3" colspan="6">
+                                        {#key job.id}
+                                            <JobForm
+                                                sources={sources}
+                                                mode="edit"
+                                                initialValue={jobToFormInput(
+                                                    job,
+                                                )}
+                                                onSubmit={async (input) => {
+                                                    await onUpdateJob(
+                                                        job.id,
+                                                        input,
+                                                    );
+                                                    editingJobId = undefined;
+                                                }}
+                                                onCancel={() =>
+                                                    (editingJobId = undefined)}
+                                            />
+                                        {/key}
+                                    </td>
+                                </tr>
+                            {/if}
                         {/each}
                     </tbody>
                 </table>

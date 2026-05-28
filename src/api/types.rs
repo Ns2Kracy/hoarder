@@ -193,6 +193,16 @@ pub struct CreateJobRequest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateJobRequest {
+    pub source_id: SourceId,
+    pub name: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    pub schedule: JobScheduleDto,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RunDto {
     pub id: RunId,
     pub job_id: JobId,

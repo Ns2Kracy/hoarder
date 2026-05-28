@@ -640,6 +640,49 @@ export const api = {
       },
     ),
 
+  updateJob: async (
+    jobId: LocalId,
+    input: JobFormInput,
+    sourceList?: SourceDto[],
+  ): Promise<ApiData<SyncJobDto>> =>
+    withMockFallback(
+      async () => {
+        const resolvedSources = sourceList ?? (await api.getSources()).data;
+        const sourceNames = new Map(resolvedSources.map((source) => [source.id, source.name]));
+        const response = await request<BackendJobDto>(`/jobs/${jobId}`, {
+          method: "PATCH",
+          body: JSON.stringify(toCreateJobRequest(input)),
+        });
+        return toJobDto(response, sourceNames);
+      },
+      () => {
+        const source = mockSources.find((candidate) => candidate.id === input.sourceId);
+        const index = mockJobs.findIndex((candidate) => candidate.id === jobId);
+        const current = index >= 0 ? mockJobs[index] : undefined;
+        const updated: SyncJobDto = {
+          id: jobId,
+          sourceId: input.sourceId,
+          sourceName: source?.name ?? String(input.sourceId),
+          name: input.name,
+          schedule: input.schedule,
+          scheduleLabel: scheduleLabel(input.schedule),
+          enabled: input.enabled,
+          status: input.enabled ? "idle" : "paused",
+          lastRunAt: current?.lastRunAt,
+          lastRunStatus: current?.lastRunStatus,
+          lastRunId: current?.lastRunId,
+        };
+
+        if (index >= 0) {
+          mockJobs[index] = updated;
+        } else {
+          mockJobs.unshift(updated);
+        }
+
+        return updated;
+      },
+    ),
+
   runJob: async (jobId: LocalId, jobList?: SyncJobDto[]): Promise<ApiData<SyncRunDto>> =>
     withMockFallback(
       async () => {

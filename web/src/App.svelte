@@ -31,6 +31,7 @@
         summary,
         testSourceConnection,
         triggerJobRun,
+        updateJob,
         updateSource,
     } from "./lib/state";
     import { formatDateTime } from "./lib/format";
@@ -243,6 +244,7 @@
                         jobs={$jobs}
                         sources={$sources}
                         onCreateJob={createJob}
+                        onUpdateJob={updateJob}
                         onRunJob={triggerJobRun}
                     />
                 {:else if activePage === "runs"}

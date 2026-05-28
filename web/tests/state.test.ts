@@ -10,6 +10,7 @@ import {
   sources,
   testSourceConnection,
   triggerJobRun,
+  updateJob,
   updateSource,
 } from "../src/lib/state";
 
@@ -238,6 +239,59 @@ test("updateSource patches the live source and refreshes dependent job names", a
   expect(get(sources).data[0]?.lastCheckedAt).toBeUndefined();
   expect(get(sources).data[0]?.lastError).toBeUndefined();
   expect(get(jobs).data[0]?.sourceName).toBe("Edited source");
+});
+
+test("updateJob patches the live sync job and replaces it in state", async () => {
+  const patchBodies: unknown[] = [];
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/jobs/job-local" && init?.method === "PATCH") {
+      patchBodies.push(JSON.parse(String(init.body)));
+      return jsonResponse({
+        id: "job-local",
+        sourceId: "src-local",
+        name: "Edited job",
+        enabled: false,
+        schedule: { kind: "interval", intervalSeconds: 900 },
+        status: "paused",
+        nextRunAt: null,
+        lastRunAt: null,
+        lastRunStatus: null,
+        lastRunId: null,
+      });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  await updateJob("job-local", {
+    sourceId: "src-local",
+    name: "Edited job",
+    enabled: false,
+    schedule: { kind: "interval", intervalSeconds: 900 },
+  });
+
+  expect(patchBodies).toEqual([
+    {
+      sourceId: "src-local",
+      name: "Edited job",
+      enabled: false,
+      schedule: { kind: "interval", intervalSeconds: 900 },
+    },
+  ]);
+  expect(get(jobs).data[0]).toMatchObject({
+    id: "job-local",
+    sourceId: "src-local",
+    sourceName: "Local source",
+    name: "Edited job",
+    enabled: false,
+    status: "paused",
+    schedule: { kind: "interval", intervalSeconds: 900 },
+    scheduleLabel: "Every 15 minutes",
+  });
 });
 
 test("triggerJobRun keeps refreshed run list data when the live API returns the new run", async () => {

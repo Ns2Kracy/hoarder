@@ -188,6 +188,24 @@ export async function createJob(input: JobFormInput) {
   }
 }
 
+export async function updateJob(jobId: LocalId, input: JobFormInput) {
+  try {
+    const result = await api.updateJob(jobId, input, get(sources).data);
+    jobs.update((current) => ({
+      ...current,
+      status: "ready",
+      origin: result.origin,
+      error: result.error,
+      data: current.data.some((job) => job.id === jobId)
+        ? current.data.map((job) => (job.id === jobId ? result.data : job))
+        : [result.data, ...current.data],
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch (error) {
+    jobs.update((current) => loadableWithError(current, error));
+  }
+}
+
 export async function triggerJobRun(jobId: LocalId) {
   try {
     const runResult = await api.runJob(jobId, get(jobs).data);

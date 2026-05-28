@@ -100,6 +100,14 @@ pub struct NewScheduledSyncJob {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UpdateScheduledSyncJob {
+    pub source_id: SourceId,
+    pub name: String,
+    pub enabled: bool,
+    pub schedule: SyncJobSchedule,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SyncJobSchedule {
     Manual,
     Interval { interval_seconds: u64 },
@@ -139,6 +147,12 @@ pub trait SyncJobRepository: Send + Sync {
     fn create_scheduled_job(
         &self,
         input: NewScheduledSyncJob,
+    ) -> RepositoryFuture<'_, SyncJobRecord>;
+
+    fn update_scheduled_job(
+        &self,
+        job_id: JobId,
+        input: UpdateScheduledSyncJob,
     ) -> RepositoryFuture<'_, SyncJobRecord>;
 
     fn list_jobs(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<SyncJobRecord>>;
@@ -251,6 +265,47 @@ impl SyncJobRepository for SeaOrmRepository {
             };
 
             let model = active_model.insert(&self.db).await.map_err(map_db_error)?;
+            Ok(sync_job_record_from_model(model))
+        })
+    }
+
+    fn update_scheduled_job(
+        &self,
+        job_id: JobId,
+        input: UpdateScheduledSyncJob,
+    ) -> RepositoryFuture<'_, SyncJobRecord> {
+        Box::pin(async move {
+            let (schedule_kind, schedule_interval_seconds) = schedule_to_storage(&input.schedule)?;
+            ensure_source_exists(&self.db, input.source_id).await?;
+
+            let model = sync_job::Entity::find_by_id(job_id.as_i64())
+                .one(&self.db)
+                .await
+                .map_err(map_db_error)?
+                .ok_or_else(|| AppError::NotFound(format!("sync job not found: {job_id}")))?;
+            if job_status_from_str(&model.status)? == JobStatus::Running {
+                return Err(AppError::Conflict(format!(
+                    "sync job is already running: {job_id}"
+                )));
+            }
+
+            let source_changed = model.source_id != input.source_id.as_i64();
+            let mut active_model: sync_job::ActiveModel = model.into();
+            active_model.source_id = Set(input.source_id.as_i64());
+            active_model.name = Set(input.name);
+            active_model.enabled = Set(input.enabled);
+            active_model.schedule_kind = Set(schedule_kind.to_owned());
+            active_model.schedule_interval_seconds = Set(schedule_interval_seconds);
+            active_model.status = Set(if input.enabled { "idle" } else { "paused" }.to_owned());
+            if source_changed {
+                active_model.cursor = Set(None);
+                active_model.last_run_at = Set(None);
+                active_model.last_run_status = Set(None);
+                active_model.last_run_id = Set(None);
+            }
+            active_model.updated_at = Set(Utc::now());
+
+            let model = active_model.update(&self.db).await.map_err(map_db_error)?;
             Ok(sync_job_record_from_model(model))
         })
     }

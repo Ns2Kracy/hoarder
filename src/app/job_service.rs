@@ -4,11 +4,12 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrde
 
 use crate::{
     AppError, AppResult,
-    api::types::{CreateJobRequest, JobDto, JobRunResponse, JobScheduleDto},
+    api::types::{CreateJobRequest, JobDto, JobRunResponse, JobScheduleDto, UpdateJobRequest},
     connectors::{opendal::source::OpenDalSourceConnector, traits::SourceConnector},
     core::types::{ConnectorKind, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus},
     db::repository::{
         NewScheduledSyncJob, SeaOrmRepository, SyncJobRecord, SyncJobRepository, SyncJobSchedule,
+        UpdateScheduledSyncJob,
     },
     entity::sync_job,
     sync::{
@@ -72,6 +73,33 @@ pub async fn create_job(
             enabled: request.enabled,
             schedule,
         })
+        .await?;
+
+    Ok(job_dto_from_record(record))
+}
+
+/// Updates an existing sync job from an API request.
+///
+/// # Errors
+///
+/// Returns an error when the job is missing, currently running, schedule is
+/// invalid, source is missing, or the database update fails.
+pub async fn update_job(
+    repository: &SeaOrmRepository,
+    job_id: JobId,
+    request: UpdateJobRequest,
+) -> AppResult<JobDto> {
+    let schedule = schedule_from_dto(&request.schedule)?;
+    let record = repository
+        .update_scheduled_job(
+            job_id,
+            UpdateScheduledSyncJob {
+                source_id: request.source_id,
+                name: request.name,
+                enabled: request.enabled,
+                schedule,
+            },
+        )
         .await?;
 
     Ok(job_dto_from_record(record))

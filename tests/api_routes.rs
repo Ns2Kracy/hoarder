@@ -168,6 +168,46 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
 }
 
 #[tokio::test]
+async fn api_routes_updates_sync_job_name_schedule_and_enabled_state() {
+    let test = TestApp::new().await;
+    let response = request(
+        test.app.clone(),
+        "PATCH",
+        &format!("/api/jobs/{}", test.job_id),
+        Some(&format!(
+            r#"{{
+                "sourceId":{},
+                "name":"Edited sync",
+                "enabled":false,
+                "schedule":{{"kind":"interval","intervalSeconds":900}}
+            }}"#,
+            test.source_id
+        )),
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["id"], json!(test.job_id.as_i64()));
+    assert_eq!(response.body["sourceId"], json!(test.source_id.as_i64()));
+    assert_eq!(response.body["name"], json!("Edited sync"));
+    assert_eq!(response.body["enabled"], json!(false));
+    assert_eq!(response.body["status"], json!("paused"));
+    assert_eq!(response.body["schedule"]["kind"], json!("interval"));
+    assert_eq!(response.body["schedule"]["intervalSeconds"], json!(900));
+
+    let stored = sync_job::Entity::find_by_id(test.job_id.as_i64())
+        .one(test.repository.connection())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.name, "Edited sync");
+    assert!(!stored.enabled);
+    assert_eq!(stored.status, "paused");
+    assert_eq!(stored.schedule_kind, "interval");
+    assert_eq!(stored.schedule_interval_seconds, Some(900));
+}
+
+#[tokio::test]
 async fn api_routes_openapi_spec_lists_current_routes() {
     let test = TestApp::new().await;
     let response = request(test.app.clone(), "GET", "/api/openapi.json", None).await;
@@ -181,6 +221,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
         "/api/sources/{id}",
         "/api/sources/{id}/test",
         "/api/jobs",
+        "/api/jobs/{id}",
         "/api/jobs/{id}/run",
         "/api/runs",
         "/api/runs/{id}",
@@ -219,6 +260,10 @@ async fn api_routes_openapi_spec_lists_current_routes() {
     );
     assert_eq!(
         response.body["paths"]["/api/sources/{id}"]["patch"]["parameters"][0]["schema"]["type"],
+        json!("integer")
+    );
+    assert_eq!(
+        response.body["paths"]["/api/jobs/{id}"]["patch"]["parameters"][0]["schema"]["type"],
         json!("integer")
     );
     assert_eq!(

@@ -14,7 +14,7 @@ use crate::{
         types::{
             CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
             ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
-            SourceDto, SourceTestResponse, SyncErrorDto, UpdateSettingsRequest,
+            SourceDto, SourceTestResponse, SyncErrorDto, UpdateJobRequest, UpdateSettingsRequest,
             UpdateSourceRequest,
         },
     },
@@ -43,6 +43,7 @@ fn api_routes_without_state() -> Router<ApiState> {
         .route("/api/sources/{id}", patch(update_source))
         .route("/api/sources/{id}/test", post(test_source))
         .route("/api/jobs", get(list_jobs).post(create_job))
+        .route("/api/jobs/{id}", patch(update_job))
         .route("/api/jobs/{id}/run", post(run_job))
         .route("/api/runs", get(list_runs))
         .route("/api/runs/{id}", get(get_run_detail))
@@ -115,6 +116,19 @@ async fn create_job(
     let job = job_service::create_job(state.repository(), request).await?;
 
     Ok((StatusCode::CREATED, Json(job)))
+}
+
+async fn update_job(
+    State(state): State<ApiState>,
+    path: Result<Path<JobId>, PathRejection>,
+    payload: Result<Json<UpdateJobRequest>, JsonRejection>,
+) -> Result<Json<JobDto>, ApiError> {
+    let Path(job_id) = path?;
+    let Json(request) = payload?;
+
+    Ok(Json(
+        job_service::update_job(state.repository(), job_id, request).await?,
+    ))
 }
 
 async fn run_job(

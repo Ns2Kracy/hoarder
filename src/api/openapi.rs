@@ -27,6 +27,7 @@ fn paths() -> Value {
         "/api/sources/{id}": source_path(),
         "/api/sources/{id}/test": source_test_path(),
         "/api/jobs": jobs_path(),
+        "/api/jobs/{id}": job_path(),
         "/api/jobs/{id}/run": job_run_path(),
         "/api/runs": runs_path(),
         "/api/runs/{id}": run_detail_path(),
@@ -148,6 +149,26 @@ fn jobs_path() -> Value {
             "responses": {
                 "201": json_response("JobDto"),
                 "400": error_response(),
+                "422": error_response(),
+                "500": error_response()
+            }
+        }
+    })
+}
+
+#[must_use]
+fn job_path() -> Value {
+    json!({
+        "patch": {
+            "tags": ["jobs"],
+            "operationId": "updateJob",
+            "parameters": [path_local_id_parameter("id", "Job identifier")],
+            "requestBody": request_body("UpdateJobRequest"),
+            "responses": {
+                "200": json_response("JobDto"),
+                "400": error_response(),
+                "404": error_response(),
+                "409": error_response(),
                 "422": error_response(),
                 "500": error_response()
             }
@@ -286,6 +307,7 @@ fn schemas() -> Value {
         "SourceDto": source_schema(),
         "SourceTestResponse": source_test_response_schema(),
         "SyncErrorDto": sync_error_schema(),
+        "UpdateJobRequest": update_job_request_schema(),
         "UpdateSettingsRequest": update_settings_request_schema(),
         "UpdateSourceRequest": update_source_request_schema()
     })
@@ -321,6 +343,11 @@ fn create_job_request_schema() -> Value {
             "schedule": ref_schema("JobScheduleDto")
         }
     })
+}
+
+#[must_use]
+fn update_job_request_schema() -> Value {
+    create_job_request_schema()
 }
 
 #[must_use]
