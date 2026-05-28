@@ -78,20 +78,16 @@
     <title>Hoarder Console</title>
 </svelte:head>
 
-<div class="min-h-screen bg-zinc-100 text-zinc-900">
-    <div class="flex min-h-screen">
-        <aside
-            class="hidden w-60 shrink-0 border-r border-zinc-200 bg-white lg:block"
-        >
-            <div
-                class="flex h-12 items-center gap-2 border-b border-zinc-200 px-3"
-            >
-                <FolderCog aria-hidden="true" size={19} class="text-blue-700" />
+<div class="min-h-[100dvh] bg-canvas text-ink [background-image:radial-gradient(circle_at_top_right,var(--accent-soft),transparent_34rem),linear-gradient(90deg,var(--surface-grid)_1px,transparent_1px),linear-gradient(180deg,var(--surface-grid)_1px,transparent_1px)] [background-size:auto,48px_48px,48px_48px]">
+    <div class="flex min-h-[100dvh]">
+        <aside class="hidden w-60 shrink-0 border-r border-line bg-panel-strong shadow-panel lg:block">
+            <div class="flex h-12 items-center gap-2 border-b border-line px-3">
+                <FolderCog aria-hidden="true" size={19} class="text-accent" />
                 <div>
-                    <p class="text-sm font-semibold leading-4 text-zinc-950">
+                    <p class="text-sm font-semibold leading-4">
                         Hoarder
                     </p>
-                    <p class="text-xs leading-4 text-zinc-500">
+                    <p class="text-xs leading-4 text-subtle">
                         Connector Console
                     </p>
                 </div>
@@ -100,10 +96,10 @@
                 {#each navigation as item (item.id)}
                     {@const Icon = item.icon}
                     <button
-                        class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-medium ${
+                        class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-semibold transition duration-150 hover:translate-x-0.5 ${
                             activePage === item.id
-                                ? "bg-zinc-900 text-white"
-                                : "text-zinc-700 hover:bg-zinc-100"
+                                ? "bg-ink text-panel-strong"
+                                : "text-muted hover:bg-panel-muted hover:text-ink"
                         }`}
                         type="button"
                         onclick={() => selectPage(item.id)}
@@ -117,29 +113,23 @@
 
         {#if sidebarOpen}
             <button
-                class="fixed inset-0 z-20 bg-zinc-950/30 lg:hidden"
+                class="fixed inset-0 z-20 bg-zinc-950/40 lg:hidden"
                 type="button"
                 aria-label="Close navigation"
                 onclick={() => (sidebarOpen = false)}
             ></button>
-            <aside
-                class="fixed inset-y-0 left-0 z-30 w-64 border-r border-zinc-200 bg-white lg:hidden"
-            >
-                <div
-                    class="flex h-12 items-center gap-2 border-b border-zinc-200 px-3"
-                >
+            <aside class="fixed inset-y-0 left-0 z-30 w-64 border-r border-line bg-panel-strong shadow-panel lg:hidden">
+                <div class="flex h-12 items-center gap-2 border-b border-line px-3">
                     <FolderCog
                         aria-hidden="true"
                         size={19}
-                        class="text-blue-700"
+                        class="text-accent"
                     />
                     <div>
-                        <p
-                            class="text-sm font-semibold leading-4 text-zinc-950"
-                        >
+                        <p class="text-sm font-semibold leading-4">
                             Hoarder
                         </p>
-                        <p class="text-xs leading-4 text-zinc-500">
+                        <p class="text-xs leading-4 text-subtle">
                             Connector Console
                         </p>
                     </div>
@@ -148,10 +138,10 @@
                     {#each navigation as item (item.id)}
                         {@const Icon = item.icon}
                         <button
-                            class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-medium ${
+                            class={`flex h-9 w-full items-center gap-2 rounded-sm px-2 text-left text-sm font-semibold transition duration-150 hover:translate-x-0.5 ${
                                 activePage === item.id
-                                    ? "bg-zinc-900 text-white"
-                                    : "text-zinc-700 hover:bg-zinc-100"
+                                    ? "bg-ink text-panel-strong"
+                                    : "text-muted hover:bg-panel-muted hover:text-ink"
                             }`}
                             type="button"
                             onclick={() => {
@@ -168,13 +158,13 @@
         {/if}
 
         <div class="min-w-0 flex-1">
-            <header class="sticky top-0 z-10 border-b border-zinc-200 bg-white">
+            <header class="sticky top-0 z-10 border-b border-line bg-panel-strong/90 shadow-panel backdrop-blur-xl">
                 <div
                     class="flex h-12 items-center justify-between gap-3 px-3 lg:px-4"
                 >
                     <div class="flex min-w-0 items-center gap-2">
                         <button
-                            class="inline-flex size-8 items-center justify-center rounded-sm border border-zinc-300 bg-white text-zinc-700 lg:hidden"
+                            class="inline-flex size-8 items-center justify-center rounded-sm border border-line bg-panel-strong text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px lg:hidden"
                             type="button"
                             aria-label="Open navigation"
                             onclick={() => (sidebarOpen = true)}
@@ -183,14 +173,14 @@
                         </button>
                         <div class="min-w-0">
                             <p
-                                class="truncate text-sm font-semibold text-zinc-950"
+                                class="truncate text-sm font-semibold"
                             >
-                                Local API · 127.0.0.1:4761
+                                Local API - 127.0.0.1:4761
                             </p>
-                            <p class="truncate text-xs text-zinc-500">
+                            <p class="truncate text-xs leading-4 text-subtle">
                                 {$consoleOrigin === "api"
                                     ? "Live API data"
-                                    : "Mock data fallback"} · refreshed
+                                    : "Mock data fallback"} - refreshed
                                 {formatDateTime(
                                     $sources.updatedAt ??
                                         $jobs.updatedAt ??
@@ -202,28 +192,32 @@
 
                     <div class="flex items-center gap-2">
                         <span
-                            class={`inline-flex h-6 items-center rounded-sm border px-2 text-xs font-medium ${
+                            class={`inline-flex h-6 items-center rounded-sm border px-2 text-xs font-bold ${
                                 $consoleOrigin === "api"
-                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                    : "border-amber-200 bg-amber-50 text-amber-800"
+                                    ? "border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+                                    : "border-amber-300/60 bg-amber-500/10 text-amber-800 dark:text-amber-200"
                             }`}
                         >
                             {$consoleOrigin === "api" ? "API" : "Mock"}
                         </span>
                         <button
-                            class="inline-flex size-8 items-center justify-center rounded-sm border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                            class="inline-flex size-8 items-center justify-center rounded-sm border border-line bg-panel-strong text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px disabled:cursor-not-allowed disabled:bg-panel-muted disabled:text-subtle"
                             type="button"
                             aria-label="Refresh console data"
                             disabled={$isRefreshing}
                             onclick={loadConsoleData}
                         >
-                            <RefreshCcw aria-hidden="true" size={15} />
+                            <RefreshCcw
+                                aria-hidden="true"
+                                size={15}
+                                class={$isRefreshing ? "animate-refreshing" : ""}
+                            />
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main class="mx-auto max-w-7xl p-3 lg:p-4">
+            <main class="mx-auto max-w-[1440px] p-3 lg:p-4">
                 {#if activePage === "overview"}
                     <Overview
                         summary={$summary}

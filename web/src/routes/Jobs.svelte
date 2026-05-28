@@ -38,84 +38,82 @@
     }
 </script>
 
-<section class="space-y-4">
+<section class="grid gap-3 motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
     <div>
-        <h1 class="text-xl font-semibold text-zinc-950">Jobs</h1>
-        <p class="mt-1 text-sm text-zinc-600">
+        <h1 class="text-[clamp(1.25rem,1.6vw,1.65rem)] font-bold leading-tight text-ink">Jobs</h1>
+        <p class="mt-1 max-w-[65ch] text-sm leading-snug text-muted">
             Inspect schedules and start one-off sync runs.
         </p>
     </div>
 
     <JobForm sources={sources} onSubmit={onCreateJob} />
 
-    <section class="rounded-sm border border-zinc-200 bg-white">
+    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
         <div
-            class="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2"
+            class="flex items-center justify-between gap-3 border-b border-line px-3 py-2"
         >
             <div class="flex items-center gap-2">
                 <TimerReset
                     aria-hidden="true"
                     size={16}
-                    class="text-zinc-500"
+                    class="text-subtle"
                 />
-                <h2 class="text-sm font-semibold text-zinc-900">Sync Jobs</h2>
+                <h2 class="text-sm font-bold text-ink">Sync Jobs</h2>
             </div>
-            <span class="text-xs text-zinc-500"
+            <span class="text-xs text-subtle"
                 >{jobs.data.filter((job) => job.enabled).length} enabled</span
             >
         </div>
 
         {#if jobs.data.length === 0}
-            <div class="px-3 py-8 text-sm text-zinc-500" role="status">
+            <div class="px-3 py-8 text-sm text-subtle" role="status">
                 No sync jobs configured.
             </div>
         {:else}
             <div class="overflow-x-auto">
                 <table
-                    class="min-w-full divide-y divide-zinc-200 text-left text-sm"
+                    class="min-w-full border-collapse text-left text-sm"
                 >
-                    <thead
-                        class="bg-zinc-50 text-xs uppercase tracking-normal text-zinc-500"
-                    >
+                    <thead class="bg-panel-muted text-xs text-subtle">
                         <tr>
-                            <th class="px-3 py-2 font-semibold">Source</th>
-                            <th class="px-3 py-2 font-semibold">Schedule</th>
-                            <th class="px-3 py-2 font-semibold">Status</th>
-                            <th class="px-3 py-2 font-semibold">Last Run</th>
-                            <th class="px-3 py-2 font-semibold">Next Run</th>
-                            <th class="px-3 py-2 text-right font-semibold"
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Source</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Schedule</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Status</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Last Run</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Next Run</th>
+                            <th class="whitespace-nowrap px-3 py-2 text-right font-bold"
                                 >Action</th
                             >
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody>
                         {#each jobs.data as job (job.id)}
-                            <tr class="hover:bg-zinc-50">
-                                <td class="px-3 py-2">
-                                    <p class="font-medium text-zinc-900">
+                            <tr class="transition-colors hover:bg-panel-muted">
+                                <td class="border-t border-line-soft px-3 py-2">
+                                    <p class="font-semibold text-ink">
                                         {job.name}
                                     </p>
-                                    <p class="font-mono text-xs text-zinc-500">
-                                        {job.sourceName} · {job.id}
+                                    <p class="font-mono text-xs text-subtle">
+                                        {job.sourceName} - {job.id}
                                     </p>
                                 </td>
-                                <td class="px-3 py-2 text-zinc-700"
+                                <td class="border-t border-line-soft px-3 py-2 text-muted"
                                     >{job.scheduleLabel}</td
                                 >
-                                <td class="px-3 py-2">
+                                <td class="border-t border-line-soft px-3 py-2">
                                     <StatusBadge status={job.status} />
                                 </td>
                                 <td
-                                    class="whitespace-nowrap px-3 py-2 text-zinc-600"
+                                    class="whitespace-nowrap border-t border-line-soft px-3 py-2 text-muted"
                                     >{formatDateTime(job.lastRunAt)}</td
                                 >
                                 <td
-                                    class="whitespace-nowrap px-3 py-2 text-zinc-600"
+                                    class="whitespace-nowrap border-t border-line-soft px-3 py-2 text-muted"
                                     >{formatDateTime(job.nextRunAt)}</td
                                 >
-                                <td class="px-3 py-2 text-right">
+                                <td class="border-t border-line-soft px-3 py-2 text-right">
                                     <button
-                                        class="mr-2 inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+                                        class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
                                         type="button"
                                         disabled={job.status === "running"}
                                         onclick={() =>
@@ -128,7 +126,7 @@
                                         Edit
                                     </button>
                                     <button
-                                        class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
+                                        class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-2 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
                                         type="button"
                                         disabled={!job.enabled ||
                                             job.status === "running"}
@@ -140,8 +138,8 @@
                                 </td>
                             </tr>
                             {#if editingJobId === job.id}
-                                <tr class="bg-zinc-50">
-                                    <td class="px-3 py-3" colspan="6">
+                                <tr class="bg-panel-muted">
+                                    <td class="border-t border-line-soft px-3 py-3" colspan="6">
                                         {#key job.id}
                                             <JobForm
                                                 sources={sources}

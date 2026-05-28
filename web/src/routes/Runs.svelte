@@ -47,22 +47,22 @@
     }
 </script>
 
-<section class="space-y-4">
+<section class="grid gap-3 motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
     <div>
-        <h1 class="text-xl font-semibold text-zinc-950">Runs</h1>
-        <p class="mt-1 text-sm text-zinc-600">
+        <h1 class="text-[clamp(1.25rem,1.6vw,1.65rem)] font-bold leading-tight text-ink">Runs</h1>
+        <p class="mt-1 max-w-[65ch] text-sm leading-snug text-muted">
             Review sync outcomes, item counts, and structured errors.
         </p>
     </div>
 
-    <section class="rounded-sm border border-zinc-200 bg-white">
-        <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
-            <ListChecks aria-hidden="true" size={16} class="text-zinc-500" />
-            <h2 class="text-sm font-semibold text-zinc-900">Run History</h2>
+    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
+        <div class="flex items-center gap-2 border-b border-line px-3 py-2">
+            <ListChecks aria-hidden="true" size={16} class="text-subtle" />
+            <h2 class="text-sm font-bold text-ink">Run History</h2>
         </div>
 
         {#if runs.data.length === 0}
-            <div class="px-3 py-8 text-sm text-zinc-500" role="status">
+            <div class="px-3 py-8 text-sm text-subtle" role="status">
                 No sync runs have been recorded yet.
             </div>
         {:else}
@@ -75,15 +75,15 @@
     </section>
 
     {#if selectedRun}
-        <section class="rounded-sm border border-zinc-200 bg-white">
+        <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
             <div
-                class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 px-3 py-2"
+                class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2"
             >
                 <div>
-                    <h2 class="text-sm font-semibold text-zinc-900">
+                    <h2 class="text-sm font-bold text-ink">
                         {selectedRun.sourceName}
                     </h2>
-                    <p class="font-mono text-xs text-zinc-500">
+                    <p class="font-mono text-xs text-subtle">
                         {selectedRun.id}
                     </p>
                 </div>
@@ -92,103 +92,103 @@
 
             <div class="grid gap-3 p-3 md:grid-cols-5">
                 <div>
-                    <p class="text-xs text-zinc-500">Processed</p>
-                    <p class="text-lg font-semibold tabular-nums text-zinc-950">
+                    <p class="text-xs text-subtle">Processed</p>
+                    <p class="text-lg font-bold tabular-nums text-ink">
                         {selectedRun.counts.processed}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-500">Synced</p>
+                    <p class="text-xs text-subtle">Synced</p>
                     <p
-                        class="text-lg font-semibold tabular-nums text-emerald-700"
+                        class="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300"
                     >
                         {selectedRun.counts.synced}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-500">Skipped</p>
-                    <p class="text-lg font-semibold tabular-nums text-zinc-700">
+                    <p class="text-xs text-subtle">Skipped</p>
+                    <p class="text-lg font-bold tabular-nums text-muted">
                         {selectedRun.counts.skipped}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-500">Failed</p>
-                    <p class="text-lg font-semibold tabular-nums text-rose-700">
+                    <p class="text-xs text-subtle">Failed</p>
+                    <p class="text-lg font-bold tabular-nums text-rose-700 dark:text-rose-300">
                         {selectedRun.counts.failed}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-500">Deleted on source</p>
+                    <p class="text-xs text-subtle">Deleted on source</p>
                     <p
-                        class="text-lg font-semibold tabular-nums text-orange-700"
+                        class="text-lg font-bold tabular-nums text-orange-700 dark:text-orange-300"
                     >
                         {selectedRun.counts.deleted}
                     </p>
                 </div>
             </div>
 
-            <div class="grid gap-3 border-t border-zinc-200 p-3 md:grid-cols-3">
+            <div class="grid gap-3 border-t border-line p-3 md:grid-cols-3">
                 <div>
-                    <p class="text-xs text-zinc-500">Started</p>
-                    <p class="text-sm text-zinc-900">
+                    <p class="text-xs text-subtle">Started</p>
+                    <p class="text-sm text-ink">
                         {formatDateTime(selectedRun.startedAt)}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-500">Finished</p>
-                    <p class="text-sm text-zinc-900">
+                    <p class="text-xs text-subtle">Finished</p>
+                    <p class="text-sm text-ink">
                         {formatDateTime(selectedRun.finishedAt)}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-500">Duration</p>
-                    <p class="text-sm text-zinc-900">
+                    <p class="text-xs text-subtle">Duration</p>
+                    <p class="text-sm text-ink">
                         {formatDuration(selectedRun.durationMs)}
                     </p>
                 </div>
             </div>
 
             {#if selectedRun.errors.length > 0}
-                <div class="border-t border-zinc-200 p-3">
+                <div class="border-t border-line p-3">
                     <div class="mb-2 flex items-center gap-2">
                         <AlertTriangle
                             aria-hidden="true"
                             size={16}
-                            class="text-rose-600"
+                            class="text-rose-600 dark:text-rose-300"
                         />
-                        <h3 class="text-sm font-semibold text-zinc-900">
+                        <h3 class="text-sm font-bold text-ink">
                             Errors
                         </h3>
                     </div>
                     <div class="space-y-2">
                         {#each selectedRun.errors as error (error.id)}
                             <div
-                                class="rounded-sm border border-rose-200 bg-rose-50 p-2"
+                                class="rounded-sm border border-rose-300/60 bg-rose-500/10 p-2 text-rose-950 dark:text-rose-100"
                             >
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-2"
                                 >
                                     <p
-                                        class="font-mono text-xs font-semibold text-rose-950"
+                                        class="font-mono text-xs font-bold"
                                     >
                                         {error.code}
                                     </p>
-                                    <p class="text-xs text-rose-800">
+                                    <p class="text-xs opacity-80">
                                         {formatDateTime(error.createdAt)}
                                     </p>
                                 </div>
-                                <p class="mt-1 text-sm text-rose-950">
+                                <p class="mt-1 text-sm">
                                     {error.message}
                                 </p>
                                 {#if error.sourcePath}
                                     <p
-                                        class="mt-1 truncate font-mono text-xs text-rose-900"
+                                        class="mt-1 truncate font-mono text-xs opacity-90"
                                     >
                                         {error.sourcePath}
                                     </p>
                                 {/if}
                                 <pre
-                                    class="mt-2 max-h-44 overflow-auto rounded-sm border border-rose-200 bg-white p-2 font-mono text-xs text-rose-950">{JSON.stringify(
+                                    class="mt-2 max-h-44 overflow-auto rounded-sm border border-rose-300/60 bg-panel-strong p-2 font-mono text-xs text-ink">{JSON.stringify(
                                         error.details ?? {},
                                         null,
                                         2,
@@ -199,28 +199,28 @@
                 </div>
             {/if}
 
-            <div class="border-t border-zinc-200 p-3">
-                <h3 class="mb-2 text-sm font-semibold text-zinc-900">Items</h3>
+            <div class="border-t border-line p-3">
+                <h3 class="mb-2 text-sm font-bold text-ink">Items</h3>
                 {#if runItems.data.length === 0}
-                    <p class="text-sm text-zinc-500">No item records for this run.</p>
+                    <p class="text-sm text-subtle">No item records for this run.</p>
                 {:else}
-                    <div class="max-h-72 overflow-auto rounded-sm border border-zinc-200">
-                        <table class="min-w-full divide-y divide-zinc-200 text-left text-sm">
-                            <thead class="bg-zinc-50 text-xs uppercase tracking-normal text-zinc-500">
+                    <div class="max-h-72 overflow-auto rounded-sm border border-line">
+                        <table class="min-w-full border-collapse text-left text-sm">
+                            <thead class="bg-panel-muted text-xs text-subtle">
                                 <tr>
-                                    <th class="px-2 py-1.5 font-semibold">Path</th>
-                                    <th class="px-2 py-1.5 font-semibold">Type</th>
-                                    <th class="px-2 py-1.5 font-semibold">Status</th>
-                                    <th class="px-2 py-1.5 text-right font-semibold">Size</th>
+                                    <th class="whitespace-nowrap px-2 py-1.5 font-bold">Path</th>
+                                    <th class="whitespace-nowrap px-2 py-1.5 font-bold">Type</th>
+                                    <th class="whitespace-nowrap px-2 py-1.5 font-bold">Status</th>
+                                    <th class="whitespace-nowrap px-2 py-1.5 text-right font-bold">Size</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-zinc-100">
+                            <tbody>
                                 {#each runItems.data as item (item.id)}
-                                    <tr>
-                                        <td class="max-w-[28rem] truncate px-2 py-1.5 font-mono text-xs text-zinc-800">{item.sourcePath}</td>
-                                        <td class="px-2 py-1.5 text-zinc-600">{item.itemType}</td>
-                                        <td class="px-2 py-1.5"><StatusBadge status={item.status} /></td>
-                                        <td class="px-2 py-1.5 text-right tabular-nums text-zinc-600">{item.size ?? "-"}</td>
+                                    <tr class="transition-colors hover:bg-panel-muted">
+                                        <td class="max-w-[28rem] truncate border-t border-line-soft px-2 py-1.5 font-mono text-xs text-ink">{item.sourcePath}</td>
+                                        <td class="border-t border-line-soft px-2 py-1.5 text-muted">{item.itemType}</td>
+                                        <td class="border-t border-line-soft px-2 py-1.5"><StatusBadge status={item.status} /></td>
+                                        <td class="border-t border-line-soft px-2 py-1.5 text-right tabular-nums text-muted">{item.size ?? "-"}</td>
                                     </tr>
                                 {/each}
                             </tbody>

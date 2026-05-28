@@ -29,7 +29,7 @@
         }
 
         if (source.config.bucket) {
-            return `${source.config.bucket}${source.config.region ? ` · ${source.config.region}` : ""}`;
+            return `${source.config.bucket}${source.config.region ? ` - ${source.config.region}` : ""}`;
         }
 
         return source.config.endpoint ?? "No endpoint configured";
@@ -60,71 +60,69 @@
     }
 </script>
 
-<section class="space-y-4">
+<section class="grid gap-3 motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
     <div>
-        <h1 class="text-xl font-semibold text-zinc-950">Sources</h1>
-        <p class="mt-1 text-sm text-zinc-600">
+        <h1 class="text-[clamp(1.25rem,1.6vw,1.65rem)] font-bold leading-tight text-ink">Sources</h1>
+        <p class="mt-1 max-w-[65ch] text-sm leading-snug text-muted">
             Configure OpenDAL-backed sources and validate connectivity.
         </p>
     </div>
 
-    <section class="rounded-sm border border-zinc-200 bg-white">
-        <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
-            <Cable aria-hidden="true" size={16} class="text-zinc-500" />
-            <h2 class="text-sm font-semibold text-zinc-900">Add Source</h2>
+    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]">
+        <div class="flex items-center gap-2 border-b border-line px-3 py-2">
+            <Cable aria-hidden="true" size={16} class="text-subtle" />
+            <h2 class="text-sm font-bold text-ink">Add Source</h2>
         </div>
         <div class="p-3">
             <SourceForm onSubmit={onAddSource} />
         </div>
     </section>
 
-    <section class="rounded-sm border border-zinc-200 bg-white">
+    <section class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both] motion-safe:[animation-delay:40ms]">
         <div
-            class="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2"
+            class="flex items-center justify-between gap-3 border-b border-line px-3 py-2"
         >
-            <h2 class="text-sm font-semibold text-zinc-900">
+            <h2 class="text-sm font-bold text-ink">
                 Configured Sources
             </h2>
-            <span class="text-xs text-zinc-500"
+            <span class="text-xs text-subtle"
                 >{formatCount(sources.data.length)} total</span
             >
         </div>
 
         {#if sources.data.length === 0}
-            <div class="px-3 py-8 text-sm text-zinc-500" role="status">
+            <div class="px-3 py-8 text-sm text-subtle" role="status">
                 No sources configured.
             </div>
         {:else}
             <div class="overflow-x-auto">
                 <table
-                    class="min-w-full divide-y divide-zinc-200 text-left text-sm"
+                    class="min-w-full border-collapse text-left text-sm"
                 >
-                    <thead
-                        class="bg-zinc-50 text-xs uppercase tracking-normal text-zinc-500"
-                    >
+                    <thead class="bg-panel-muted text-xs text-subtle">
                         <tr>
-                            <th class="px-3 py-2 font-semibold">Name</th>
-                            <th class="px-3 py-2 font-semibold">Service</th>
-                            <th class="px-3 py-2 font-semibold">Location</th>
-                            <th class="px-3 py-2 font-semibold">Health</th>
-                            <th class="px-3 py-2 text-right font-semibold"
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Name</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Service</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Location</th>
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Health</th>
+                            <th class="whitespace-nowrap px-3 py-2 text-right font-bold"
                                 >Items</th
                             >
-                            <th class="px-3 py-2 font-semibold">Last Check</th>
-                            <th class="px-3 py-2 text-right font-semibold"
+                            <th class="whitespace-nowrap px-3 py-2 font-bold">Last Check</th>
+                            <th class="whitespace-nowrap px-3 py-2 text-right font-bold"
                                 >Action</th
                             >
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody>
                         {#each sources.data as source (source.id)}
-                            <tr class="align-top hover:bg-zinc-50">
-                                <td class="px-3 py-2">
-                                    <div class="font-medium text-zinc-900">
+                            <tr class="align-top transition-colors hover:bg-panel-muted">
+                                <td class="border-t border-line-soft px-3 py-2">
+                                    <div class="font-semibold text-ink">
                                         {source.name}
                                     </div>
                                     <div
-                                        class="mt-0.5 flex items-center gap-1 text-xs text-zinc-500"
+                                        class="mt-0.5 flex items-center gap-1 text-xs text-subtle"
                                     >
                                         {#if source.enabled}
                                             <CheckCircle2
@@ -138,43 +136,43 @@
                                     </div>
                                 </td>
                                 <td
-                                    class="px-3 py-2 font-mono text-xs text-zinc-700"
+                                    class="border-t border-line-soft px-3 py-2 font-mono text-xs text-muted"
                                     >{source.serviceKind}</td
                                 >
-                                <td class="max-w-72 px-3 py-2">
+                                <td class="max-w-72 border-t border-line-soft px-3 py-2">
                                     <div
-                                        class="truncate font-mono text-xs text-zinc-700"
+                                        class="truncate font-mono text-xs text-muted"
                                         title={configLine(source)}
                                     >
                                         {configLine(source)}
                                     </div>
                                     {#if source.config.access_key_id || source.config.secret_access_key || source.config.token}
-                                        <div class="mt-1 text-xs text-zinc-500">
+                                        <div class="mt-1 text-xs text-subtle">
                                             Secrets redacted
                                         </div>
                                     {/if}
                                 </td>
-                                <td class="px-3 py-2">
+                                <td class="border-t border-line-soft px-3 py-2">
                                     <StatusBadge status={source.health} />
                                     {#if source.lastError}
                                         <p
-                                            class="mt-1 max-w-72 text-xs text-amber-800"
+                                            class="mt-1 max-w-72 text-xs text-amber-800 dark:text-amber-200"
                                         >
                                             {source.lastError}
                                         </p>
                                     {/if}
                                 </td>
                                 <td
-                                    class="px-3 py-2 text-right tabular-nums text-zinc-700"
+                                    class="border-t border-line-soft px-3 py-2 text-right tabular-nums text-muted"
                                     >{formatCount(source.itemCount)}</td
                                 >
                                 <td
-                                    class="whitespace-nowrap px-3 py-2 text-zinc-600"
+                                    class="whitespace-nowrap border-t border-line-soft px-3 py-2 text-muted"
                                     >{formatDateTime(source.lastCheckedAt)}</td
                                 >
-                                <td class="px-3 py-2 text-right">
+                                <td class="border-t border-line-soft px-3 py-2 text-right">
                                     <button
-                                        class="mr-2 inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                                        class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
                                         type="button"
                                         onclick={() =>
                                             (editingSourceId =
@@ -186,7 +184,7 @@
                                         Edit
                                     </button>
                                     <button
-                                        class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                                        class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
                                         type="button"
                                         onclick={() => onTestSource(source.id)}
                                     >
@@ -199,8 +197,8 @@
                                 </td>
                             </tr>
                             {#if editingSourceId === source.id}
-                                <tr class="bg-zinc-50">
-                                    <td class="px-3 py-3" colspan="7">
+                                <tr class="bg-panel-muted">
+                                    <td class="border-t border-line-soft px-3 py-3" colspan="7">
                                         {#key source.id}
                                             <SourceForm
                                                 mode="edit"

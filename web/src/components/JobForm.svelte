@@ -79,17 +79,17 @@
 </script>
 
 <form
-    class="rounded-sm border border-zinc-200 bg-white"
+    class="rounded-sm border border-line bg-panel-strong shadow-panel motion-safe:animate-[cockpit-enter_380ms_cubic-bezier(0.16,1,0.3,1)_both]"
     onsubmit={(event) => {
         event.preventDefault();
         submit();
     }}
 >
     <div class="grid gap-2 p-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_9rem_9rem_auto]">
-        <label class="space-y-1">
-            <span class="text-xs font-medium text-zinc-600">Source</span>
+        <label class="grid gap-1">
+            <span class="text-xs font-semibold text-muted">Source</span>
             <select
-                class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
+                class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
                 bind:value={sourceId}
                 disabled={sources.data.length === 0}
             >
@@ -98,28 +98,28 @@
                 {/each}
             </select>
         </label>
-        <label class="space-y-1">
-            <span class="text-xs font-medium text-zinc-600">Job name</span>
+        <label class="grid gap-1">
+            <span class="text-xs font-semibold text-muted">Job name</span>
             <input
-                class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
+                class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink placeholder:text-subtle disabled:bg-panel-muted disabled:text-subtle"
                 bind:value={name}
                 placeholder="Sync job"
             />
         </label>
-        <label class="space-y-1">
-            <span class="text-xs font-medium text-zinc-600">Schedule</span>
+        <label class="grid gap-1">
+            <span class="text-xs font-semibold text-muted">Schedule</span>
             <select
-                class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
+                class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
                 bind:value={scheduleKind}
             >
                 <option value="interval">Interval</option>
                 <option value="manual">Manual</option>
             </select>
         </label>
-        <label class="space-y-1">
-            <span class="text-xs font-medium text-zinc-600">Seconds</span>
+        <label class="grid gap-1">
+            <span class="text-xs font-semibold text-muted">Seconds</span>
             <input
-                class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm disabled:bg-zinc-100"
+                class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
                 type="number"
                 min="1"
                 bind:value={intervalSeconds}
@@ -127,13 +127,13 @@
             />
         </label>
         <div class="flex items-end gap-2">
-            <label class="flex h-9 items-center gap-1 text-sm text-zinc-700">
+            <label class="flex h-9 items-center gap-1 text-sm text-muted">
                 <input type="checkbox" bind:checked={enabled} />
                 Enabled
             </label>
             {#if onCancel}
                 <button
-                    class="inline-flex h-9 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                    class="inline-flex h-9 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-3 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
                     type="button"
                     onclick={onCancel}
                 >
@@ -142,7 +142,7 @@
                 </button>
             {/if}
             <button
-                class="inline-flex h-9 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
+                class="inline-flex h-9 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-3 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
                 type="submit"
                 disabled={isSaving || sourceId === undefined || !name.trim()}
             >

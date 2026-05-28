@@ -23,21 +23,21 @@
   };
 
   const classByStatus: Record<Status, string> = {
-    healthy: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    failed: "border-rose-200 bg-rose-50 text-rose-800",
-    untested: "border-zinc-200 bg-zinc-50 text-zinc-700",
-    disabled: "border-zinc-200 bg-zinc-100 text-zinc-600",
-    idle: "border-sky-200 bg-sky-50 text-sky-800",
-    running: "border-blue-200 bg-blue-50 text-blue-800",
-    paused: "border-zinc-200 bg-zinc-100 text-zinc-600",
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    completed_with_failures: "border-amber-200 bg-amber-50 text-amber-800",
-    cancelled: "border-zinc-200 bg-zinc-100 text-zinc-600",
-    pending: "border-sky-200 bg-sky-50 text-sky-800",
-    synced: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    skipped: "border-zinc-200 bg-zinc-50 text-zinc-700",
-    deleted_on_source: "border-orange-200 bg-orange-50 text-orange-800"
+    healthy: "border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
+    warning: "border-amber-300/60 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+    failed: "border-rose-300/60 bg-rose-500/10 text-rose-800 dark:text-rose-200",
+    untested: "border-line bg-panel-muted text-muted",
+    disabled: "border-line bg-panel-muted text-muted",
+    idle: "border-sky-300/60 bg-sky-500/10 text-sky-800 dark:text-sky-200",
+    running: "border-accent-border bg-accent-soft text-blue-800 motion-safe:[&_svg]:animate-status-pulse dark:text-blue-100",
+    paused: "border-line bg-panel-muted text-muted",
+    completed: "border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
+    completed_with_failures: "border-amber-300/60 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+    cancelled: "border-line bg-panel-muted text-muted",
+    pending: "border-sky-300/60 bg-sky-500/10 text-sky-800 dark:text-sky-200",
+    synced: "border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
+    skipped: "border-line bg-panel-muted text-muted",
+    deleted_on_source: "border-orange-300/60 bg-orange-500/10 text-orange-800 dark:text-orange-200"
   };
 
   const iconByStatus = {
@@ -64,7 +64,7 @@
 </script>
 
 <span
-  class={`inline-flex min-w-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium leading-4 ${classByStatus[status]}`}
+  class={`inline-flex min-w-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-bold leading-4 ${classByStatus[status]}`}
 >
   <Icon aria-hidden="true" size={12} strokeWidth={2.2} />
   <span class="truncate">{displayLabel}</span>

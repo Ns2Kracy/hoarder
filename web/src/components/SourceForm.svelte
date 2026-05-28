@@ -100,20 +100,20 @@
   }
 </script>
 
-<form class="space-y-3" onsubmit={(event) => { event.preventDefault(); submit(); }}>
+<form class="grid gap-3" onsubmit={(event) => { event.preventDefault(); submit(); }}>
   <div class="grid gap-3 md:grid-cols-[1fr_10rem_8rem]">
-    <label class="space-y-1">
-      <span class="text-xs font-medium text-zinc-600">Name</span>
+    <label class="grid gap-1">
+      <span class="text-xs font-semibold text-muted">Name</span>
       <input
-        class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm text-zinc-900"
+        class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink placeholder:text-subtle disabled:bg-panel-muted disabled:text-subtle"
         bind:value={name}
         placeholder="Sample archive"
       />
     </label>
 
-    <label class="space-y-1">
-      <span class="text-xs font-medium text-zinc-600">Service</span>
-      <select class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={serviceKind}>
+    <label class="grid gap-1">
+      <span class="text-xs font-semibold text-muted">Service</span>
+      <select class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={serviceKind}>
         {#each sourceServiceOptions as option (option.value)}
           <option value={option.value} disabled={!option.implemented}>
             {option.label}{option.implemented ? "" : " (not available)"}
@@ -122,64 +122,64 @@
       </select>
     </label>
 
-    <label class="flex items-end gap-2 pb-2 text-sm text-zinc-700">
-      <input class="size-4 rounded-sm border-zinc-300" type="checkbox" bind:checked={enabled} />
+    <label class="flex items-end gap-2 pb-2 text-sm text-muted">
+      <input class="size-4 rounded-sm" type="checkbox" bind:checked={enabled} />
       Enabled
     </label>
   </div>
 
   {#if serviceKind === "fs"}
-    <label class="block space-y-1">
-      <span class="text-xs font-medium text-zinc-600">Root path</span>
+    <label class="grid gap-1">
+      <span class="text-xs font-semibold text-muted">Root path</span>
       <input
-        class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 font-mono text-sm text-zinc-900"
+        class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 font-mono text-sm text-ink placeholder:text-subtle disabled:bg-panel-muted disabled:text-subtle"
         bind:value={root}
         placeholder="/Users/alex/Documents/source"
       />
     </label>
   {:else}
     <div class="grid gap-3 md:grid-cols-2">
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-zinc-600">Endpoint</span>
-        <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={endpoint} />
+      <label class="grid gap-1">
+        <span class="text-xs font-semibold text-muted">Endpoint</span>
+        <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={endpoint} />
       </label>
 
       {#if serviceKind === "s3"}
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-zinc-600">Bucket</span>
-          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={bucket} />
+        <label class="grid gap-1">
+          <span class="text-xs font-semibold text-muted">Bucket</span>
+          <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={bucket} />
         </label>
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-zinc-600">Region</span>
-          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={region} />
+        <label class="grid gap-1">
+          <span class="text-xs font-semibold text-muted">Region</span>
+          <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={region} />
         </label>
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-zinc-600">Access key</span>
-          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={accessKeyId} />
+        <label class="grid gap-1">
+          <span class="text-xs font-semibold text-muted">Access key</span>
+          <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={accessKeyId} />
         </label>
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-zinc-600">Secret key</span>
+        <label class="grid gap-1">
+          <span class="text-xs font-semibold text-muted">Secret key</span>
           <input
-            class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
+            class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
             type="password"
             autocomplete="new-password"
             bind:value={secretAccessKey}
           />
         </label>
       {:else}
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-zinc-600">Remote root</span>
-          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={root} />
+        <label class="grid gap-1">
+          <span class="text-xs font-semibold text-muted">Remote root</span>
+          <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={root} />
         </label>
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-zinc-600">Username</span>
-          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={username} />
+        <label class="grid gap-1">
+          <span class="text-xs font-semibold text-muted">Username</span>
+          <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={username} />
         </label>
         {#if serviceKind === "webdav"}
-          <label class="space-y-1">
-            <span class="text-xs font-medium text-zinc-600">Token</span>
+          <label class="grid gap-1">
+            <span class="text-xs font-semibold text-muted">Token</span>
             <input
-              class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
+              class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
               type="password"
               autocomplete="new-password"
               bind:value={token}
@@ -190,10 +190,10 @@
     </div>
   {/if}
 
-  <div class="flex justify-end border-t border-zinc-200 pt-3">
+  <div class="flex justify-end border-t border-line pt-3">
     {#if onCancel}
       <button
-        class="mr-2 inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+        class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-3 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
         type="button"
         onclick={onCancel}
       >
@@ -202,7 +202,7 @@
       </button>
     {/if}
     <button
-      class="inline-flex h-8 items-center gap-1 rounded-sm border border-zinc-900 bg-zinc-900 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-200 disabled:text-zinc-500"
+      class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-3 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
       type="submit"
       disabled={!canSubmit || isSaving}
     >
