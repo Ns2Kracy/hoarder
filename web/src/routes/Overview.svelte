@@ -10,6 +10,7 @@
     import RunTrendChart from "../components/RunTrendChart.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import RunSummaryTable from "../components/RunSummaryTable.svelte";
+    import heroArchiveUrl from "../assets/hero-archive.jpg";
     import { formatCount, formatDateTime } from "../lib/format";
     import type {
         ConsoleSummary,
@@ -66,7 +67,7 @@
         <div class="relative min-h-[18rem] overflow-hidden border-t border-line lg:border-l lg:border-t-0">
             <img
                 class="h-full min-h-[18rem] w-full object-cover motion-safe:animate-[media-drift_16s_ease-in-out_infinite_alternate]"
-                src="https://picsum.photos/seed/hoarder-local-archive-console/1200/720"
+                src={heroArchiveUrl}
                 alt="Archive shelves used as a local storage visual"
             />
             <div class="absolute inset-0 bg-[linear-gradient(90deg,rgb(0_0_0_/_0.45),transparent_55%)]"></div>
