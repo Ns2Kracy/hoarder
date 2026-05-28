@@ -70,10 +70,10 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- db sync` | [x] | 根据 SeaORM entities 同步 SQLite schema。 |
 | `cargo run -- source list` | [x] | 从 SQLite 列出已配置 sources。 |
 | `cargo run -- source add --name docs --service fs --root ./docs` | [x] | 创建 OpenDAL filesystem source。 |
-| `cargo run -- source test --id <source-id>` | [x] | 校验 source 并持久化健康状态。 |
-| `cargo run -- job add --source-id <source-id> --name docs --interval 300` | [x] | 创建手动或固定间隔 sync job。 |
+| `cargo run -- source test --id 1` | [x] | 校验 source 并持久化健康状态。 |
+| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | 创建手动或固定间隔 sync job。 |
 | `cargo run -- job list` | [x] | 列出 sync jobs。 |
-| `cargo run -- sync run --job-id <job-id>` | [x] | 立即运行一个 sync job。 |
+| `cargo run -- sync run --job-id 1` | [x] | 立即运行一个 sync job。 |
 | `cargo run -- sync status` | [x] | 输出 sync run 状态摘要。 |
 
 ## 功能清单
@@ -86,7 +86,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 本地优先默认监听地址：`127.0.0.1:4761`
 - [x] JSON 配置文件支持
 - [x] 基于 Clap 的 CLI 解析
-- [x] UUID v4 标识符
+- [x] 本地整数标识符
 - [x] 标准库文件系统路径
 - [x] `Cargo.toml` 中启用严格 Rust 和 Clippy lint
 - [x] Release profile 启用 LTO 和符号裁剪

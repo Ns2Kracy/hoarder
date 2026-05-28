@@ -1,15 +1,17 @@
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, NotSet, QueryFilter,
+    Set,
+};
 use serde_json::Value;
-use uuid::Uuid;
 
 use crate::{
     AppConfig, AppError, AppResult,
     config::{RuntimeSettings, RuntimeSettingsPatch},
     connectors::traits::ConnectorConfig,
     core::types::{
-        ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
+        ConnectorKind, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
     },
     entity::{app_setting, source, sync_error, sync_item, sync_job, sync_run},
     sync::{
@@ -43,7 +45,7 @@ impl SeaOrmRepository {
     ///
     /// Returns an error when the query fails or no source exists for `source_id`.
     pub async fn load_source(&self, source_id: SourceId) -> AppResult<SourceRecord> {
-        let model = source::Entity::find_by_id(source_id.as_uuid())
+        let model = source::Entity::find_by_id(source_id.as_i64())
             .one(&self.db)
             .await
             .map_err(map_db_error)?
@@ -146,7 +148,7 @@ impl SourceRepository for SeaOrmRepository {
         Box::pin(async move {
             let now = Utc::now();
             let active_model = source::ActiveModel {
-                id: Set(SourceId::new().as_uuid()),
+                id: NotSet,
                 name: Set(input.name),
                 kind: Set(connector_kind_to_str(input.kind).to_owned()),
                 config_json: Set(input.config_json),
@@ -191,9 +193,11 @@ impl SyncJobRepository for SeaOrmRepository {
         Box::pin(async move {
             let now = Utc::now();
             let (schedule_kind, schedule_interval_seconds) = schedule_to_storage(&input.schedule)?;
+            ensure_source_exists(&self.db, input.source_id).await?;
+
             let active_model = sync_job::ActiveModel {
-                id: Set(JobId::new().as_uuid()),
-                source_id: Set(input.source_id.as_uuid()),
+                id: NotSet,
+                source_id: Set(input.source_id.as_i64()),
                 name: Set(input.name),
                 enabled: Set(input.enabled),
                 schedule_kind: Set(schedule_kind.to_owned()),
@@ -215,7 +219,7 @@ impl SyncJobRepository for SeaOrmRepository {
     fn list_jobs(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<SyncJobRecord>> {
         Box::pin(async move {
             let models = sync_job::Entity::find()
-                .filter(sync_job::Column::SourceId.eq(source_id.as_uuid()))
+                .filter(sync_job::Column::SourceId.eq(source_id.as_i64()))
                 .all(&self.db)
                 .await
                 .map_err(map_db_error)?;
@@ -279,7 +283,7 @@ impl RuntimeSettingsRepository for SeaOrmRepository {
 impl SyncRepository for SeaOrmRepository {
     fn load_job(&self, job_id: JobId) -> RepositoryFuture<'_, SyncJob> {
         Box::pin(async move {
-            let job = sync_job::Entity::find_by_id(job_id.as_uuid())
+            let job = sync_job::Entity::find_by_id(job_id.as_i64())
                 .one(&self.db)
                 .await
                 .map_err(map_db_error)?
@@ -305,8 +309,10 @@ impl SyncRepository for SeaOrmRepository {
             })?;
 
             Ok(SyncJob {
-                id: JobId::from_uuid(job.id),
-                source_id: SourceId::from_uuid(source.id),
+                id: JobId::from_i64(job.id),
+                source_id: SourceId::from_i64(source.id),
+                source_name: source.name,
+                job_name: job.name,
                 connector_kind: connector_kind_from_str(&source.kind)?,
                 connector_config,
                 scan_cursor: job.cursor,
@@ -317,11 +323,12 @@ impl SyncRepository for SeaOrmRepository {
     fn start_run<'a>(&'a self, job: &'a SyncJob) -> RepositoryFuture<'a, RunId> {
         Box::pin(async move {
             let now = Utc::now();
-            let run_id = RunId::new();
             let active_model = sync_run::ActiveModel {
-                id: Set(run_id.as_uuid()),
-                job_id: Set(job.id.as_uuid()),
-                source_id: Set(job.source_id.as_uuid()),
+                id: NotSet,
+                job_id: Set(job.id.as_i64()),
+                source_id: Set(job.source_id.as_i64()),
+                source_name: Set(job.source_name.clone()),
+                job_name: Set(job.job_name.clone()),
                 status: Set("running".to_owned()),
                 started_at: Set(now),
                 finished_at: Set(None),
@@ -329,13 +336,15 @@ impl SyncRepository for SeaOrmRepository {
                 synced_count: Set(0),
                 skipped_count: Set(0),
                 failed_count: Set(0),
+                deleted_count: Set(0),
+                bytes_written: Set(0),
                 created_at: Set(now),
                 updated_at: Set(now),
             };
 
-            active_model.insert(&self.db).await.map_err(map_db_error)?;
+            let model = active_model.insert(&self.db).await.map_err(map_db_error)?;
 
-            Ok(run_id)
+            Ok(RunId::from_i64(model.id))
         })
     }
 
@@ -346,7 +355,7 @@ impl SyncRepository for SeaOrmRepository {
     ) -> RepositoryFuture<'a, Option<StoredItemState>> {
         Box::pin(async move {
             let item = sync_item::Entity::find()
-                .filter(sync_item::Column::SourceId.eq(source_id.as_uuid()))
+                .filter(sync_item::Column::SourceId.eq(source_id.as_i64()))
                 .filter(sync_item::Column::SourcePath.eq(source_path))
                 .filter(sync_item::Column::DeletedOnSourceAt.is_null())
                 .one(&self.db)
@@ -357,66 +366,60 @@ impl SyncRepository for SeaOrmRepository {
         })
     }
 
-    fn known_item_states(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<StoredItemState>> {
-        Box::pin(async move {
-            let items = sync_item::Entity::find()
-                .filter(sync_item::Column::SourceId.eq(source_id.as_uuid()))
-                .filter(sync_item::Column::DeletedOnSourceAt.is_null())
-                .all(&self.db)
-                .await
-                .map_err(map_db_error)?;
-
-            items
-                .into_iter()
-                .map(stored_item_state_from_model)
-                .collect()
-        })
-    }
-
     fn record_item_outcome(
         &self,
         run_id: RunId,
         outcome: ItemSyncOutcome,
     ) -> RepositoryFuture<'_, ()> {
         Box::pin(async move {
-            let item = upsert_sync_item(&self.db, run_id, &outcome).await?;
+            upsert_sync_item(&self.db, run_id, &outcome).await?;
 
             if let Some(message) = outcome.error_message.as_ref() {
-                insert_sync_error(&self.db, run_id, &outcome, item.id, message).await?;
+                insert_sync_error(&self.db, run_id, &outcome, message).await?;
             }
 
             Ok(())
         })
     }
 
-    fn mark_deleted<'a>(
-        &'a self,
+    fn mark_missing_items_deleted(
+        &self,
         run_id: RunId,
         source_id: SourceId,
-        source_path: &'a str,
-    ) -> RepositoryFuture<'a, ()> {
+    ) -> RepositoryFuture<'_, u64> {
         Box::pin(async move {
-            let item = sync_item::Entity::find()
-                .filter(sync_item::Column::SourceId.eq(source_id.as_uuid()))
-                .filter(sync_item::Column::SourcePath.eq(source_path))
-                .one(&self.db)
-                .await
-                .map_err(map_db_error)?
-                .ok_or_else(|| {
-                    AppError::NotFound(format!(
-                        "sync item not found for deleted source path: {source_path}"
-                    ))
-                })?;
             let now = Utc::now();
-            let mut active_model: sync_item::ActiveModel = item.into();
-            active_model.run_id = Set(Some(run_id.as_uuid()));
-            active_model.status = Set(sync_status_to_str(SyncStatus::DeletedOnSource).to_owned());
-            active_model.deleted_on_source_at = Set(Some(now));
-            active_model.updated_at = Set(now);
+            let result = sync_item::Entity::update_many()
+                .col_expr(
+                    sync_item::Column::LastRunId,
+                    sea_orm::sea_query::Expr::value(Some(run_id.as_i64())),
+                )
+                .col_expr(
+                    sync_item::Column::Status,
+                    sea_orm::sea_query::Expr::value(sync_status_to_str(
+                        SyncStatus::DeletedOnSource,
+                    )),
+                )
+                .col_expr(
+                    sync_item::Column::DeletedOnSourceAt,
+                    sea_orm::sea_query::Expr::value(Some(now)),
+                )
+                .col_expr(
+                    sync_item::Column::UpdatedAt,
+                    sea_orm::sea_query::Expr::value(now),
+                )
+                .filter(sync_item::Column::SourceId.eq(source_id.as_i64()))
+                .filter(sync_item::Column::DeletedOnSourceAt.is_null())
+                .filter(
+                    Condition::any()
+                        .add(sync_item::Column::LastRunId.is_null())
+                        .add(sync_item::Column::LastRunId.ne(run_id.as_i64())),
+                )
+                .exec(&self.db)
+                .await
+                .map_err(map_db_error)?;
 
-            active_model.update(&self.db).await.map_err(map_db_error)?;
-
-            Ok(())
+            Ok(result.rows_affected)
         })
     }
 
@@ -427,7 +430,7 @@ impl SyncRepository for SeaOrmRepository {
         summary: SyncRunSummary,
     ) -> RepositoryFuture<'_, ()> {
         Box::pin(async move {
-            let run = sync_run::Entity::find_by_id(run_id.as_uuid())
+            let run = sync_run::Entity::find_by_id(run_id.as_i64())
                 .one(&self.db)
                 .await
                 .map_err(map_db_error)?
@@ -441,6 +444,8 @@ impl SyncRepository for SeaOrmRepository {
             active_run.synced_count = Set(u64_to_i64(summary.synced, "synced_count")?);
             active_run.skipped_count = Set(u64_to_i64(summary.skipped, "skipped_count")?);
             active_run.failed_count = Set(u64_to_i64(summary.failed, "failed_count")?);
+            active_run.deleted_count = Set(u64_to_i64(summary.deleted, "deleted_count")?);
+            active_run.bytes_written = Set(u64_to_i64(summary.bytes_written, "bytes_written")?);
             active_run.updated_at = Set(now);
             active_run.update(&self.db).await.map_err(map_db_error)?;
 
@@ -453,7 +458,7 @@ impl SyncRepository for SeaOrmRepository {
                 active_job.status = Set(job_status_after_run(status).to_owned());
                 active_job.last_run_at = Set(Some(now));
                 active_job.last_run_status = Set(Some(sync_run_status_to_str(status).to_owned()));
-                active_job.last_run_id = Set(Some(run_id.as_uuid()));
+                active_job.last_run_id = Set(Some(run_id.as_i64()));
                 active_job.updated_at = Set(now);
                 active_job.update(&self.db).await.map_err(map_db_error)?;
             }
@@ -488,6 +493,20 @@ async fn upsert_app_setting(
         .insert(db)
         .await
         .map_err(map_db_error)?;
+    }
+
+    Ok(())
+}
+
+async fn ensure_source_exists(db: &DatabaseConnection, source_id: SourceId) -> AppResult<()> {
+    let exists = source::Entity::find_by_id(source_id.as_i64())
+        .one(db)
+        .await
+        .map_err(map_db_error)?
+        .is_some();
+
+    if !exists {
+        return Err(AppError::NotFound(format!("source not found: {source_id}")));
     }
 
     Ok(())
@@ -533,7 +552,7 @@ async fn upsert_sync_item(
     outcome: &ItemSyncOutcome,
 ) -> AppResult<sync_item::Model> {
     let existing = sync_item::Entity::find()
-        .filter(sync_item::Column::SourceId.eq(outcome.source_id.as_uuid()))
+        .filter(sync_item::Column::SourceId.eq(outcome.source_id.as_i64()))
         .filter(sync_item::Column::SourcePath.eq(&outcome.source_path))
         .one(db)
         .await
@@ -564,7 +583,7 @@ async fn upsert_sync_item(
             model.synced_at
         };
         let mut active_model: sync_item::ActiveModel = model.into();
-        active_model.run_id = Set(Some(run_id.as_uuid()));
+        active_model.last_run_id = Set(Some(run_id.as_i64()));
         active_model.item_type = Set(item_type_to_str(outcome.item_type).to_owned());
         active_model.status = Set(sync_status_to_str(outcome.status).to_owned());
         active_model.size = Set(size);
@@ -582,9 +601,9 @@ async fn upsert_sync_item(
     }
 
     let active_model = sync_item::ActiveModel {
-        id: Set(ItemId::new().as_uuid()),
-        source_id: Set(outcome.source_id.as_uuid()),
-        run_id: Set(Some(run_id.as_uuid())),
+        id: NotSet,
+        source_id: Set(outcome.source_id.as_i64()),
+        last_run_id: Set(Some(run_id.as_i64())),
         source_path: Set(outcome.source_path.clone()),
         item_type: Set(item_type_to_str(outcome.item_type).to_owned()),
         status: Set(sync_status_to_str(outcome.status).to_owned()),
@@ -608,19 +627,17 @@ async fn insert_sync_error(
     db: &DatabaseConnection,
     run_id: RunId,
     outcome: &ItemSyncOutcome,
-    item_id: Uuid,
     message: &str,
 ) -> AppResult<()> {
-    let run = sync_run::Entity::find_by_id(run_id.as_uuid())
+    let run = sync_run::Entity::find_by_id(run_id.as_i64())
         .one(db)
         .await
         .map_err(map_db_error)?;
     let active_model = sync_error::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        source_id: Set(outcome.source_id.as_uuid()),
+        id: NotSet,
+        source_id: Set(Some(outcome.source_id.as_i64())),
         job_id: Set(run.as_ref().map(|run| run.job_id)),
-        run_id: Set(Some(run_id.as_uuid())),
-        item_id: Set(Some(item_id)),
+        run_id: Set(Some(run_id.as_i64())),
         source_path: Set(Some(outcome.source_path.clone())),
         error_kind: Set("item_sync".to_owned()),
         message: Set(message.to_owned()),
@@ -645,7 +662,7 @@ fn stored_item_state_from_model(model: sync_item::Model) -> AppResult<StoredItem
 
 fn source_record_from_model(model: source::Model) -> AppResult<SourceRecord> {
     Ok(SourceRecord {
-        id: SourceId::from_uuid(model.id),
+        id: SourceId::from_i64(model.id),
         name: model.name,
         kind: connector_kind_from_str(&model.kind)?,
         config_json: model.config_json,
@@ -668,8 +685,8 @@ fn sync_job_record_from_model(model: sync_job::Model) -> SyncJobRecord {
         .transpose()
         .unwrap_or(None);
     SyncJobRecord {
-        id: JobId::from_uuid(model.id),
-        source_id: SourceId::from_uuid(model.source_id),
+        id: JobId::from_i64(model.id),
+        source_id: SourceId::from_i64(model.source_id),
         name: model.name,
         enabled: model.enabled,
         schedule,
@@ -677,7 +694,7 @@ fn sync_job_record_from_model(model: sync_job::Model) -> SyncJobRecord {
         cursor: model.cursor,
         last_run_at: model.last_run_at,
         last_run_status,
-        last_run_id: model.last_run_id.map(RunId::from_uuid),
+        last_run_id: model.last_run_id.map(RunId::from_i64),
         created_at: model.created_at,
         updated_at: model.updated_at,
     }

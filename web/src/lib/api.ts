@@ -5,6 +5,7 @@ import type {
   FrontendApiError,
   ItemFilters,
   JobFormInput,
+  LocalId,
   SettingsDto,
   SettingsUpdate,
   SourceDto,
@@ -28,7 +29,7 @@ const isoMinutesAhead = (minutes: number) =>
 
 const mockSources: SourceDto[] = [
   {
-    id: "src-local-notes",
+    id: 1,
     name: "Local notes",
     connectorKind: "opendal",
     serviceKind: "fs",
@@ -40,7 +41,7 @@ const mockSources: SourceDto[] = [
     lastRunAt: isoMinutesAgo(32),
   },
   {
-    id: "src-team-s3",
+    id: 2,
     name: "Team S3 archive",
     connectorKind: "opendal",
     serviceKind: "s3",
@@ -60,7 +61,7 @@ const mockSources: SourceDto[] = [
       "Two objects were skipped because their source paths normalize into reserved vault paths.",
   },
   {
-    id: "src-webdav-research",
+    id: 3,
     name: "Research WebDAV",
     connectorKind: "opendal",
     serviceKind: "webdav",
@@ -79,8 +80,8 @@ const mockSources: SourceDto[] = [
 
 const mockJobs: SyncJobDto[] = [
   {
-    id: "job-notes-hourly",
-    sourceId: "src-local-notes",
+    id: 1,
+    sourceId: 1,
     sourceName: "Local notes",
     name: "Notes hourly",
     schedule: { kind: "interval", intervalSeconds: 3600 },
@@ -92,8 +93,8 @@ const mockJobs: SyncJobDto[] = [
     lastRunStatus: "completed",
   },
   {
-    id: "job-s3-nightly",
-    sourceId: "src-team-s3",
+    id: 2,
+    sourceId: 2,
     sourceName: "Team S3 archive",
     name: "S3 nightly",
     schedule: { kind: "interval", intervalSeconds: 86_400 },
@@ -105,8 +106,8 @@ const mockJobs: SyncJobDto[] = [
     lastRunStatus: "running",
   },
   {
-    id: "job-webdav-paused",
-    sourceId: "src-webdav-research",
+    id: 3,
+    sourceId: 3,
     sourceName: "Research WebDAV",
     name: "Research manual",
     schedule: { kind: "manual" },
@@ -120,9 +121,9 @@ const mockJobs: SyncJobDto[] = [
 
 const mockRuns: SyncRunDto[] = [
   {
-    id: "run-20260512-012",
-    jobId: "job-s3-nightly",
-    sourceId: "src-team-s3",
+    id: 12,
+    jobId: 2,
+    sourceId: 2,
     sourceName: "Team S3 archive",
     jobName: "S3 nightly",
     status: "running",
@@ -136,14 +137,14 @@ const mockRuns: SyncRunDto[] = [
     },
     errors: [
       {
-        id: "err-s3-reserved-path",
-        runId: "run-20260512-012",
-        sourceId: "src-team-s3",
+        id: 1,
+        runId: 12,
+        sourceId: 2,
         sourcePath: ".hoarder/tmp/leaked",
         code: "RESERVED_TARGET_PATH",
         message: "Source item cannot write under the reserved .hoarder directory.",
         details: {
-          target_path: "src-team-s3/.hoarder/tmp/leaked",
+          target_path: "2/.hoarder/tmp/leaked",
           policy: "mark_failed_continue_run",
         },
         createdAt: isoMinutesAgo(8),
@@ -151,9 +152,9 @@ const mockRuns: SyncRunDto[] = [
     ],
   },
   {
-    id: "run-20260512-011",
-    jobId: "job-notes-hourly",
-    sourceId: "src-local-notes",
+    id: 11,
+    jobId: 1,
+    sourceId: 1,
     sourceName: "Local notes",
     jobName: "Notes hourly",
     status: "completed",
@@ -170,9 +171,9 @@ const mockRuns: SyncRunDto[] = [
     errors: [],
   },
   {
-    id: "run-20260511-025",
-    jobId: "job-webdav-paused",
-    sourceId: "src-webdav-research",
+    id: 25,
+    jobId: 3,
+    sourceId: 3,
     sourceName: "Research WebDAV",
     jobName: "Research manual",
     status: "failed",
@@ -188,9 +189,9 @@ const mockRuns: SyncRunDto[] = [
     },
     errors: [
       {
-        id: "err-webdav-auth",
-        runId: "run-20260511-025",
-        sourceId: "src-webdav-research",
+        id: 2,
+        runId: 25,
+        sourceId: 3,
         code: "CONNECTOR_AUTH_FAILED",
         message: "WebDAV token was rejected by the remote server.",
         details: {
@@ -205,61 +206,61 @@ const mockRuns: SyncRunDto[] = [
 
 const mockItems: SyncItemDto[] = [
   {
-    id: "item-notes-readme",
-    sourceId: "src-local-notes",
+    id: 1,
+    sourceId: 1,
     sourcePath: "README.md",
     itemType: "file",
     status: "synced",
     size: 8452,
     modifiedAt: isoMinutesAgo(44),
     metadataJson: {
-      runId: "run-20260512-011",
+      runId: 11,
     },
   },
   {
-    id: "item-notes-index",
-    sourceId: "src-local-notes",
+    id: 2,
+    sourceId: 1,
     sourcePath: "index.md",
     itemType: "file",
     status: "skipped",
     size: 1298,
     modifiedAt: isoMinutesAgo(80),
     metadataJson: {
-      runId: "run-20260512-011",
+      runId: 11,
     },
   },
   {
-    id: "item-s3-reserved",
-    sourceId: "src-team-s3",
+    id: 3,
+    sourceId: 2,
     sourcePath: ".hoarder/tmp/leaked",
     itemType: "file",
     status: "failed",
     size: 128,
     modifiedAt: isoMinutesAgo(9),
     metadataJson: {
-      runId: "run-20260512-012",
+      runId: 12,
     },
   },
   {
-    id: "item-s3-archive",
-    sourceId: "src-team-s3",
+    id: 4,
+    sourceId: 2,
     sourcePath: "archive/2026/report.pdf",
     itemType: "file",
     status: "synced",
     size: 2_400_000,
     modifiedAt: isoMinutesAgo(10),
     metadataJson: {
-      runId: "run-20260512-012",
+      runId: 12,
     },
   },
   {
-    id: "item-s3-deleted",
-    sourceId: "src-team-s3",
+    id: 5,
+    sourceId: 2,
     sourcePath: "archive/old.csv",
     itemType: "file",
     status: "deleted_on_source",
     metadataJson: {
-      runId: "run-20260512-012",
+      runId: 12,
     },
   },
 ];
@@ -277,6 +278,10 @@ const mockSettings: SettingsDto = {
     listenAddress: true,
   },
 };
+
+let nextMockSourceId = 100;
+let nextMockJobId = 100;
+let nextMockRunId = 100;
 
 export function normalizeApiError(error: unknown, status?: number): FrontendApiError {
   if (isFrontendApiError(error)) {
@@ -406,7 +411,7 @@ interface BackendListResponse<T> {
 }
 
 interface BackendSourceDto {
-  id: string;
+  id: number;
   name: string;
   connectorKind: "opendal";
   config: {
@@ -419,8 +424,8 @@ interface BackendSourceDto {
 }
 
 interface BackendJobDto {
-  id: string;
-  sourceId: string;
+  id: number;
+  sourceId: number;
   name?: string;
   enabled: boolean;
   schedule?: JobSchedule | string | null;
@@ -428,12 +433,15 @@ interface BackendJobDto {
   nextRunAt?: string | null;
   lastRunAt?: string | null;
   lastRunStatus?: SyncRunDto["status"] | null;
-  lastRunId?: string | null;
+  lastRunId?: number | null;
 }
 
 interface BackendRunDto {
-  id: string;
-  jobId: string;
+  id: number;
+  jobId: number;
+  sourceId: number;
+  sourceName: string;
+  jobName: string;
   status: SyncRunDto["status"] | "pending" | "synced" | "skipped" | "deleted_on_source";
   startedAt?: string | null;
   finishedAt?: string | null;
@@ -441,12 +449,13 @@ interface BackendRunDto {
   syncedCount: number;
   skippedCount: number;
   failedCount: number;
+  deletedCount: number;
 }
 
 interface BackendRunDetailDto {
-  id: string;
-  jobId: string;
-  sourceId: string;
+  id: number;
+  jobId: number;
+  sourceId: number;
   sourceName: string;
   jobName?: string;
   status: SyncRunDto["status"];
@@ -458,13 +467,13 @@ interface BackendRunDetailDto {
 }
 
 interface BackendJobRunResponse {
-  runId: string;
+  runId: number;
   status: SyncRunDto["status"] | "pending" | "synced" | "failed" | "skipped" | "deleted_on_source";
 }
 
 interface BackendItemDto {
-  id: string;
-  sourceId: string;
+  id: number;
+  sourceId: number;
   sourcePath: string;
   itemType: SyncItemDto["itemType"];
   status: SyncItemDto["status"];
@@ -476,9 +485,9 @@ interface BackendItemDto {
 }
 
 interface BackendSyncErrorDto {
-  id: string;
-  runId?: string | null;
-  sourceId?: string | null;
+  id: number;
+  runId?: number | null;
+  sourceId?: number | null;
   sourcePath?: string | null;
   code: string;
   message: string;
@@ -521,12 +530,7 @@ export const api = {
       },
       () => {
         const created = {
-          id: `src-${
-            input.name
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)/g, "") || "new"
-          }`,
+          id: nextMockSourceId++,
           name: input.name,
           connectorKind: "opendal" as const,
           serviceKind: input.serviceKind,
@@ -540,7 +544,7 @@ export const api = {
       },
     ),
 
-  testSource: async (sourceId: string): Promise<ApiData<{ ok: boolean; checkedAt: string }>> =>
+  testSource: async (sourceId: LocalId): Promise<ApiData<{ ok: boolean; checkedAt: string }>> =>
     withMockFallback(
       () =>
         request<{ ok: boolean; checkedAt: string }>(`/sources/${sourceId}/test`, {
@@ -582,9 +586,9 @@ export const api = {
       () => {
         const source = mockSources.find((candidate) => candidate.id === input.sourceId);
         const created: SyncJobDto = {
-          id: `job-${Date.now()}`,
+          id: nextMockJobId++,
           sourceId: input.sourceId,
-          sourceName: source?.name ?? input.sourceId,
+          sourceName: source?.name ?? String(input.sourceId),
           name: input.name,
           schedule: input.schedule,
           scheduleLabel: scheduleLabel(input.schedule),
@@ -596,7 +600,7 @@ export const api = {
       },
     ),
 
-  runJob: async (jobId: string, jobList?: SyncJobDto[]): Promise<ApiData<SyncRunDto>> =>
+  runJob: async (jobId: LocalId, jobList?: SyncJobDto[]): Promise<ApiData<SyncRunDto>> =>
     withMockFallback(
       async () => {
         const response = await request<BackendJobRunResponse>(`/jobs/${jobId}/run`, {
@@ -607,9 +611,9 @@ export const api = {
       () => {
         const job = mockJobs.find((candidate) => candidate.id === jobId);
         const run: SyncRunDto = {
-          id: `run-${Date.now()}`,
+          id: nextMockRunId++,
           jobId,
-          sourceId: job?.sourceId ?? "unknown-source",
+          sourceId: job?.sourceId,
           sourceName: job?.sourceName ?? "Unknown source",
           jobName: job?.name,
           status: "running",
@@ -633,18 +637,16 @@ export const api = {
       },
     ),
 
-  getRuns: (jobList?: SyncJobDto[]) =>
+  getRuns: () =>
     withMockFallback(
       async () => {
-        const resolvedJobs = jobList ?? (await api.getJobs()).data;
-        const jobsById = new Map(resolvedJobs.map((job) => [job.id, job]));
         const response = await request<BackendListResponse<BackendRunDto>>("/runs");
-        return response.data.map((run) => toRunDto(run, jobsById));
+        return response.data.map(toRunDto);
       },
       () => [...mockRuns],
     ),
 
-  getRunDetail: (runId: string, jobList?: SyncJobDto[], runList?: SyncRunDto[]) =>
+  getRunDetail: (runId: LocalId, jobList?: SyncJobDto[], runList?: SyncRunDto[]) =>
     withMockFallback(
       async () => {
         const resolvedJobs = jobList ?? (await api.getJobs()).data;
@@ -759,9 +761,9 @@ function toCreateJobRequest(input: JobFormInput) {
   };
 }
 
-function toJobDto(job: BackendJobDto, sourceNames: Map<string, string>): SyncJobDto {
+function toJobDto(job: BackendJobDto, sourceNames: Map<LocalId, string>): SyncJobDto {
   const schedule = normalizeSchedule(job.schedule);
-  const sourceName = sourceNames.get(job.sourceId) ?? job.sourceId;
+  const sourceName = sourceNames.get(job.sourceId) ?? String(job.sourceId);
 
   return {
     id: job.id,
@@ -779,15 +781,13 @@ function toJobDto(job: BackendJobDto, sourceNames: Map<string, string>): SyncJob
   };
 }
 
-function toRunDto(run: BackendRunDto, jobsById: Map<string, SyncJobDto>): SyncRunDto {
-  const job = jobsById.get(run.jobId);
-
+function toRunDto(run: BackendRunDto): SyncRunDto {
   return {
     id: run.id,
     jobId: run.jobId,
-    sourceId: job?.sourceId ?? "unknown-source",
-    sourceName: job?.sourceName ?? "Unknown source",
-    jobName: job?.name,
+    sourceId: run.sourceId,
+    sourceName: run.sourceName,
+    jobName: run.jobName,
     status: backendRunStatus(run.status),
     startedAt: run.startedAt ?? new Date().toISOString(),
     finishedAt: run.finishedAt ?? undefined,
@@ -797,13 +797,13 @@ function toRunDto(run: BackendRunDto, jobsById: Map<string, SyncJobDto>): SyncRu
       synced: run.syncedCount,
       skipped: run.skippedCount,
       failed: run.failedCount,
-      deleted: 0,
+      deleted: run.deletedCount,
     },
     errors: [],
   };
 }
 
-function toRunDetailDto(run: BackendRunDetailDto, jobsById: Map<string, SyncJobDto>): SyncRunDto {
+function toRunDetailDto(run: BackendRunDetailDto, jobsById: Map<LocalId, SyncJobDto>): SyncRunDto {
   const job = jobsById.get(run.jobId);
 
   return {
@@ -822,7 +822,7 @@ function toRunDetailDto(run: BackendRunDetailDto, jobsById: Map<string, SyncJobD
 }
 
 function runResponseToRunDto(
-  jobId: string,
+  jobId: LocalId,
   response: BackendJobRunResponse,
   jobList?: SyncJobDto[],
 ): SyncRunDto {
@@ -833,7 +833,7 @@ function runResponseToRunDto(
   return {
     id: response.runId,
     jobId,
-    sourceId: job?.sourceId ?? "unknown-source",
+    sourceId: job?.sourceId,
     sourceName: job?.sourceName ?? "Unknown source",
     jobName: job?.name,
     status: backendRunStatus(response.status),
@@ -941,6 +941,8 @@ function queryString(filters: object) {
   for (const [key, value] of Object.entries(filters)) {
     if (typeof value === "string" && value) {
       params.set(key, value);
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      params.set(key, String(value));
     }
   }
 
@@ -959,11 +961,9 @@ function cloneRun(run: SyncRunDto): SyncRunDto {
   };
 }
 
-function emptyRunDetail(runId: string): SyncRunDto {
+function emptyRunDetail(runId: LocalId): SyncRunDto {
   return {
     id: runId,
-    jobId: "unknown-job",
-    sourceId: "unknown-source",
     sourceName: "Unknown source",
     status: "failed",
     startedAt: new Date().toISOString(),
@@ -1017,7 +1017,7 @@ function runIdForItem(item: SyncItemDto) {
   const metadata = item.metadataJson;
   if (metadata && typeof metadata === "object" && "runId" in metadata) {
     const runId = (metadata as { runId?: unknown }).runId;
-    return typeof runId === "string" ? runId : undefined;
+    return typeof runId === "number" ? runId : undefined;
   }
 
   return undefined;

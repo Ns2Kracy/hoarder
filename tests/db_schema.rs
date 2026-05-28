@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use hoarder::{
+    AppError,
     core::types::{ConnectorKind, JobStatus, RunStatus, SourceId},
     db::{
         connect_sqlite,
@@ -15,7 +16,7 @@ use hoarder::{
         repository::SyncRepository,
     },
 };
-use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+use sea_orm::{ConnectionTrait, DatabaseBackend, EntityTrait, Statement};
 use serde_json::json;
 
 #[tokio::test]
@@ -63,6 +64,80 @@ async fn db_schema_syncs_expected_tables_and_job_columns() -> Result<(), Box<dyn
             "expected sync_job column `{expected}` to be created"
         );
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn db_schema_creates_flat_tables_without_foreign_keys_and_with_indexes()
+-> Result<(), Box<dyn std::error::Error>> {
+    let db = connect_sqlite("sqlite::memory:").await?;
+
+    sync_schema(&db).await?;
+
+    for table in ["source", "sync_job", "sync_run", "sync_item", "sync_error"] {
+        assert!(
+            foreign_keys(&db, table).await?.is_empty(),
+            "{table} should not have database foreign keys"
+        );
+    }
+
+    let sync_run_columns = table_columns(&db, "sync_run").await?;
+    assert!(sync_run_columns.contains("source_name"));
+    assert!(sync_run_columns.contains("job_name"));
+    assert!(sync_run_columns.contains("deleted_count"));
+    assert!(sync_run_columns.contains("bytes_written"));
+
+    let sync_item_columns = table_columns(&db, "sync_item").await?;
+    assert!(sync_item_columns.contains("last_run_id"));
+    assert!(!sync_item_columns.contains("run_id"));
+
+    let sync_error_columns = table_columns(&db, "sync_error").await?;
+    assert!(!sync_error_columns.contains("item_id"));
+    let sync_error_nullable_columns = nullable_columns(&db, "sync_error").await?;
+    for expected in ["source_id", "job_id", "run_id", "source_path"] {
+        assert!(
+            sync_error_nullable_columns.contains(expected),
+            "sync_error.{expected} should be nullable"
+        );
+    }
+
+    let all_indexes = all_index_names(&db).await?;
+    for expected in [
+        "idx_sync_job_source_id",
+        "idx_sync_job_enabled_schedule",
+        "idx_sync_run_started_at",
+        "idx_sync_run_job_id",
+        "idx_sync_run_source_id",
+        "idx_sync_item_source_path",
+        "idx_sync_item_source_status_path",
+        "idx_sync_item_source_last_run",
+        "idx_sync_error_run_created",
+        "idx_sync_error_source_created",
+    ] {
+        assert!(all_indexes.contains(expected), "missing index {expected}");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn db_schema_rejects_job_creation_for_missing_source_in_repository()
+-> Result<(), Box<dyn std::error::Error>> {
+    let db = connect_sqlite("sqlite::memory:").await?;
+    sync_schema(&db).await?;
+    let repository = SeaOrmRepository::new(db);
+
+    let error = repository
+        .create_job(NewSyncJob {
+            source_id: SourceId::from_i64(999_999),
+            name: "orphan job".to_owned(),
+            enabled: true,
+        })
+        .await
+        .expect_err("job creation should validate source existence");
+
+    assert!(matches!(error, AppError::NotFound(_)));
 
     Ok(())
 }
@@ -126,6 +201,7 @@ async fn db_schema_records_last_run_metadata_on_job() -> Result<(), Box<dyn std:
                 synced: 2,
                 skipped: 1,
                 failed: 1,
+                deleted: 1,
                 bytes_written: 128,
             },
         )
@@ -142,6 +218,12 @@ async fn db_schema_records_last_run_metadata_on_job() -> Result<(), Box<dyn std:
         Some(RunStatus::CompletedWithFailures)
     );
     assert!(finished_job.last_run_at.is_some());
+
+    let finished_run = hoarder::entity::sync_run::Entity::find_by_id(run_id.as_i64())
+        .one(repository.connection())
+        .await?
+        .expect("finished run exists");
+    assert_eq!(finished_run.deleted_count, 1);
 
     Ok(())
 }
@@ -194,7 +276,7 @@ async fn assert_interval_job_is_listed(
                 interval_seconds: 300,
             })));
 
-    let missing_source_jobs = repository.list_jobs(SourceId::new()).await?;
+    let missing_source_jobs = repository.list_jobs(SourceId::from_i64(999_999)).await?;
     assert!(missing_source_jobs.is_empty());
 
     Ok(())
@@ -208,6 +290,57 @@ async fn table_columns(
         .query_all_raw(Statement::from_string(
             DatabaseBackend::Sqlite,
             format!("PRAGMA table_info({table_name})"),
+        ))
+        .await?;
+
+    rows.into_iter()
+        .map(|row| row.try_get::<String>("", "name"))
+        .collect()
+}
+
+async fn nullable_columns(
+    db: &impl ConnectionTrait,
+    table_name: &str,
+) -> Result<BTreeSet<String>, sea_orm::DbErr> {
+    let rows = db
+        .query_all_raw(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            format!("PRAGMA table_info({table_name})"),
+        ))
+        .await?;
+
+    let mut columns = BTreeSet::new();
+    for row in rows {
+        let notnull = row.try_get::<i64>("", "notnull")?;
+        if notnull == 0 {
+            columns.insert(row.try_get::<String>("", "name")?);
+        }
+    }
+
+    Ok(columns)
+}
+
+async fn foreign_keys(
+    db: &impl ConnectionTrait,
+    table_name: &str,
+) -> Result<Vec<String>, sea_orm::DbErr> {
+    let rows = db
+        .query_all_raw(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            format!("PRAGMA foreign_key_list({table_name})"),
+        ))
+        .await?;
+
+    rows.into_iter()
+        .map(|row| row.try_get::<String>("", "table"))
+        .collect()
+}
+
+async fn all_index_names(db: &impl ConnectionTrait) -> Result<BTreeSet<String>, sea_orm::DbErr> {
+    let rows = db
+        .query_all_raw(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "SELECT name FROM sqlite_master WHERE type = 'index'".to_owned(),
         ))
         .await?;
 

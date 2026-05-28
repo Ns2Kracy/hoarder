@@ -26,20 +26,17 @@ pub trait SyncRepository: Send + Sync {
         source_path: &'a str,
     ) -> RepositoryFuture<'a, Option<StoredItemState>>;
 
-    fn known_item_states(&self, source_id: SourceId) -> RepositoryFuture<'_, Vec<StoredItemState>>;
-
     fn record_item_outcome(
         &self,
         run_id: RunId,
         outcome: ItemSyncOutcome,
     ) -> RepositoryFuture<'_, ()>;
 
-    fn mark_deleted<'a>(
-        &'a self,
+    fn mark_missing_items_deleted(
+        &self,
         run_id: RunId,
         source_id: SourceId,
-        source_path: &'a str,
-    ) -> RepositoryFuture<'a, ()>;
+    ) -> RepositoryFuture<'_, u64>;
 
     fn finish_run(
         &self,

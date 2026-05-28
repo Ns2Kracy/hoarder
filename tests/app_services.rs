@@ -214,7 +214,7 @@ async fn set_job_running(
     repository: &SeaOrmRepository,
     job_id: hoarder::core::types::JobId,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let job = sync_job::Entity::find_by_id(job_id.as_uuid())
+    let job = sync_job::Entity::find_by_id(job_id.as_i64())
         .one(repository.connection())
         .await?
         .expect("job exists");

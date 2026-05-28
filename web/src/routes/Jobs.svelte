@@ -6,6 +6,7 @@
     import { formatDateTime } from "../lib/format";
     import type {
         JobFormInput,
+        LocalId,
         Loadable,
         SourceDto,
         SyncJobDto,
@@ -20,7 +21,7 @@
         jobs: Loadable<SyncJobDto[]>;
         sources: Loadable<SourceDto[]>;
         onCreateJob: (input: JobFormInput) => Promise<void> | void;
-        onRunJob: (jobId: string) => Promise<void> | void;
+        onRunJob: (jobId: LocalId) => Promise<void> | void;
     } = $props();
 </script>
 

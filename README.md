@@ -70,10 +70,10 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- db sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
 | `cargo run -- source list` | [x] | List configured sources from SQLite. |
 | `cargo run -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
-| `cargo run -- source test --id <source-id>` | [x] | Validate a source and persist health. |
-| `cargo run -- job add --source-id <source-id> --name docs --interval 300` | [x] | Create a manual or interval sync job. |
+| `cargo run -- source test --id 1` | [x] | Validate a source and persist health. |
+| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval sync job. |
 | `cargo run -- job list` | [x] | List configured sync jobs. |
-| `cargo run -- sync run --job-id <job-id>` | [x] | Run one sync job immediately. |
+| `cargo run -- sync run --job-id 1` | [x] | Run one sync job immediately. |
 | `cargo run -- sync status` | [x] | Print sync run status summaries. |
 
 ## Feature Checklist
@@ -86,7 +86,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Local-first default bind address, `127.0.0.1:4761`
 - [x] JSON configuration file support
 - [x] Clap-based CLI parser
-- [x] UUID v4 identifiers
+- [x] Local integer identifiers
 - [x] Standard-library filesystem paths
 - [x] Strict Rust and Clippy lints in `Cargo.toml`
 - [x] Release profile with LTO and symbol stripping

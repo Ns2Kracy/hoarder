@@ -6,10 +6,10 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "sync_item")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: Uuid,
-    pub source_id: Uuid,
-    pub run_id: Option<Uuid>,
+    #[sea_orm(primary_key)]
+    pub id: i64,
+    pub source_id: i64,
+    pub last_run_id: Option<i64>,
     pub source_path: String,
     pub item_type: String,
     pub status: String,
@@ -24,12 +24,6 @@ pub struct Model {
     pub deleted_on_source_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
-    #[sea_orm(belongs_to, from = "source_id", to = "id")]
-    pub source: HasOne<super::source::Entity>,
-    #[sea_orm(belongs_to, from = "run_id", to = "id")]
-    pub run: HasOne<super::sync_run::Entity>,
-    #[sea_orm(has_many)]
-    pub errors: HasMany<super::sync_error::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

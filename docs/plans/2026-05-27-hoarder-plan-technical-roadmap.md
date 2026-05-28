@@ -222,13 +222,16 @@ Settings update:
 | `sync_error` | connector 级或 item 级错误 |
 | `app_setting` | 运行时可变设置 |
 
-当前阶段继续沿用 SeaORM entity registry schema sync：
+当前阶段使用扁平 SQLite schema：本地资源使用 integer ID，表之间保留 `source_id`、`job_id`、`run_id` 等普通引用列，但不创建数据库 foreign key。repository 层负责必要的实时引用校验，历史 run/error/item 记录通过快照字段保持可读。
+
+SeaORM entity registry schema sync 仍作为本地初始化机制：
 
 1. 保留 SeaORM entities 作为类型与 repository 代码的核心模型。
 2. `cargo run -- db sync` 继续作为本地 schema 初始化和开发辅助命令。
-3. schema 变更必须同步更新 entity、repository、`db_schema` 测试和相关 API/CLI 文档。
-4. 发布构建需要覆盖空数据库启动 smoke test，确保新用户首次启动能完成初始化。
-5. 涉及已有数据兼容性的变更在 release notes 中写清影响和处理方式。
+3. 显式 SQLite index 在 schema sync 后创建，匹配 job/source、run 时间、item source/path/status 和 error 查询路径。
+4. schema 变更必须同步更新 entity、repository、`db_schema` 测试和相关 API/CLI 文档。
+5. 发布构建需要覆盖空数据库启动 smoke test，确保新用户首次启动能完成初始化。
+6. 涉及已有数据兼容性的变更在 release notes 中写清影响和处理方式。
 
 ### 7.4 Connector 方案
 
@@ -345,10 +348,10 @@ hoarder serve
 hoarder db sync
 hoarder source list
 hoarder source add --name docs --service fs --root ./docs
-hoarder source test --id <source-id>
+hoarder source test --id 1
 hoarder job list
-hoarder job add --source-id <source-id> --name docs --interval 300
-hoarder sync run --job-id <job-id>
+hoarder job add --source-id 1 --name docs --interval 300
+hoarder sync run --job-id 1
 hoarder sync status
 ```
 

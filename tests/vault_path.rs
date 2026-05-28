@@ -3,7 +3,6 @@ use hoarder::core::{
     vault_path::{normalize_source_path, target_path},
 };
 use std::path::PathBuf;
-use uuid::Uuid;
 
 #[test]
 fn vault_path_normalizes_valid_nested_paths() {
@@ -50,8 +49,7 @@ fn vault_path_rejects_hoarder_root_paths() {
 
 #[test]
 fn vault_path_target_path_places_items_under_source_directory() {
-    let source_id =
-        SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
+    let source_id = SourceId::from_i64(42);
     let vault_root = PathBuf::from("/tmp/hoarder-vault");
 
     let target = target_path(&vault_root, &source_id, "folder/report.pdf").unwrap();
@@ -64,8 +62,7 @@ fn vault_path_target_path_places_items_under_source_directory() {
 
 #[test]
 fn vault_path_target_path_revalidates_normalized_input() {
-    let source_id =
-        SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
+    let source_id = SourceId::from_i64(42);
 
     let vault_root = PathBuf::from("./vault");
 

@@ -7,7 +7,6 @@ use hoarder::{
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use uuid::Uuid;
 
 #[tokio::test]
 async fn api_error_serializes_validation_errors_with_stable_shape() {
@@ -94,8 +93,7 @@ async fn api_error_hides_internal_database_error_details() {
 
 #[test]
 fn api_error_source_dto_redacts_secret_config_values() {
-    let source_id =
-        SourceId::from_uuid(Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap());
+    let source_id = SourceId::from_i64(42);
     let config = ConnectorConfig::OpenDal {
         service: "s3".to_owned(),
         options: BTreeMap::from([

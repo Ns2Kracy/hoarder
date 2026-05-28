@@ -6,7 +6,7 @@ use std::{
 
 use axum::{
     Router,
-    http::{HeaderName, HeaderValue, Method, header},
+    http::{HeaderName, Method, header},
     middleware,
 };
 use sea_orm::{ConnectOptions, DatabaseConnection};
@@ -121,22 +121,18 @@ async fn connect_sqlite(config: &AppConfig) -> AppResult<DatabaseConnection> {
         tokio::fs::create_dir_all(parent).await?;
     }
 
-    let database_url = sqlite_url(config);
+    let path = config.database_path.to_string_lossy();
+    let database_url = if path == ":memory:" {
+        "sqlite::memory:".to_owned()
+    } else {
+        format!("sqlite://{path}?mode=rwc")
+    };
     let mut options = ConnectOptions::new(database_url);
     options.sqlx_logging(false);
 
     sea_orm::Database::connect(options)
         .await
         .map_err(|error| AppError::Config(format!("database connection failed: {error}")))
-}
-
-fn sqlite_url(config: &AppConfig) -> String {
-    let path = config.database_path.to_string_lossy();
-    if path == ":memory:" {
-        return "sqlite::memory:".to_owned();
-    }
-
-    format!("sqlite://{path}?mode=rwc")
 }
 
 #[must_use]
@@ -175,41 +171,35 @@ fn app_with_state(state: ApiState) -> Router {
             HeaderName::from_static("x-request-id"),
             MakeRequestUuid,
         ))
-        .layer(local_cors_layer())
-}
+        .layer(
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::predicate(|origin, _parts| {
+                    let Ok(origin) = origin.to_str() else {
+                        return false;
+                    };
+                    let Some((scheme, host_port)) = origin.split_once("://") else {
+                        return false;
+                    };
+                    if !matches!(scheme, "http" | "https") {
+                        return false;
+                    }
+                    let Some((host, port)) = host_port.rsplit_once(':') else {
+                        return false;
+                    };
+                    if !matches!(host, "127.0.0.1" | "localhost" | "[::1]") {
+                        return false;
+                    }
 
-fn local_cors_layer() -> CorsLayer {
-    CorsLayer::new()
-        .allow_origin(AllowOrigin::predicate(|origin, _parts| {
-            is_allowed_local_origin(origin)
-        }))
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PATCH,
-            Method::OPTIONS,
-            Method::HEAD,
-        ])
-        .allow_headers([header::CONTENT_TYPE])
-}
-
-fn is_allowed_local_origin(origin: &HeaderValue) -> bool {
-    let Ok(origin) = origin.to_str() else {
-        return false;
-    };
-    let Some((scheme, host_port)) = origin.split_once("://") else {
-        return false;
-    };
-    if !matches!(scheme, "http" | "https") {
-        return false;
-    }
-    let Some((host, port)) = host_port.rsplit_once(':') else {
-        return false;
-    };
-    if !matches!(host, "127.0.0.1" | "localhost" | "[::1]") {
-        return false;
-    }
-
-    port.parse::<u16>()
-        .is_ok_and(|port| matches!(port, 4761 | 5173 | 4173))
+                    port.parse::<u16>()
+                        .is_ok_and(|port| matches!(port, 4761 | 5173 | 4173))
+                }))
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PATCH,
+                    Method::OPTIONS,
+                    Method::HEAD,
+                ])
+                .allow_headers([header::CONTENT_TYPE]),
+        )
 }

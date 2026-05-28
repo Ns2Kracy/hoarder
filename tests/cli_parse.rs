@@ -93,11 +93,11 @@ fn cli_parse_source_commands() {
         other => panic!("expected source add command, got {other:?}"),
     }
 
-    let test = Cli::parse_from(["hoarder", "source", "test", "--id", "source-1"]);
+    let test = Cli::parse_from(["hoarder", "source", "test", "--id", "1"]);
     match test.command {
         Command::Source {
             command: SourceCommand::Test { id },
-        } => assert_eq!(id, "source-1"),
+        } => assert_eq!(id, "1"),
         other => panic!("expected source test command, got {other:?}"),
     }
 }
@@ -117,7 +117,7 @@ fn cli_parse_job_commands() {
         "job",
         "add",
         "--source-id",
-        "source-1",
+        "1",
         "--name",
         "Every five minutes",
         "--interval",
@@ -133,7 +133,7 @@ fn cli_parse_job_commands() {
                     enabled,
                 },
         } => {
-            assert_eq!(source_id, "source-1");
+            assert_eq!(source_id, "1");
             assert_eq!(name, "Every five minutes");
             assert_eq!(interval, Some(300));
             assert!(enabled);
@@ -144,20 +144,20 @@ fn cli_parse_job_commands() {
 
 #[test]
 fn cli_parse_sync_commands() {
-    let run = Cli::parse_from(["hoarder", "sync", "run", "--job-id", "job-1"]);
+    let run = Cli::parse_from(["hoarder", "sync", "run", "--job-id", "1"]);
     match run.command {
         Command::Sync {
             command: SyncCommand::Run { job_id },
-        } => assert_eq!(job_id, "job-1"),
+        } => assert_eq!(job_id, "1"),
         other => panic!("expected sync run command, got {other:?}"),
     }
 
-    let status = Cli::parse_from(["hoarder", "sync", "status", "--job-id", "job-1"]);
+    let status = Cli::parse_from(["hoarder", "sync", "status", "--job-id", "1"]);
     match status.command {
         Command::Sync {
             command: SyncCommand::Status { job_id, run_id },
         } => {
-            assert_eq!(job_id, Some("job-1".to_owned()));
+            assert_eq!(job_id, Some("1".to_owned()));
             assert_eq!(run_id, None);
         }
         other => panic!("expected sync status command, got {other:?}"),

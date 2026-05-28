@@ -122,7 +122,7 @@ async fn update_source_check(
     checked_at: chrono::DateTime<Utc>,
 ) -> AppResult<()> {
     let db = repository.connection();
-    let source = source::Entity::find_by_id(source_id.as_uuid())
+    let source = source::Entity::find_by_id(source_id.as_i64())
         .one(db)
         .await
         .map_err(map_db_error)?

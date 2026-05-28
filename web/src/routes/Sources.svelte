@@ -4,7 +4,7 @@
     import SourceForm from "../components/SourceForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { formatCount, formatDateTime } from "../lib/format";
-    import type { Loadable, SourceDto, SourceFormInput } from "../lib/types";
+    import type { Loadable, LocalId, SourceDto, SourceFormInput } from "../lib/types";
 
     let {
         sources,
@@ -13,7 +13,7 @@
     }: {
         sources: Loadable<SourceDto[]>;
         onAddSource: (input: SourceFormInput) => Promise<void> | void;
-        onTestSource: (sourceId: string) => Promise<void> | void;
+        onTestSource: (sourceId: LocalId) => Promise<void> | void;
     } = $props();
 
     function configLine(source: SourceDto) {

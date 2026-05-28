@@ -1,4 +1,4 @@
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::{
     AppError, AppResult,
@@ -7,7 +7,7 @@ use crate::{
     },
     core::types::{ItemId, ItemType, RunId, RunStatus, SyncStatus},
     db::repository::SeaOrmRepository,
-    entity::{source, sync_error, sync_item, sync_job, sync_run},
+    entity::{sync_error, sync_item, sync_run},
 };
 
 /// Lists sync run summaries.
@@ -24,8 +24,11 @@ pub async fn list_runs(repository: &SeaOrmRepository) -> AppResult<Vec<RunDto>> 
         .into_iter()
         .map(|run| {
             Ok(RunDto {
-                id: RunId::from_uuid(run.id),
-                job_id: crate::core::types::JobId::from_uuid(run.job_id),
+                id: RunId::from_i64(run.id),
+                job_id: crate::core::types::JobId::from_i64(run.job_id),
+                source_id: crate::core::types::SourceId::from_i64(run.source_id),
+                source_name: run.source_name,
+                job_name: run.job_name,
                 status: run_summary_status_from_str(&run.status)?,
                 started_at: Some(run.started_at),
                 finished_at: run.finished_at,
@@ -33,6 +36,7 @@ pub async fn list_runs(repository: &SeaOrmRepository) -> AppResult<Vec<RunDto>> 
                 synced_count: i64_to_u64(run.synced_count, "synced_count")?,
                 skipped_count: i64_to_u64(run.skipped_count, "skipped_count")?,
                 failed_count: i64_to_u64(run.failed_count, "failed_count")?,
+                deleted_count: i64_to_u64(run.deleted_count, "deleted_count")?,
             })
         })
         .collect()
@@ -42,28 +46,18 @@ pub async fn list_runs(repository: &SeaOrmRepository) -> AppResult<Vec<RunDto>> 
 ///
 /// # Errors
 ///
-/// Returns an error when the run, source, or job cannot be found, or when stored
-/// run metadata is invalid.
+/// Returns an error when the run cannot be found or stored run metadata is
+/// invalid. Source and job names are read from the run snapshot.
 pub async fn get_run_detail(
     repository: &SeaOrmRepository,
     run_id: RunId,
 ) -> AppResult<RunDetailDto> {
     let db = repository.connection();
-    let run = sync_run::Entity::find_by_id(run_id.as_uuid())
+    let run = sync_run::Entity::find_by_id(run_id.as_i64())
         .one(db)
         .await
         .map_err(map_db_error)?
         .ok_or_else(|| AppError::NotFound(format!("sync run not found: {run_id}")))?;
-    let job = sync_job::Entity::find_by_id(run.job_id)
-        .one(db)
-        .await
-        .map_err(map_db_error)?
-        .ok_or_else(|| AppError::NotFound(format!("sync job not found: {}", run.job_id)))?;
-    let source = source::Entity::find_by_id(run.source_id)
-        .one(db)
-        .await
-        .map_err(map_db_error)?
-        .ok_or_else(|| AppError::NotFound(format!("source not found: {}", run.source_id)))?;
     let errors = list_errors(
         repository,
         ErrorListQuery {
@@ -72,14 +66,13 @@ pub async fn get_run_detail(
         },
     )
     .await?;
-    let deleted = deleted_count_for_run(repository, run_id).await?;
 
     Ok(RunDetailDto {
         id: run_id,
-        job_id: crate::core::types::JobId::from_uuid(run.job_id),
-        source_id: crate::core::types::SourceId::from_uuid(run.source_id),
-        source_name: source.name,
-        job_name: job.name,
+        job_id: crate::core::types::JobId::from_i64(run.job_id),
+        source_id: crate::core::types::SourceId::from_i64(run.source_id),
+        source_name: run.source_name,
+        job_name: run.job_name,
         status: run_status_from_str(&run.status)?,
         started_at: Some(run.started_at),
         finished_at: run.finished_at,
@@ -91,7 +84,7 @@ pub async fn get_run_detail(
             synced: i64_to_u64(run.synced_count, "synced_count")?,
             skipped: i64_to_u64(run.skipped_count, "skipped_count")?,
             failed: i64_to_u64(run.failed_count, "failed_count")?,
-            deleted,
+            deleted: i64_to_u64(run.deleted_count, "deleted_count")?,
         },
         errors,
     })
@@ -108,10 +101,10 @@ pub async fn list_items(
 ) -> AppResult<Vec<ItemDto>> {
     let mut select = sync_item::Entity::find();
     if let Some(source_id) = query.source_id {
-        select = select.filter(sync_item::Column::SourceId.eq(source_id.as_uuid()));
+        select = select.filter(sync_item::Column::SourceId.eq(source_id.as_i64()));
     }
     if let Some(run_id) = query.run_id {
-        select = select.filter(sync_item::Column::RunId.eq(run_id.as_uuid()));
+        select = select.filter(sync_item::Column::LastRunId.eq(run_id.as_i64()));
     }
     if let Some(status) = query.status {
         select = select.filter(sync_item::Column::Status.eq(sync_status_to_str(status)));
@@ -138,10 +131,10 @@ pub async fn list_errors(
 ) -> AppResult<Vec<SyncErrorDto>> {
     let mut select = sync_error::Entity::find();
     if let Some(source_id) = query.source_id {
-        select = select.filter(sync_error::Column::SourceId.eq(source_id.as_uuid()));
+        select = select.filter(sync_error::Column::SourceId.eq(source_id.as_i64()));
     }
     if let Some(run_id) = query.run_id {
-        select = select.filter(sync_error::Column::RunId.eq(run_id.as_uuid()));
+        select = select.filter(sync_error::Column::RunId.eq(run_id.as_i64()));
     }
 
     Ok(select
@@ -151,9 +144,9 @@ pub async fn list_errors(
         .map_err(map_db_error)?
         .into_iter()
         .map(|error| SyncErrorDto {
-            id: error.id.to_string(),
-            run_id: error.run_id.map(RunId::from_uuid),
-            source_id: Some(crate::core::types::SourceId::from_uuid(error.source_id)),
+            id: error.id,
+            run_id: error.run_id.map(RunId::from_i64),
+            source_id: error.source_id.map(crate::core::types::SourceId::from_i64),
             source_path: error.source_path,
             code: error.error_kind,
             message: error.message,
@@ -162,21 +155,10 @@ pub async fn list_errors(
         .collect())
 }
 
-async fn deleted_count_for_run(repository: &SeaOrmRepository, run_id: RunId) -> AppResult<u64> {
-    let count = sync_item::Entity::find()
-        .filter(sync_item::Column::RunId.eq(run_id.as_uuid()))
-        .filter(sync_item::Column::Status.eq(sync_status_to_str(SyncStatus::DeletedOnSource)))
-        .count(repository.connection())
-        .await
-        .map_err(map_db_error)?;
-
-    Ok(count)
-}
-
 fn item_dto_from_model(item: sync_item::Model) -> AppResult<ItemDto> {
     Ok(ItemDto {
-        id: ItemId::from_uuid(item.id),
-        source_id: crate::core::types::SourceId::from_uuid(item.source_id),
+        id: ItemId::from_i64(item.id),
+        source_id: crate::core::types::SourceId::from_i64(item.source_id),
         source_path: item.source_path,
         item_type: item_type_from_str(&item.item_type)?,
         status: sync_status_from_str(&item.status)?,

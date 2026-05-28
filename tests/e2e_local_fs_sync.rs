@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
 use hoarder::{
+    app::run_service,
     connectors::{
         opendal::source::OpenDalSourceConnector,
         traits::{ConnectorConfig, SourceConnector},
@@ -14,7 +15,10 @@ use hoarder::{
         schema::sync_schema,
     },
     entity::{sync_item, sync_run},
-    sync::{engine::SyncEngine, vault_writer::VaultWriter},
+    sync::{
+        engine::{SyncEngine, SyncRunSummary},
+        vault_writer::VaultWriter,
+    },
 };
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -77,19 +81,11 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
         b"nested"
     );
 
-    let first_run = sync_run::Entity::find_by_id(first.run_id.as_uuid())
-        .one(&db)
-        .await?
-        .expect("first sync run row exists");
-    assert_eq!(first_run.status, "completed");
-    assert_eq!(first_run.processed_count, first.processed.cast_signed());
-    assert_eq!(first_run.synced_count, first.synced.cast_signed());
-    assert_eq!(first_run.skipped_count, first.skipped.cast_signed());
-    assert_eq!(first_run.failed_count, 0);
-    assert!(first_run.finished_at.is_some());
+    assert_first_run_persisted(&db, &first).await?;
 
     let readme = sync_item(source.id, "docs/readme.md", &db).await?;
     assert_eq!(readme.status, "synced");
+    assert_eq!(readme.last_run_id, Some(first.run_id.as_i64()));
     let readme_vault_path = vault_root
         .join(source.id.to_string())
         .join("docs/readme.md");
@@ -108,6 +104,12 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
         "skipped"
     );
     assert_eq!(
+        sync_item(source.id, "docs/readme.md", &db)
+            .await?
+            .last_run_id,
+        Some(second.run_id.as_i64())
+    );
+    assert_eq!(
         sync_item(source.id, "docs/nested/guide.txt", &db)
             .await?
             .status,
@@ -118,6 +120,7 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
     let third = engine.run_job(job.id).await?;
 
     assert_eq!(third.failed, 0);
+    assert_eq!(third.deleted, 1);
     assert_eq!(
         tokio::fs::read(
             vault_root
@@ -129,7 +132,10 @@ async fn e2e_local_fs_sync_writes_skips_and_marks_deleted() -> Result<(), Box<dy
     );
     let deleted = sync_item(source.id, "docs/nested/guide.txt", &db).await?;
     assert_eq!(deleted.status, "deleted_on_source");
+    assert_eq!(deleted.last_run_id, Some(third.run_id.as_i64()));
     assert!(deleted.deleted_on_source_at.is_some());
+
+    assert_deleted_run_summary(repository.as_ref(), source.id, &third).await?;
 
     Ok(())
 }
@@ -155,11 +161,52 @@ async fn sync_item(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<sync_item::Model, Box<dyn std::error::Error>> {
     Ok(sync_item::Entity::find()
-        .filter(sync_item::Column::SourceId.eq(source_id.as_uuid()))
+        .filter(sync_item::Column::SourceId.eq(source_id.as_i64()))
         .filter(sync_item::Column::SourcePath.eq(source_path))
         .one(db)
         .await?
         .unwrap_or_else(|| panic!("sync item row exists for {source_path}")))
+}
+
+async fn assert_first_run_persisted(
+    db: &sea_orm::DatabaseConnection,
+    first: &SyncRunSummary,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let first_run = sync_run::Entity::find_by_id(first.run_id.as_i64())
+        .one(db)
+        .await?
+        .expect("first sync run row exists");
+
+    assert_eq!(first_run.source_name, "local docs");
+    assert_eq!(first_run.job_name, "default sync");
+    assert_eq!(first_run.status, "completed");
+    assert_eq!(first_run.processed_count, first.processed.cast_signed());
+    assert_eq!(first_run.synced_count, first.synced.cast_signed());
+    assert_eq!(first_run.skipped_count, first.skipped.cast_signed());
+    assert_eq!(first_run.failed_count, 0);
+    assert_eq!(first_run.deleted_count, 0);
+    assert_eq!(first_run.bytes_written, first.bytes_written.cast_signed());
+    assert!(first_run.finished_at.is_some());
+
+    Ok(())
+}
+
+async fn assert_deleted_run_summary(
+    repository: &SeaOrmRepository,
+    source_id: SourceId,
+    run: &SyncRunSummary,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let run_summaries = run_service::list_runs(repository).await?;
+    let third_summary = run_summaries
+        .iter()
+        .find(|summary| summary.id == run.run_id)
+        .expect("third run summary exists");
+    assert_eq!(third_summary.source_id, source_id);
+    assert_eq!(third_summary.source_name, "local docs");
+    assert_eq!(third_summary.job_name, "default sync");
+    assert_eq!(third_summary.deleted_count, 1);
+
+    Ok(())
 }
 
 fn fs_config(root: &std::path::Path) -> ConnectorConfig {

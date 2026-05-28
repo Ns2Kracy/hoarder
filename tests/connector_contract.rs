@@ -11,7 +11,6 @@ use hoarder::{
         ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
     },
 };
-use uuid::Uuid;
 
 #[derive(Debug)]
 struct FakeConnector {
@@ -19,11 +18,9 @@ struct FakeConnector {
 }
 
 impl FakeConnector {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
-            source_id: SourceId::from_uuid(
-                Uuid::parse_str("018f3f55-6b4d-7b2f-8b1e-f7563f31b8d5").unwrap(),
-            ),
+            source_id: SourceId::from_i64(42),
         }
     }
 
