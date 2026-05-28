@@ -349,6 +349,8 @@ fn is_secret_key(key: &str) -> bool {
     key.contains("password")
         || key.contains("token")
         || key.contains("access_key")
+        || key.contains("private_key")
         || key.contains("secret_key")
         || key.contains("secret_access_key")
+        || key == "key"
 }

@@ -209,15 +209,14 @@ async fn api_routes_test_source_persists_failed_health() {
     let source = test
         .repository
         .create_source(NewSource {
-            name: "Unsupported archive".to_owned(),
+            name: "Unsupported SFTP password".to_owned(),
             kind: ConnectorKind::OpenDal,
             config_json: serde_json::to_value(ConnectorConfig::OpenDal {
-                service: "s3".to_owned(),
+                service: "sftp".to_owned(),
                 options: BTreeMap::from([
-                    ("bucket".to_owned(), "archive".to_owned()),
-                    ("region".to_owned(), "us-east-1".to_owned()),
-                    ("access_key_id".to_owned(), "key".to_owned()),
-                    ("secret_access_key".to_owned(), "secret".to_owned()),
+                    ("endpoint".to_owned(), "ssh://example.test:22".to_owned()),
+                    ("username".to_owned(), "ada".to_owned()),
+                    ("password".to_owned(), "correct-horse".to_owned()),
                 ]),
             })
             .unwrap(),

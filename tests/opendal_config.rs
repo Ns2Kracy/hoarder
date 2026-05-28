@@ -76,6 +76,8 @@ fn opendal_config_redacts_sensitive_options_without_validating() {
                 "session_token".to_owned(),
                 "visible-session-token".to_owned(),
             ),
+            ("private_key".to_owned(), "visible-private-key".to_owned()),
+            ("key".to_owned(), "visible-key".to_owned()),
             ("root".to_owned(), "/docs".to_owned()),
         ]),
     };
@@ -88,6 +90,8 @@ fn opendal_config_redacts_sensitive_options_without_validating() {
     assert_eq!(options["access_key_id"], REDACTED_SECRET);
     assert_eq!(options["secret_access_key"], REDACTED_SECRET);
     assert_eq!(options["session_token"], REDACTED_SECRET);
+    assert_eq!(options["private_key"], REDACTED_SECRET);
+    assert_eq!(options["key"], REDACTED_SECRET);
 }
 
 #[test]

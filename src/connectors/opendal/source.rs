@@ -2,11 +2,14 @@ use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, StreamExt};
-use opendal::{Entry, EntryMode, Operator, services::Fs};
+use opendal::{
+    Entry, EntryMode, Operator,
+    services::{Fs, S3, Sftp, Webdav},
+};
 
 use crate::{
     connectors::{
-        opendal::config::{OpenDalServiceConfig, OpenDalServiceKind, validate_connector_config},
+        opendal::config::{OpenDalServiceConfig, validate_connector_config},
         traits::{ByteStream, ConnectorConfig, ConnectorFuture, ScanStream, SourceConnector},
     },
     core::types::{
@@ -45,7 +48,9 @@ impl SourceConnector for OpenDalSourceConnector {
     ) -> ConnectorFuture<'a, ConnectorCapabilities> {
         async move {
             let config = validate_connector_config(config)?;
-            ensure_fs_service(&config)?;
+            if !matches!(config, OpenDalServiceConfig::Fs { .. }) {
+                build_operator(&config)?;
+            }
 
             Ok(ConnectorCapabilities {
                 supports_files: true,
@@ -69,13 +74,13 @@ impl SourceConnector for OpenDalSourceConnector {
                 .lister_with("")
                 .recursive(true)
                 .await
-                .map_err(|error| opendal_error("list filesystem source", error))?;
+                .map_err(|error| opendal_error("list OpenDAL source", error))?;
             let source_id = self.source_id;
 
             Ok(Box::pin(lister.filter_map(move |entry| async move {
                 match entry {
                     Ok(entry) => snapshot_from_entry(source_id, entry),
-                    Err(error) => Some(Err(opendal_error("list filesystem source", error))),
+                    Err(error) => Some(Err(opendal_error("list OpenDAL source", error))),
                 }
             })) as ScanStream)
         }
@@ -101,11 +106,11 @@ impl SourceConnector for OpenDalSourceConnector {
                 .reader_with(&item_ref.source_path)
                 .chunk(READ_CHUNK_SIZE)
                 .await
-                .map_err(|error| opendal_error("open filesystem source item reader", error))?
+                .map_err(|error| opendal_error("open OpenDAL source item reader", error))?
                 .into_bytes_stream(..)
                 .await
-                .map_err(|error| opendal_error("stream filesystem source item", error))?
-                .map(|chunk| chunk.map_err(|error| io_error("read filesystem source item", error)));
+                .map_err(|error| opendal_error("stream OpenDAL source item", error))?
+                .map(|chunk| chunk.map_err(|error| io_error("read OpenDAL source item", error)));
 
             Ok(Box::pin(stream) as ByteStream)
         }
@@ -124,21 +129,86 @@ fn build_operator(config: &OpenDalServiceConfig) -> AppResult<Operator> {
         OpenDalServiceConfig::Fs { root } => Operator::new(Fs::default().root(root))
             .map(opendal::OperatorBuilder::finish)
             .map_err(|error| opendal_error("build filesystem source operator", error)),
-        config => Err(AppError::Connector(format!(
-            "OpenDAL service `{}` is validated but the source connector currently supports `fs` only",
-            config.kind()
-        ))),
-    }
-}
+        OpenDalServiceConfig::WebDav {
+            endpoint,
+            root,
+            username,
+            password,
+            token,
+        } => {
+            let mut builder = Webdav::default().endpoint(endpoint);
+            if let Some(root) = root {
+                builder = builder.root(root);
+            }
+            if let Some(username) = username {
+                builder = builder.username(username);
+            }
+            if let Some(password) = password {
+                builder = builder.password(password);
+            }
+            if let Some(token) = token {
+                builder = builder.token(token);
+            }
 
-fn ensure_fs_service(config: &OpenDalServiceConfig) -> AppResult<()> {
-    if config.kind() == OpenDalServiceKind::Fs {
-        Ok(())
-    } else {
-        Err(AppError::Connector(format!(
-            "OpenDAL service `{}` is validated but the source connector currently supports `fs` only",
-            config.kind()
-        )))
+            Operator::new(builder)
+                .map(opendal::OperatorBuilder::finish)
+                .map_err(|error| opendal_error("build WebDAV source operator", error))
+        }
+        OpenDalServiceConfig::Sftp {
+            endpoint,
+            username,
+            root,
+            password,
+            private_key,
+        } => {
+            if password.is_some() {
+                return Err(AppError::Connector(
+                    "OpenDAL sftp does not support password login; use an SSH key file or ssh-agent"
+                        .to_owned(),
+                ));
+            }
+
+            let mut builder = Sftp::default().endpoint(endpoint).user(username);
+            if let Some(root) = root {
+                builder = builder.root(root);
+            }
+            if let Some(private_key) = private_key {
+                builder = builder.key(private_key);
+            }
+
+            Operator::new(builder)
+                .map(opendal::OperatorBuilder::finish)
+                .map_err(|error| opendal_error("build SFTP source operator", error))
+        }
+        OpenDalServiceConfig::S3 {
+            bucket,
+            region,
+            access_key_id,
+            secret_access_key,
+            endpoint,
+            root,
+            session_token,
+        } => {
+            let mut builder = S3::default()
+                .bucket(bucket)
+                .region(region)
+                .access_key_id(access_key_id)
+                .secret_access_key(secret_access_key)
+                .disable_config_load();
+            if let Some(endpoint) = endpoint {
+                builder = builder.endpoint(endpoint);
+            }
+            if let Some(root) = root {
+                builder = builder.root(root);
+            }
+            if let Some(session_token) = session_token {
+                builder = builder.session_token(session_token);
+            }
+
+            Operator::new(builder)
+                .map(opendal::OperatorBuilder::finish)
+                .map_err(|error| opendal_error("build S3 source operator", error))
+        }
     }
 }
 

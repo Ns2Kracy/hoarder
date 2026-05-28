@@ -272,6 +272,7 @@ fn is_secret_option_key(key: &str) -> bool {
         || normalized.contains("token")
         || normalized.contains("secret")
         || normalized.contains("privatekey")
+        || normalized == "key"
         || (normalized.contains("access") && normalized.contains("key"))
 }
 

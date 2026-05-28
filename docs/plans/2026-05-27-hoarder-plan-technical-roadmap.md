@@ -9,12 +9,12 @@
 
 Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外部数据源，把内容同步到用户可直接阅读的本地 vault，并把 source、job、run、item、error 等元数据记录到本地 SQLite，方便通过 CLI、HTTP API 和 Web 控制台进行配置、运行、排障和审计。
 
-当前项目已经完成本地 MVP 主路径：Rust 2024 后端、Axum API、SeaORM 2.0 entity-first、SQLite、OpenDAL filesystem connector、单向同步引擎、定时 job、运行时设置、Svelte 5 Web 控制台、OpenAPI、单二进制嵌入式前端和基础测试门禁。下一阶段的重点不是重写核心，而是在现有边界上补齐工程化和产品化能力：CI、发布产物、WebDAV/SFTP/S3 连接器实现、可访问性和浏览器回归、增量 cursor、重试策略、搜索、标签和长期运行稳定性。
+当前项目已经完成本地 MVP 主路径：Rust 2024 后端、Axum API、SeaORM 2.0 entity-first、SQLite、OpenDAL filesystem connector、WebDAV/SFTP/S3 operator wiring、单向同步引擎、定时 job、运行时设置、Svelte 5 Web 控制台、OpenAPI、单二进制嵌入式前端和基础测试门禁。下一阶段的重点不是重写核心，而是在现有边界上补齐工程化和产品化能力：CI、发布产物、connector-specific typed config、远端 connector integration tests、可访问性和浏览器回归、增量 cursor、重试策略、搜索、标签和长期运行稳定性。
 
 推荐路线是分三步推进：
 
 1. **稳定化**：补齐 CI、发布流水线、测试和可访问性，确保现有 MVP 可重复构建、可安装、可回归。
-2. **连接器扩展**：优先落地 WebDAV、SFTP、S3 和 NAS 预设，让 Hoarder 覆盖真实本地与私有云存储场景。
+2. **连接器扩展**：优先补齐 WebDAV、SFTP、S3 的 typed config、integration tests 和 NAS 预设，让 Hoarder 覆盖真实本地与私有云存储场景。
 3. **知识库能力**：在可靠同步基础上加入全文搜索、标签、集合、去重和通知，把平台从“同步工具”推进为“本地数据汇聚与检索工作台”。
 
 ## 2. 项目目标
@@ -515,9 +515,9 @@ cargo build --release
 
 任务：
 
-- 实现 OpenDAL WebDAV operator。
-- 实现 OpenDAL SFTP operator。
-- 实现 OpenDAL S3 operator。
+- 验证 OpenDAL WebDAV operator against 可控测试服务。
+- 验证 OpenDAL SFTP operator against 可控测试服务。
+- 验证 OpenDAL S3 operator against 可控测试服务。
 - 增加 connector-specific typed config。
 - 增加 NAS presets。
 - 增加 connector integration tests。

@@ -101,6 +101,8 @@ fn api_error_source_dto_redacts_secret_config_values() {
             ("access_key_id".to_owned(), "AKIASECRET".to_owned()),
             ("secret_access_key".to_owned(), "very-secret".to_owned()),
             ("session_token".to_owned(), "token-value".to_owned()),
+            ("private_key".to_owned(), "private-key-value".to_owned()),
+            ("key".to_owned(), "key-value".to_owned()),
         ]),
     };
 
@@ -119,9 +121,16 @@ fn api_error_source_dto_redacts_secret_config_values() {
         encoded["config"]["options"]["access_key_id"],
         json!("<redacted>")
     );
+    assert_eq!(
+        encoded["config"]["options"]["private_key"],
+        json!("<redacted>")
+    );
+    assert_eq!(encoded["config"]["options"]["key"], json!("<redacted>"));
     assert!(!encoded.to_string().contains("AKIASECRET"));
     assert!(!encoded.to_string().contains("very-secret"));
     assert!(!encoded.to_string().contains("token-value"));
+    assert!(!encoded.to_string().contains("private-key-value"));
+    assert!(!encoded.to_string().contains("key-value"));
 }
 
 async fn response_json(response: axum::response::Response) -> Value {

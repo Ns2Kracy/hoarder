@@ -12,7 +12,7 @@ The first implementation focuses on a strong local foundation: Rust, Axum, SeaOR
 - One-way sync model: sources write into the vault; local files are not pushed back to sources.
 - Readable vault layout: synced files live under `vault/{source_id}/normalized/source/path`.
 - Connector abstraction: sync logic depends on Hoarder traits, not OpenDAL or vendor-specific APIs.
-- OpenDAL as the first connector family: filesystem sync works now; config models exist for `fs`, `webdav`, `sftp`, and `s3`.
+- OpenDAL as the first connector family: filesystem sync works now; operator wiring exists for `fs`, `webdav`, `sftp`, and `s3`.
 - Safe writes: files stream through a temporary path and are atomically promoted into the vault.
 - No automatic local deletion: missing source files are marked `deleted_on_source`, but local vault files remain.
 - Structured run history: runs, items, errors, counts, hashes, and timestamps are persisted.
@@ -124,9 +124,9 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] OpenDAL filesystem scan
 - [x] OpenDAL filesystem file read
 - [x] Directory and file metadata mapping into Hoarder snapshots
-- [ ] OpenDAL WebDAV operator implementation
-- [ ] OpenDAL SFTP operator implementation
-- [ ] OpenDAL S3 operator implementation
+- [x] OpenDAL WebDAV operator implementation
+- [x] OpenDAL SFTP operator implementation
+- [x] OpenDAL S3 operator implementation
 - [ ] NAS-specific presets or templates
 - [ ] Notion connector implementation
 - [ ] Feishu connector implementation
@@ -309,4 +309,4 @@ cargo build --release
 
 ## Current Status
 
-Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. The next highest-value work is implementing more OpenDAL services beyond filesystem and preparing CI/release artifacts.
+Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. OpenDAL operator wiring now covers filesystem, WebDAV, SFTP, and S3; the next highest-value work is connector-specific integration tests, typed config templates, and CI/release artifacts.

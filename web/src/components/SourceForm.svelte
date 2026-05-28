@@ -18,7 +18,19 @@
   let token = $state("");
   let isSaving = $state(false);
 
-  let canSubmit = $derived(canSubmitSourceForm({ name, serviceKind, root }));
+  let canSubmit = $derived(
+    canSubmitSourceForm({
+      name,
+      serviceKind,
+      root,
+      endpoint,
+      bucket,
+      region,
+      username,
+      accessKeyId,
+      secretAccessKey
+    })
+  );
 
   async function submit() {
     if (!canSubmit || isSaving) {
@@ -105,40 +117,50 @@
         <span class="text-xs font-medium text-zinc-600">Endpoint</span>
         <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={endpoint} />
       </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-zinc-600">Bucket / remote root</span>
-        <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={bucket} />
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-zinc-600">Region</span>
-        <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={region} />
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-zinc-600">Username</span>
-        <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={username} />
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-zinc-600">Access key</span>
-        <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={accessKeyId} />
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-zinc-600">Secret / token</span>
-        {#if serviceKind === "s3"}
+
+      {#if serviceKind === "s3"}
+        <label class="space-y-1">
+          <span class="text-xs font-medium text-zinc-600">Bucket</span>
+          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={bucket} />
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs font-medium text-zinc-600">Region</span>
+          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={region} />
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs font-medium text-zinc-600">Access key</span>
+          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={accessKeyId} />
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs font-medium text-zinc-600">Secret key</span>
           <input
             class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
             type="password"
             autocomplete="new-password"
             bind:value={secretAccessKey}
           />
-        {:else}
-          <input
-            class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
-            type="password"
-            autocomplete="new-password"
-            bind:value={token}
-          />
+        </label>
+      {:else}
+        <label class="space-y-1">
+          <span class="text-xs font-medium text-zinc-600">Remote root</span>
+          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={root} />
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs font-medium text-zinc-600">Username</span>
+          <input class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm" bind:value={username} />
+        </label>
+        {#if serviceKind === "webdav"}
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-zinc-600">Token</span>
+            <input
+              class="h-9 w-full rounded-sm border border-zinc-300 bg-white px-2 text-sm"
+              type="password"
+              autocomplete="new-password"
+              bind:value={token}
+            />
+          </label>
         {/if}
-      </label>
+      {/if}
     </div>
   {/if}
 
