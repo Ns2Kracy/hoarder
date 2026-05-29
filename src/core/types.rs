@@ -152,6 +152,7 @@ pub enum ConnectorKind {
     OpenDal,
     Notion,
     Feishu,
+    Plugin,
 }
 
 #[allow(clippy::struct_excessive_bools)]

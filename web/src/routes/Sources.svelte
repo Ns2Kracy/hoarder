@@ -4,7 +4,7 @@
     import SourceForm from "../components/SourceForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { formatCount, formatDateTime } from "../lib/format";
-    import type { Loadable, LocalId, SourceDto, SourceFormInput } from "../lib/types";
+    import type { Loadable, LocalId, OpenDalServiceKind, SourceDto, SourceFormInput } from "../lib/types";
 
     let {
         sources,
@@ -24,6 +24,18 @@
     let editingSourceId = $state<LocalId | undefined>(undefined);
 
     function configLine(source: SourceDto) {
+        if (source.connectorKind === "notion") {
+            return stringOption(source.config.data_source_id) ?? stringOption(source.config.page_id) ?? "Notion workspace";
+        }
+
+        if (source.connectorKind === "feishu") {
+            return stringOption(source.config.folder_token) ?? "Feishu Drive";
+        }
+
+        if (source.connectorKind === "plugin") {
+            return stringOption(source.config.plugin_id) ?? "Compiled plugin";
+        }
+
         if (source.config.root) {
             return source.config.root;
         }
@@ -40,7 +52,7 @@
 
         return {
             name: source.name,
-            serviceKind: source.serviceKind,
+            serviceKind: openDalServiceKind(source.serviceKind),
             enabled: source.enabled,
             config: {
                 root: stringOption(config.root),
@@ -58,6 +70,18 @@
 
     function stringOption(value: unknown) {
         return typeof value === "string" ? value : undefined;
+    }
+
+    function canEditSource(source: SourceDto) {
+        return source.connectorKind === "opendal";
+    }
+
+    function openDalServiceKind(value: SourceDto["serviceKind"]): OpenDalServiceKind {
+        if (value === "fs" || value === "s3" || value === "webdav" || value === "sftp") {
+            return value;
+        }
+
+        return "fs";
     }
 </script>
 
@@ -148,7 +172,7 @@
                                     >
                                         {configLine(source)}
                                     </div>
-                                    {#if source.config.access_key_id || source.config.secret_access_key || source.config.token}
+                                    {#if source.config.access_key_id || source.config.secret_access_key || source.config.token || source.config.app_secret}
                                         <div class="mt-1 text-xs text-subtle">
                                             Secrets redacted
                                         </div>
@@ -173,18 +197,20 @@
                                     >{formatDateTime(source.lastCheckedAt)}</td
                                 >
                                 <td class="border-t border-line-soft px-3 py-2 text-right">
-                                    <button
-                                        class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
-                                        type="button"
-                                        onclick={() =>
-                                            (editingSourceId =
-                                                editingSourceId === source.id
-                                                    ? undefined
-                                                    : source.id)}
-                                    >
-                                        <Pencil aria-hidden="true" size={14} />
-                                        Edit
-                                    </button>
+                                    {#if canEditSource(source)}
+                                        <button
+                                            class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
+                                            type="button"
+                                            onclick={() =>
+                                                (editingSourceId =
+                                                    editingSourceId === source.id
+                                                        ? undefined
+                                                        : source.id)}
+                                        >
+                                            <Pencil aria-hidden="true" size={14} />
+                                            Edit
+                                        </button>
+                                    {/if}
                                     <button
                                         class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
                                         type="button"

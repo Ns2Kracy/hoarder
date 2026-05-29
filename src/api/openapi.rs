@@ -487,10 +487,19 @@ fn read_only_settings_schema() -> Value {
 fn connector_config_schema() -> Value {
     json!({
         "type": "object",
-        "required": ["kind", "service", "options"],
+        "required": ["kind"],
         "properties": {
-            "kind": {"type": "string", "enum": ["opendal"]},
+            "kind": {"type": "string", "enum": ["opendal", "notion", "feishu", "plugin"]},
             "service": {"type": "string", "enum": ["fs", "webdav", "sftp", "s3"]},
+            "token": {"type": "string"},
+            "dataSourceId": {"type": ["string", "null"]},
+            "pageId": {"type": ["string", "null"]},
+            "version": {"type": ["string", "null"]},
+            "appId": {"type": "string"},
+            "appSecret": {"type": "string"},
+            "folderToken": {"type": ["string", "null"]},
+            "baseUrl": {"type": ["string", "null"]},
+            "pluginId": {"type": "string"},
             "options": {
                 "type": "object",
                 "additionalProperties": {"type": "string"}
@@ -583,7 +592,7 @@ fn source_schema() -> Value {
         "properties": {
             "id": local_id_schema(),
             "name": {"type": "string"},
-            "connectorKind": {"type": "string", "enum": ["opendal"]},
+            "connectorKind": {"type": "string", "enum": ["opendal", "notion", "feishu", "plugin"]},
             "config": ref_schema("RedactedConnectorConfig"),
             "enabled": {"type": "boolean"},
             "health": {"type": "string", "enum": ["healthy", "warning", "failed", "untested", "disabled"]},

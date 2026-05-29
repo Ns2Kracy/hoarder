@@ -92,6 +92,13 @@ cargo run -- sync run --job-id 1
 cargo run -- sync status
 ```
 
+Create app connector sources through the generic JSON config path:
+
+```bash
+cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'
+cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'
+```
+
 Use a JSON config file when you need non-default paths:
 
 ```json

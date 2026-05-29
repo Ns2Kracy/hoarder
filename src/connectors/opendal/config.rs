@@ -178,6 +178,9 @@ pub fn validate_connector_config(config: &ConnectorConfig) -> AppResult<OpenDalS
         ConnectorConfig::OpenDal { service, options } => {
             validate_service_options(service.parse()?, options)
         }
+        _ => Err(AppError::Validation(
+            "expected opendal connector config".to_owned(),
+        )),
     }
 }
 
@@ -188,6 +191,7 @@ pub fn redacted_connector_config(config: &ConnectorConfig) -> ConnectorConfig {
             service: service.clone(),
             options: redacted_options(options),
         },
+        other => other.clone(),
     }
 }
 

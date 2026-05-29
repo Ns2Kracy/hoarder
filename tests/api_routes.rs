@@ -170,6 +170,67 @@ async fn api_routes_updates_source_and_preserves_redacted_secrets() {
 }
 
 #[tokio::test]
+async fn api_routes_updates_notion_source_and_preserves_redacted_token() {
+    let test = TestApp::new().await;
+    let source = test
+        .repository
+        .create_source(NewSource {
+            name: "Notion knowledge".to_owned(),
+            kind: ConnectorKind::Notion,
+            config_json: serde_json::to_value(ConnectorConfig::Notion {
+                token: "real-notion-token".to_owned(),
+                data_source_id: Some("old_ds".to_owned()),
+                page_id: None,
+                version: Some("2026-03-11".to_owned()),
+                base_url: None,
+            })
+            .unwrap(),
+            enabled: true,
+        })
+        .await
+        .unwrap();
+
+    let response = request(
+        test.app.clone(),
+        "PATCH",
+        &format!("/api/sources/{}", source.id),
+        Some(
+            r#"{
+                "name":"Notion knowledge edited",
+                "enabled":true,
+                "config":{
+                    "kind":"notion",
+                    "token":"<redacted>",
+                    "dataSourceId":"new_ds",
+                    "version":"2026-03-11"
+                }
+            }"#,
+        ),
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["name"], json!("Notion knowledge edited"));
+    assert_eq!(response.body["connectorKind"], json!("notion"));
+    assert_eq!(
+        response.body["config"]["options"]["token"],
+        json!("<redacted>")
+    );
+    assert_eq!(
+        response.body["config"]["options"]["data_source_id"],
+        json!("new_ds")
+    );
+
+    let stored = source::Entity::find_by_id(source.id.as_i64())
+        .one(test.repository.connection())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.config_json["token"], json!("real-notion-token"));
+    assert_eq!(stored.config_json["dataSourceId"], json!("new_ds"));
+}
+
+#[tokio::test]
 async fn api_routes_collection_endpoints_return_lists_and_settings() {
     let test = TestApp::new().await;
     let jobs = request(test.app.clone(), "GET", "/api/jobs", None).await;

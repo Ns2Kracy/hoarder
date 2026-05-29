@@ -36,6 +36,9 @@ flowchart TB
         VaultWriter[Vault writer]
         ConnectorTrait[SourceConnector trait]
         OpenDalConnector[OpenDAL connector]
+        NotionConnector[Notion connector]
+        FeishuConnector[Feishu connector]
+        PluginAbi[Plugin ABI contract]
         Repository[SeaORM repository]
         SchemaSync[Entity registry schema sync]
     end
@@ -50,7 +53,9 @@ flowchart TB
         WebDAV[WebDAV]
         SFTP[SFTP]
         S3[S3]
-        Future[Future app connectors]
+        Notion[Notion API]
+        Feishu[Feishu Drive API]
+        Plugins[Compiled connector plugins]
     end
 
     Browser --> Axum
@@ -67,11 +72,16 @@ flowchart TB
     SyncEngine --> VaultWriter
     SyncEngine --> Repository
     ConnectorTrait --> OpenDalConnector
+    ConnectorTrait --> NotionConnector
+    ConnectorTrait --> FeishuConnector
+    ConnectorTrait -. manifest .-> PluginAbi
     OpenDalConnector --> FS
     OpenDalConnector --> WebDAV
     OpenDalConnector --> SFTP
     OpenDalConnector --> S3
-    ConnectorTrait -. reserved .-> Future
+    NotionConnector --> Notion
+    FeishuConnector --> Feishu
+    PluginAbi -. future host .-> Plugins
     VaultWriter --> Vault
     Repository --> SQLite
     SchemaSync --> SQLite
@@ -138,6 +148,9 @@ flowchart LR
 | `src/sync/vault_writer.rs` | 安全路径、临时写入、hash、原子替换 |
 | `src/connectors/traits.rs` | connector 公共接口和 config enum |
 | `src/connectors/opendal/` | OpenDAL fs/webdav/sftp/s3 配置校验、operator、scan、read |
+| `src/connectors/notion.rs` | Notion data source/page 虚拟文档扫描、分页 cursor、读取 JSON 文档 |
+| `src/connectors/feishu.rs` | 飞书 tenant token、Drive folder 分页扫描、引用型 JSON 文档读取 |
+| `src/connectors/plugin.rs` | 第三方编译 connector ABI 常量、manifest、配置 schema 和 secret field 契约 |
 | `src/db/repository.rs` | SeaORM repository，实现 source/job/settings/sync repository traits |
 | `web/src/` | Svelte 5 控制台：Overview、Sources、Jobs、Runs、Settings |
 
@@ -157,6 +170,17 @@ flowchart TB
         ByteStream[Reader -> bytes stream]
     end
 
+    subgraph AppConnectors[App document connectors]
+        Notion[Notion data_sources / blocks]
+        Feishu[Feishu tenant token / drive files]
+        VirtualDoc[virtual_document snapshots]
+    end
+
+    subgraph PluginBoundary[Compiled plugin ABI]
+        Manifest[manifest validate]
+        Entrypoint[hoarder_connector_plugin_v1]
+    end
+
     Validate --> Config
     Scan --> Operator
     Operator --> MapEntry
@@ -167,6 +191,13 @@ flowchart TB
     Config --> WebDAV[webdav]
     Config --> SFTP[sftp]
     Config --> S3[s3]
+    Scan --> Notion
+    Scan --> Feishu
+    Notion --> VirtualDoc
+    Feishu --> VirtualDoc
+    Read --> VirtualDoc
+    Contract -. future host .-> Manifest
+    Manifest --> Entrypoint
 ```
 
 Connector contract：

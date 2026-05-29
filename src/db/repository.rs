@@ -833,6 +833,7 @@ const fn connector_kind_to_str(kind: ConnectorKind) -> &'static str {
         ConnectorKind::OpenDal => "opendal",
         ConnectorKind::Notion => "notion",
         ConnectorKind::Feishu => "feishu",
+        ConnectorKind::Plugin => "plugin",
     }
 }
 
@@ -841,6 +842,7 @@ fn connector_kind_from_str(kind: &str) -> AppResult<ConnectorKind> {
         "opendal" => Ok(ConnectorKind::OpenDal),
         "notion" => Ok(ConnectorKind::Notion),
         "feishu" => Ok(ConnectorKind::Feishu),
+        "plugin" => Ok(ConnectorKind::Plugin),
         other => Err(AppError::Database(format!(
             "unknown connector kind stored in database: {other}"
         ))),

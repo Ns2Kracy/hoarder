@@ -127,8 +127,80 @@ impl From<&ConnectorConfig> for RedactedConnectorConfig {
                     })
                     .collect(),
             },
+            ConnectorConfig::Notion {
+                token,
+                data_source_id,
+                page_id,
+                version,
+                base_url,
+            } => Self {
+                kind: ConnectorKind::Notion,
+                service: "notion".to_owned(),
+                options: redacted_app_options([
+                    ("token", Some(token.as_str()), true),
+                    ("data_source_id", data_source_id.as_deref(), false),
+                    ("page_id", page_id.as_deref(), false),
+                    ("version", version.as_deref(), false),
+                    ("base_url", base_url.as_deref(), false),
+                ]),
+            },
+            ConnectorConfig::Feishu {
+                app_id,
+                app_secret,
+                folder_token,
+                base_url,
+            } => Self {
+                kind: ConnectorKind::Feishu,
+                service: "feishu".to_owned(),
+                options: redacted_app_options([
+                    ("app_id", Some(app_id.as_str()), false),
+                    ("app_secret", Some(app_secret.as_str()), true),
+                    ("folder_token", folder_token.as_deref(), false),
+                    ("base_url", base_url.as_deref(), false),
+                ]),
+            },
+            ConnectorConfig::Plugin { plugin_id, options } => {
+                let mut options = options
+                    .iter()
+                    .map(|(key, value)| {
+                        let value = if is_secret_key(key) {
+                            "<redacted>".to_owned()
+                        } else {
+                            value.clone()
+                        };
+
+                        (key.clone(), value)
+                    })
+                    .collect::<BTreeMap<_, _>>();
+                options.insert("plugin_id".to_owned(), plugin_id.clone());
+
+                Self {
+                    kind: ConnectorKind::Plugin,
+                    service: "plugin".to_owned(),
+                    options,
+                }
+            }
         }
     }
+}
+
+fn redacted_app_options<const N: usize>(
+    entries: [(&str, Option<&str>, bool); N],
+) -> BTreeMap<String, String> {
+    entries
+        .into_iter()
+        .filter_map(|(key, value, secret)| {
+            value.map(|value| {
+                let value = if secret {
+                    "<redacted>".to_owned()
+                } else {
+                    value.to_owned()
+                };
+
+                (key.to_owned(), value)
+            })
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

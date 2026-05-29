@@ -84,7 +84,9 @@ fn opendal_config_redacts_sensitive_options_without_validating() {
 
     let redacted = redacted_connector_config(&config);
 
-    let ConnectorConfig::OpenDal { options, .. } = redacted;
+    let ConnectorConfig::OpenDal { options, .. } = redacted else {
+        panic!("redacted OpenDAL config should stay OpenDAL");
+    };
     assert_eq!(options["bucket"], "archive");
     assert_eq!(options["root"], "/docs");
     assert_eq!(options["access_key_id"], REDACTED_SECRET);

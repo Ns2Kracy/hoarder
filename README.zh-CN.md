@@ -12,7 +12,7 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台，也是 AI �
 - 单向同步：数据从 source 写入 vault，不会把本地文件反向推回数据源。
 - 可读的 vault 结构：同步后的文件位于 `vault/{source_id}/normalized/source/path`。
 - 连接器抽象清晰：同步核心依赖 Hoarder 自己的 trait，不直接依赖 OpenDAL 或具体厂商 API。
-- OpenDAL 是第一组连接器能力：文件系统同步已经可用；`fs`、`webdav`、`sftp`、`s3` 的配置模型和 operator wiring 已经存在。
+- 内置 connector 家族：OpenDAL 支持 `fs`、`webdav`、`sftp`、`s3`，Notion 与飞书以 `virtual_document` 形式接入知识库聚合。
 - 安全写入：文件先流式写入临时路径，再原子替换到最终 vault 路径。
 - 默认不删除本地文件：源端消失的文件会标记为 `deleted_on_source`，但本地 vault 文件会保留。
 - 结构化运行历史：run、item、error、计数、hash、时间戳都会持久化。
@@ -77,6 +77,8 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- db sync` | [x] | 根据 SeaORM entities 同步 SQLite schema。 |
 | `cargo run -- source list` | [x] | 从 SQLite 列出已配置 sources。 |
 | `cargo run -- source add --name docs --service fs --root ./docs` | [x] | 创建 OpenDAL filesystem source。 |
+| `cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | 创建 Notion 虚拟文档 source。 |
+| `cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | 创建飞书 Drive 虚拟文档 source。 |
 | `cargo run -- source test --id 1` | [x] | 校验 source 并持久化健康状态。 |
 | `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | 创建手动或固定间隔 sync job。 |
 | `cargo run -- job list` | [x] | 列出 sync jobs。 |
@@ -122,7 +124,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Connector trait 边界
 - [x] Connector capability 模型
 - [x] `opendal` connector kind
-- [x] 在领域类型中预留 `notion` 和 `feishu` connector kind
+- [x] `notion` 和 `feishu` connector kind
 - [x] OpenDAL `fs` 服务配置校验
 - [x] OpenDAL `webdav` 服务配置校验
 - [x] OpenDAL `sftp` 服务配置校验
@@ -134,11 +136,11 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] OpenDAL WebDAV operator 实现
 - [x] OpenDAL SFTP operator 实现
 - [x] OpenDAL S3 operator 实现
-- [ ] NAS 专用预设或模板
-- [ ] Notion connector 实现
-- [ ] 飞书 connector 实现
-- [ ] Connector pagination 或 incremental cursor 支持
-- [ ] 第三方编译插件 ABI
+- [x] NAS 专用预设或模板
+- [x] Notion connector 实现
+- [x] 飞书 connector 实现
+- [x] Connector pagination 或 incremental cursor 支持
+- [x] 第三方编译插件 ABI 契约
 
 ### 同步运行时
 
@@ -163,7 +165,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 有界并发文件同步
 - [x] Job 级并发控制
 - [x] 定时同步任务
-- [ ] 从 connector cursor 恢复
+- [x] 从 connector cursor 恢复
 - [ ] 临时性 connector 错误重试策略
 - [ ] 冲突处理
 - [ ] 双向同步

@@ -55,6 +55,36 @@ pub enum ConnectorConfig {
         #[serde(default)]
         options: BTreeMap<String, String>,
     },
+    #[serde(rename = "notion")]
+    Notion {
+        token: String,
+        #[serde(default, rename = "dataSourceId", alias = "data_source_id")]
+        data_source_id: Option<String>,
+        #[serde(default, rename = "pageId", alias = "page_id")]
+        page_id: Option<String>,
+        #[serde(default)]
+        version: Option<String>,
+        #[serde(default, rename = "baseUrl", alias = "base_url")]
+        base_url: Option<String>,
+    },
+    #[serde(rename = "feishu")]
+    Feishu {
+        #[serde(rename = "appId", alias = "app_id")]
+        app_id: String,
+        #[serde(rename = "appSecret", alias = "app_secret")]
+        app_secret: String,
+        #[serde(default, rename = "folderToken", alias = "folder_token")]
+        folder_token: Option<String>,
+        #[serde(default, rename = "baseUrl", alias = "base_url")]
+        base_url: Option<String>,
+    },
+    #[serde(rename = "plugin")]
+    Plugin {
+        #[serde(rename = "pluginId", alias = "plugin_id")]
+        plugin_id: String,
+        #[serde(default)]
+        options: BTreeMap<String, String>,
+    },
 }
 
 impl ConnectorConfig {
@@ -62,6 +92,9 @@ impl ConnectorConfig {
     pub const fn kind(&self) -> ConnectorKind {
         match self {
             Self::OpenDal { .. } => ConnectorKind::OpenDal,
+            Self::Notion { .. } => ConnectorKind::Notion,
+            Self::Feishu { .. } => ConnectorKind::Feishu,
+            Self::Plugin { .. } => ConnectorKind::Plugin,
         }
     }
 }

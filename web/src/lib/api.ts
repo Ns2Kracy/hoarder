@@ -10,6 +10,7 @@ import type {
   SettingsUpdate,
   SourceDto,
   SourceFormInput,
+  ConnectorKind,
   JobSchedule,
   SyncErrorDto,
   SyncItemDto,
@@ -413,7 +414,7 @@ interface BackendListResponse<T> {
 interface BackendSourceDto {
   id: number;
   name: string;
-  connectorKind: "opendal";
+  connectorKind: ConnectorKind;
   config: {
     service: string;
     options: Record<string, string>;

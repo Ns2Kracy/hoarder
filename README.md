@@ -12,7 +12,7 @@ The first implementation focuses on a strong local foundation: Rust, Axum, SeaOR
 - One-way sync model: sources write into the vault; local files are not pushed back to sources.
 - Readable vault layout: synced files live under `vault/{source_id}/normalized/source/path`.
 - Connector abstraction: sync logic depends on Hoarder traits, not OpenDAL or vendor-specific APIs.
-- OpenDAL as the first connector family: filesystem sync works now; operator wiring exists for `fs`, `webdav`, `sftp`, and `s3`.
+- Built-in connector families: OpenDAL-backed `fs`, `webdav`, `sftp`, and `s3`, plus Notion and Feishu virtual-document connectors for knowledge-base aggregation.
 - Safe writes: files stream through a temporary path and are atomically promoted into the vault.
 - No automatic local deletion: missing source files are marked `deleted_on_source`, but local vault files remain.
 - Structured run history: runs, items, errors, counts, hashes, and timestamps are persisted.
@@ -77,6 +77,8 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- db sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
 | `cargo run -- source list` | [x] | List configured sources from SQLite. |
 | `cargo run -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
+| `cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | Create a Notion virtual-document source. |
+| `cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | Create a Feishu Drive virtual-document source. |
 | `cargo run -- source test --id 1` | [x] | Validate a source and persist health. |
 | `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval sync job. |
 | `cargo run -- job list` | [x] | List configured sync jobs. |
@@ -122,7 +124,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Connector trait boundary
 - [x] Connector capability model
 - [x] `opendal` connector kind
-- [x] `notion` and `feishu` connector kinds reserved in domain types
+- [x] `notion` and `feishu` connector kinds
 - [x] OpenDAL service config validation for `fs`
 - [x] OpenDAL service config validation for `webdav`
 - [x] OpenDAL service config validation for `sftp`
@@ -134,11 +136,11 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] OpenDAL WebDAV operator implementation
 - [x] OpenDAL SFTP operator implementation
 - [x] OpenDAL S3 operator implementation
-- [ ] NAS-specific presets or templates
-- [ ] Notion connector implementation
-- [ ] Feishu connector implementation
-- [ ] Connector pagination or incremental cursor support
-- [ ] Pluggable third-party connector ABI
+- [x] NAS-specific presets or templates
+- [x] Notion connector implementation
+- [x] Feishu connector implementation
+- [x] Connector pagination or incremental cursor support
+- [x] Pluggable third-party connector ABI contract
 
 ### Sync Runtime
 
@@ -163,7 +165,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Bounded concurrent file sync execution
 - [x] Job-level concurrency control
 - [x] Scheduled recurring sync jobs
-- [ ] Resume from connector cursor
+- [x] Resume from connector cursor
 - [ ] Retry policy for transient connector errors
 - [ ] Conflict resolution
 - [ ] Bidirectional sync

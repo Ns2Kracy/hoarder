@@ -39,8 +39,8 @@ Hoarder 是一个本地优先的数据聚合与单向同步平台，也是在 AI
 - 默认自动删除本地 vault 文件。
 - 全文搜索、标签、集合和通知的完整产品化版本。
 - 内置 embedding model、vector database、LLM gateway 或完整 RAG query runtime。
-- 第三方编译插件 ABI。
-- Notion、飞书等应用 connector 的完整实现。
+- 第三方编译插件的动态加载、沙箱执行和远程分发。
+- Notion、飞书等应用 connector 的完整富文本渲染、附件导出和双向写回。
 
 这些能力可以进入后续 roadmap，但必须建立在稳定的本地单用户同步模型之上。
 
@@ -86,7 +86,8 @@ flowchart LR
 | OpenDAL | `webdav` | 已实现 operator wiring | 面向 NAS、Nextcloud、WebDAV 私有云 |
 | OpenDAL | `sftp` | 已实现 operator wiring | 面向 SSH 文件服务器、传统 NAS |
 | OpenDAL | `s3` | 已实现 operator wiring | 面向 S3/MinIO/兼容对象存储 |
-| App connectors | `notion`、`feishu` | 领域类型预留 | 后续可映射为 `virtual_document` 与附件 |
+| App connectors | `notion`、`feishu` | 已实现基础扫描与读取 | 以 `virtual_document` 写入 vault，保留 source provenance，支持分页 cursor |
+| Plugin connectors | 第三方编译插件 | 已实现 ABI 契约 | 当前提供 manifest/ABI 校验与配置形状，动态加载作为后续能力 |
 
 ### 5.4 AI/RAG 知识库聚合定位
 

@@ -5,7 +5,10 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrde
 use crate::{
     AppError, AppResult,
     api::types::{CreateJobRequest, JobDto, JobRunResponse, JobScheduleDto, UpdateJobRequest},
-    connectors::{opendal::source::OpenDalSourceConnector, traits::SourceConnector},
+    connectors::{
+        feishu::FeishuSourceConnector, notion::NotionSourceConnector,
+        opendal::source::OpenDalSourceConnector, traits::SourceConnector,
+    },
     core::types::{ConnectorKind, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus},
     db::repository::{
         NewScheduledSyncJob, SeaOrmRepository, SyncJobRecord, SyncJobRepository, SyncJobSchedule,
@@ -286,7 +289,13 @@ fn source_connector(
         ConnectorKind::OpenDal => {
             Ok(Arc::new(OpenDalSourceConnector::new(source_id)) as Arc<dyn SourceConnector>)
         }
-        kind => Err(AppError::NotFound(format!(
+        ConnectorKind::Notion => {
+            Ok(Arc::new(NotionSourceConnector::new(source_id)) as Arc<dyn SourceConnector>)
+        }
+        ConnectorKind::Feishu => {
+            Ok(Arc::new(FeishuSourceConnector::new(source_id)) as Arc<dyn SourceConnector>)
+        }
+        kind @ ConnectorKind::Plugin => Err(AppError::NotFound(format!(
             "connector factory not registered for {kind:?}"
         ))),
     }

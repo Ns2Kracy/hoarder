@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, EntityTrait};
 
@@ -8,7 +10,10 @@ use crate::{
         SourceTestResponse, UpdateSourceRequest,
     },
     connectors::traits::ConnectorConfig,
-    connectors::{opendal::source::OpenDalSourceConnector, traits::SourceConnector},
+    connectors::{
+        feishu::FeishuSourceConnector, notion::NotionSourceConnector,
+        opendal::source::OpenDalSourceConnector, traits::SourceConnector,
+    },
     core::types::{ConnectorKind, SourceId},
     db::repository::{NewSource, SeaOrmRepository, SourceRepository, UpdateSource},
     entity::source,
@@ -338,7 +343,19 @@ async fn validate_source_connector(
                 .await?;
             Ok(())
         }
-        kind => Err(AppError::NotFound(format!(
+        ConnectorKind::Notion => {
+            NotionSourceConnector::new(source_id)
+                .validate(config)
+                .await?;
+            Ok(())
+        }
+        ConnectorKind::Feishu => {
+            FeishuSourceConnector::new(source_id)
+                .validate(config)
+                .await?;
+            Ok(())
+        }
+        kind @ ConnectorKind::Plugin => Err(AppError::NotFound(format!(
             "connector factory not registered for {kind:?}"
         ))),
     }
@@ -397,23 +414,94 @@ fn merge_redacted_connector_config(
             },
         ) => {
             if current_service == &service {
-                for (key, value) in current_options {
-                    if is_secret_option_key(key) && !options.contains_key(key) {
-                        options.insert(key.clone(), value.clone());
-                    }
-                }
-
-                for (key, value) in &mut options {
-                    if is_secret_option_key(key)
-                        && is_redacted_value(value)
-                        && let Some(current_value) = current_options.get(key)
-                    {
-                        value.clone_from(current_value);
-                    }
-                }
+                preserve_redacted_options(current_options, &mut options);
             }
 
             ConnectorConfig::OpenDal { service, options }
+        }
+        (
+            ConnectorConfig::Notion {
+                token: current_token,
+                ..
+            },
+            ConnectorConfig::Notion {
+                mut token,
+                data_source_id,
+                page_id,
+                version,
+                base_url,
+            },
+        ) => {
+            if is_redacted_value(&token) {
+                token.clone_from(current_token);
+            }
+
+            ConnectorConfig::Notion {
+                token,
+                data_source_id,
+                page_id,
+                version,
+                base_url,
+            }
+        }
+        (
+            ConnectorConfig::Feishu {
+                app_secret: current_app_secret,
+                ..
+            },
+            ConnectorConfig::Feishu {
+                app_id,
+                mut app_secret,
+                folder_token,
+                base_url,
+            },
+        ) => {
+            if is_redacted_value(&app_secret) {
+                app_secret.clone_from(current_app_secret);
+            }
+
+            ConnectorConfig::Feishu {
+                app_id,
+                app_secret,
+                folder_token,
+                base_url,
+            }
+        }
+        (
+            ConnectorConfig::Plugin {
+                plugin_id: current_plugin_id,
+                options: current_options,
+            },
+            ConnectorConfig::Plugin {
+                plugin_id,
+                mut options,
+            },
+        ) => {
+            if current_plugin_id == &plugin_id {
+                preserve_redacted_options(current_options, &mut options);
+            }
+
+            ConnectorConfig::Plugin { plugin_id, options }
+        }
+        (_, incoming) => incoming,
+    }
+}
+
+fn preserve_redacted_options(
+    current_options: &BTreeMap<String, String>,
+    options: &mut BTreeMap<String, String>,
+) {
+    for (key, value) in current_options {
+        if is_secret_option_key(key) && !options.contains_key(key) {
+            options.insert(key.clone(), value.clone());
+        }
+    }
+    for (key, value) in options {
+        if is_secret_option_key(key)
+            && is_redacted_value(value)
+            && let Some(current_value) = current_options.get(key)
+        {
+            value.clone_from(current_value);
         }
     }
 }

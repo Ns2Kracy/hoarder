@@ -4,9 +4,11 @@ export type DataOrigin = "api" | "mock";
 
 export type LocalId = number;
 
-export type ConnectorKind = "opendal";
+export type ConnectorKind = "opendal" | "notion" | "feishu" | "plugin";
 
 export type OpenDalServiceKind = "fs" | "s3" | "webdav" | "sftp";
+
+export type SourceServiceKind = OpenDalServiceKind | "notion" | "feishu" | "plugin";
 
 export type SourceHealth = "healthy" | "warning" | "failed" | "untested" | "disabled";
 
@@ -50,7 +52,7 @@ export interface FrontendApiError {
 }
 
 export interface RedactedConfig {
-  service: OpenDalServiceKind;
+  service: SourceServiceKind;
   root?: string;
   endpoint?: string;
   bucket?: string;
@@ -67,7 +69,7 @@ export interface SourceDto {
   id: LocalId;
   name: string;
   connectorKind: ConnectorKind;
-  serviceKind: OpenDalServiceKind;
+  serviceKind: SourceServiceKind;
   enabled: boolean;
   config: RedactedConfig;
   health: SourceHealth;

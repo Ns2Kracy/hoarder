@@ -322,14 +322,15 @@ async fn execute_sync(config_path: Option<PathBuf>, command: SyncCommand) -> App
 
 fn source_config_from_cli(args: &SourceAddArgs) -> AppResult<ConnectorConfig> {
     if let Some(config_json) = args.config_json.as_ref() {
-        if args.kind.as_deref().is_some_and(|kind| kind != "opendal") {
-            return Err(AppError::Validation(
-                "only opendal source config is supported".to_owned(),
-            ));
-        }
         return serde_json::from_str(config_json).map_err(|error| {
             AppError::Validation(format!("invalid connector config JSON: {error}"))
         });
+    }
+
+    if args.kind.as_deref().is_some_and(|kind| kind != "opendal") {
+        return Err(AppError::Validation(
+            "non-opendal sources must be created with --config-json".to_owned(),
+        ));
     }
 
     let mut options = BTreeMap::new();
