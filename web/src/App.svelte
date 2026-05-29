@@ -8,6 +8,7 @@
         RefreshCcw,
         Settings as SettingsIcon,
     } from "lucide-svelte";
+    import { Tooltip } from "bits-ui";
     import { onMount } from "svelte";
     import Jobs from "./routes/Jobs.svelte";
     import Overview from "./routes/Overview.svelte";
@@ -76,6 +77,7 @@
     <title>Hoarder Console</title>
 </svelte:head>
 
+<Tooltip.Provider delayDuration={250}>
 <div class="min-h-[100dvh] bg-canvas text-ink [background-image:radial-gradient(circle_at_top_right,var(--accent-soft),transparent_34rem),linear-gradient(90deg,var(--surface-grid)_1px,transparent_1px),linear-gradient(180deg,var(--surface-grid)_1px,transparent_1px)] [background-size:auto,48px_48px,48px_48px]">
     <header class="sticky top-0 z-10 border-b border-line bg-panel-strong/90 shadow-panel backdrop-blur-xl">
         <div class="mx-auto flex h-16 max-w-[1500px] items-center gap-3 px-3 lg:px-5">
@@ -181,3 +183,4 @@
                 {/if}
     </main>
 </div>
+</Tooltip.Provider>
