@@ -799,6 +799,7 @@ function toSourceRequest(input: SourceFormInput) {
     access_key_id: input.config.accessKeyId,
     secret_access_key: input.config.secretAccessKey,
     token: input.config.token,
+    private_key: input.config.privateKey,
   })) {
     if (value) {
       options[key] = value;
@@ -1132,6 +1133,7 @@ function redactConfig(input: SourceFormInput) {
     access_key_id: config.accessKeyId ? REDACTED : undefined,
     secret_access_key: config.secretAccessKey ? REDACTED : undefined,
     token: config.token ? REDACTED : undefined,
+    private_key: config.privateKey ? REDACTED : undefined,
   };
 }
 

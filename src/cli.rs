@@ -64,6 +64,8 @@ pub enum DbCommand {
 pub enum SourceCommand {
     List,
 
+    Templates,
+
     Add(SourceAddArgs),
 
     Test {
@@ -103,6 +105,9 @@ pub struct SourceAddArgs {
 
     #[arg(long)]
     pub token: Option<String>,
+
+    #[arg(long)]
+    pub private_key: Option<String>,
 
     #[arg(long, hide = true)]
     pub kind: Option<String>,
@@ -171,6 +176,11 @@ pub async fn execute(cli: Cli) -> AppResult<()> {
 }
 
 async fn execute_source(config_path: Option<PathBuf>, command: SourceCommand) -> AppResult<()> {
+    if matches!(&command, SourceCommand::Templates) {
+        print_source_templates();
+        return Ok(());
+    }
+
     let (_, repository) = server::open_repository(config_path).await?;
     match command {
         SourceCommand::List => {
@@ -183,6 +193,7 @@ async fn execute_source(config_path: Option<PathBuf>, command: SourceCommand) ->
                 );
             }
         }
+        SourceCommand::Templates => unreachable!("templates returns before opening repository"),
         SourceCommand::Add(args) => {
             let config = source_config_from_cli(&args)?;
             let source = source_service::create_source(
@@ -204,6 +215,16 @@ async fn execute_source(config_path: Option<PathBuf>, command: SourceCommand) ->
     }
 
     Ok(())
+}
+
+fn print_source_templates() {
+    println!("ID\tSERVICE\tLABEL\tDESCRIPTION");
+    for template in source_service::source_templates() {
+        println!(
+            "{}\t{}\t{}\t{}",
+            template.id, template.service, template.label, template.description
+        );
+    }
 }
 
 async fn execute_job(config_path: Option<PathBuf>, command: JobCommand) -> AppResult<()> {
@@ -326,6 +347,7 @@ fn source_config_from_cli(args: &SourceAddArgs) -> AppResult<ConnectorConfig> {
         args.secret_access_key.as_deref(),
     );
     insert_option(&mut options, "token", args.token.as_deref());
+    insert_option(&mut options, "private_key", args.private_key.as_deref());
 
     Ok(ConnectorConfig::OpenDal {
         service: args.service.clone(),

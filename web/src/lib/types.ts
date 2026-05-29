@@ -59,6 +59,7 @@ export interface RedactedConfig {
   access_key_id?: string;
   secret_access_key?: string;
   token?: string;
+  private_key?: string;
   [key: string]: unknown;
 }
 
@@ -89,7 +90,16 @@ export interface SourceFormInput {
     accessKeyId?: string;
     secretAccessKey?: string;
     token?: string;
+    privateKey?: string;
   };
+}
+
+export interface SourceTemplate {
+  id: string;
+  label: string;
+  description: string;
+  serviceKind: OpenDalServiceKind;
+  defaultConfig: Partial<SourceFormInput["config"]>;
 }
 
 export interface SyncJobDto {

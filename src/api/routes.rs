@@ -14,8 +14,8 @@ use crate::{
         types::{
             CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
             ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
-            SourceDto, SourceTestResponse, SyncErrorDto, UpdateJobRequest, UpdateSettingsRequest,
-            UpdateSourceRequest,
+            SourceDto, SourceTemplateDto, SourceTestResponse, SyncErrorDto, UpdateJobRequest,
+            UpdateSettingsRequest, UpdateSourceRequest,
         },
     },
     app::{job_service, run_service, settings_service, source_service},
@@ -39,6 +39,7 @@ fn api_routes_without_state() -> Router<ApiState> {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/openapi.json", get(openapi_spec))
+        .route("/api/source-templates", get(list_source_templates))
         .route("/api/sources", get(list_sources).post(create_source))
         .route("/api/sources/{id}", patch(update_source))
         .route("/api/sources/{id}/test", post(test_source))
@@ -58,6 +59,10 @@ async fn health() -> Json<HealthResponse> {
 
 async fn openapi_spec() -> Json<serde_json::Value> {
     Json(openapi::spec())
+}
+
+async fn list_source_templates() -> Json<ListResponse<SourceTemplateDto>> {
+    Json(ListResponse::new(source_service::source_templates()))
 }
 
 async fn list_sources(

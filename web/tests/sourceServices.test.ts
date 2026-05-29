@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { canSubmitSourceForm, sourceServiceOptions } from "../src/lib/sourceServices";
+import {
+  canSubmitSourceForm,
+  sourceServiceOptions,
+  sourceTemplateById,
+  sourceTemplates,
+} from "../src/lib/sourceServices";
 
 test("all OpenDAL storage source services are selectable", () => {
   expect(
@@ -43,4 +48,17 @@ test("source form submission validates required service fields", () => {
 
   expect(canSubmitSourceForm({ name: "Docs", serviceKind: "s3", root: "/tmp/docs" })).toBe(false);
   expect(canSubmitSourceForm({ name: "Docs", serviceKind: "fs", root: "" })).toBe(false);
+});
+
+test("source templates include NAS and S3-compatible presets", () => {
+  expect(sourceTemplates.map((template) => template.id)).toEqual([
+    "local-filesystem",
+    "synology-webdav",
+    "qnap-sftp",
+    "minio-s3",
+    "cloudflare-r2",
+  ]);
+  expect(sourceTemplateById("synology-webdav")?.serviceKind).toBe("webdav");
+  expect(sourceTemplateById("qnap-sftp")?.serviceKind).toBe("sftp");
+  expect(sourceTemplateById("minio-s3")?.defaultConfig.region).toBe("us-east-1");
 });

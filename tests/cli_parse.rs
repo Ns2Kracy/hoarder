@@ -71,6 +71,14 @@ fn cli_parse_source_commands() {
         }
     ));
 
+    let templates = Cli::parse_from(["hoarder", "source", "templates"]);
+    assert!(matches!(
+        templates.command,
+        Command::Source {
+            command: SourceCommand::Templates
+        }
+    ));
+
     let add = Cli::parse_from([
         "hoarder",
         "source",
@@ -81,6 +89,8 @@ fn cli_parse_source_commands() {
         "fs",
         "--root",
         ".",
+        "--private-key",
+        "~/.ssh/id_ed25519",
     ]);
     match add.command {
         Command::Source {
@@ -89,6 +99,7 @@ fn cli_parse_source_commands() {
             assert_eq!(args.name, "Local Docs");
             assert_eq!(args.service, "fs");
             assert_eq!(args.root, Some(PathBuf::from(".")));
+            assert_eq!(args.private_key, Some("~/.ssh/id_ed25519".to_owned()));
         }
         other => panic!("expected source add command, got {other:?}"),
     }

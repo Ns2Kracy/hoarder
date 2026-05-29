@@ -1,4 +1,4 @@
-import type { OpenDalServiceKind } from "./types";
+import type { OpenDalServiceKind, SourceTemplate } from "./types";
 
 export const sourceServiceOptions = [
   { value: "fs", label: "Filesystem", implemented: true },
@@ -10,6 +10,52 @@ export const sourceServiceOptions = [
   label: string;
   implemented: boolean;
 }[];
+
+export const sourceTemplates: SourceTemplate[] = [
+  {
+    id: "local-filesystem",
+    label: "Local filesystem",
+    description: "Sync a local directory into the vault.",
+    serviceKind: "fs",
+    defaultConfig: {},
+  },
+  {
+    id: "synology-webdav",
+    label: "Synology WebDAV",
+    description: "Synology Drive or WebDAV Server with an app password.",
+    serviceKind: "webdav",
+    defaultConfig: {},
+  },
+  {
+    id: "qnap-sftp",
+    label: "QNAP SFTP",
+    description: "NAS share over SSH/SFTP with key-based auth.",
+    serviceKind: "sftp",
+    defaultConfig: {},
+  },
+  {
+    id: "minio-s3",
+    label: "MinIO / S3-compatible NAS",
+    description: "S3-compatible object storage hosted by a NAS or local service.",
+    serviceKind: "s3",
+    defaultConfig: {
+      region: "us-east-1",
+    },
+  },
+  {
+    id: "cloudflare-r2",
+    label: "Cloudflare R2",
+    description: "Cloudflare R2 through its S3-compatible API.",
+    serviceKind: "s3",
+    defaultConfig: {
+      region: "auto",
+    },
+  },
+];
+
+export function sourceTemplateById(templateId: string) {
+  return sourceTemplates.find((template) => template.id === templateId);
+}
 
 export function canSubmitSourceForm(input: {
   name: string;

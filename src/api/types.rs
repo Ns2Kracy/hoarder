@@ -158,6 +158,28 @@ pub struct SourceTestResponse {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SourceTemplateDto {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub connector_kind: ConnectorKind,
+    pub service: String,
+    pub options: Vec<SourceTemplateOptionDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceTemplateOptionDto {
+    pub key: String,
+    pub label: String,
+    pub required: bool,
+    pub secret: bool,
+    pub default_value: Option<String>,
+    pub placeholder: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JobDto {
     pub id: JobId,
     pub source_id: SourceId,

@@ -4,7 +4,8 @@ use sea_orm::{ActiveModelTrait, EntityTrait};
 use crate::{
     AppError, AppResult,
     api::types::{
-        CreateSourceRequest, SourceDto, SourceHealth, SourceTestResponse, UpdateSourceRequest,
+        CreateSourceRequest, SourceDto, SourceHealth, SourceTemplateDto, SourceTemplateOptionDto,
+        SourceTestResponse, UpdateSourceRequest,
     },
     connectors::traits::ConnectorConfig,
     connectors::{opendal::source::OpenDalSourceConnector, traits::SourceConnector},
@@ -35,6 +36,187 @@ pub async fn list_sources(repository: &SeaOrmRepository) -> AppResult<Vec<Source
             ))
         })
         .collect()
+}
+
+#[must_use]
+pub fn source_templates() -> Vec<SourceTemplateDto> {
+    vec![
+        local_filesystem_template(),
+        synology_webdav_template(),
+        qnap_sftp_template(),
+        minio_s3_template(),
+        cloudflare_r2_template(),
+    ]
+}
+
+fn local_filesystem_template() -> SourceTemplateDto {
+    source_template(
+        "local-filesystem",
+        "Local filesystem",
+        "Sync a local directory into the Hoarder vault.",
+        "fs",
+        vec![template_option(
+            "root",
+            "Root path",
+            true,
+            false,
+            None,
+            Some("/Users/alex/Documents/source"),
+        )],
+    )
+}
+
+fn synology_webdav_template() -> SourceTemplateDto {
+    source_template(
+        "synology-webdav",
+        "Synology WebDAV",
+        "Use Synology Drive or WebDAV Server with an app password or token.",
+        "webdav",
+        vec![
+            template_option(
+                "endpoint",
+                "Endpoint",
+                true,
+                false,
+                None,
+                Some("https://nas.example.com:5006/home"),
+            ),
+            template_option(
+                "root",
+                "Remote root",
+                false,
+                false,
+                None,
+                Some("/Documents"),
+            ),
+            template_option("username", "Username", false, false, None, Some("alice")),
+            template_option("token", "Token", false, true, None, Some("app password")),
+        ],
+    )
+}
+
+fn qnap_sftp_template() -> SourceTemplateDto {
+    source_template(
+        "qnap-sftp",
+        "QNAP SFTP",
+        "Use SSH/SFTP access to sync a NAS share with key-based auth.",
+        "sftp",
+        vec![
+            template_option(
+                "endpoint",
+                "Endpoint",
+                true,
+                false,
+                None,
+                Some("ssh://nas.example.com:22"),
+            ),
+            template_option("username", "Username", true, false, None, Some("alice")),
+            template_option(
+                "root",
+                "Remote root",
+                false,
+                false,
+                None,
+                Some("/share/docs"),
+            ),
+            template_option(
+                "private_key",
+                "Private key",
+                false,
+                true,
+                None,
+                Some("/Users/alice/.ssh/id_ed25519"),
+            ),
+        ],
+    )
+}
+
+fn minio_s3_template() -> SourceTemplateDto {
+    source_template(
+        "minio-s3",
+        "MinIO / S3-compatible NAS",
+        "Use an S3-compatible endpoint hosted by a NAS or local object store.",
+        "s3",
+        s3_options(Some("us-east-1"), Some("http://127.0.0.1:9000"), false),
+    )
+}
+
+fn cloudflare_r2_template() -> SourceTemplateDto {
+    source_template(
+        "cloudflare-r2",
+        "Cloudflare R2",
+        "Use Cloudflare R2 through its S3-compatible API.",
+        "s3",
+        s3_options(
+            Some("auto"),
+            Some("https://account-id.r2.cloudflarestorage.com"),
+            true,
+        ),
+    )
+}
+
+fn source_template(
+    id: &str,
+    label: &str,
+    description: &str,
+    service: &str,
+    options: Vec<SourceTemplateOptionDto>,
+) -> SourceTemplateDto {
+    SourceTemplateDto {
+        id: id.to_owned(),
+        label: label.to_owned(),
+        description: description.to_owned(),
+        connector_kind: ConnectorKind::OpenDal,
+        service: service.to_owned(),
+        options,
+    }
+}
+
+fn s3_options(
+    region_default: Option<&str>,
+    endpoint_placeholder: Option<&str>,
+    endpoint_required: bool,
+) -> Vec<SourceTemplateOptionDto> {
+    vec![
+        template_option("bucket", "Bucket", true, false, None, Some("archive")),
+        template_option(
+            "region",
+            "Region",
+            true,
+            false,
+            region_default,
+            region_default,
+        ),
+        template_option(
+            "endpoint",
+            "Endpoint",
+            endpoint_required,
+            false,
+            None,
+            endpoint_placeholder,
+        ),
+        template_option("root", "Prefix", false, false, None, Some("documents/")),
+        template_option("access_key_id", "Access key", true, true, None, None),
+        template_option("secret_access_key", "Secret key", true, true, None, None),
+    ]
+}
+
+fn template_option(
+    key: &str,
+    label: &str,
+    required: bool,
+    secret: bool,
+    default_value: Option<&str>,
+    placeholder: Option<&str>,
+) -> SourceTemplateOptionDto {
+    SourceTemplateOptionDto {
+        key: key.to_owned(),
+        label: label.to_owned(),
+        required,
+        secret,
+        default_value: default_value.map(ToOwned::to_owned),
+        placeholder: placeholder.map(ToOwned::to_owned),
+    }
 }
 
 /// Creates a source from an API request.

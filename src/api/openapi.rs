@@ -23,6 +23,7 @@ fn paths() -> Value {
     json!({
         "/api/health": health_path(),
         "/api/openapi.json": openapi_path(),
+        "/api/source-templates": source_templates_path(),
         "/api/sources": sources_path(),
         "/api/sources/{id}": source_path(),
         "/api/sources/{id}/test": source_test_path(),
@@ -67,6 +68,19 @@ fn openapi_path() -> Value {
                         }
                     }
                 }
+            }
+        }
+    })
+}
+
+#[must_use]
+fn source_templates_path() -> Value {
+    json!({
+        "get": {
+            "tags": ["sources"],
+            "operationId": "listSourceTemplates",
+            "responses": {
+                "200": list_response("SourceTemplateDto")
             }
         }
     })
@@ -305,6 +319,8 @@ fn schemas() -> Value {
         "RunDto": run_schema(),
         "SettingsDto": settings_schema(),
         "SourceDto": source_schema(),
+        "SourceTemplateDto": source_template_schema(),
+        "SourceTemplateOptionDto": source_template_option_schema(),
         "SourceTestResponse": source_test_response_schema(),
         "SyncErrorDto": sync_error_schema(),
         "UpdateJobRequest": update_job_request_schema(),
@@ -572,6 +588,38 @@ fn source_schema() -> Value {
             "enabled": {"type": "boolean"},
             "health": {"type": "string", "enum": ["healthy", "warning", "failed", "untested", "disabled"]},
             "lastCheckedAt": nullable_datetime_schema()
+        }
+    })
+}
+
+#[must_use]
+fn source_template_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["id", "label", "description", "connectorKind", "service", "options"],
+        "properties": {
+            "id": {"type": "string"},
+            "label": {"type": "string"},
+            "description": {"type": "string"},
+            "connectorKind": {"type": "string", "enum": ["opendal"]},
+            "service": {"type": "string", "enum": ["fs", "webdav", "sftp", "s3"]},
+            "options": array_ref_schema("SourceTemplateOptionDto")
+        }
+    })
+}
+
+#[must_use]
+fn source_template_option_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["key", "label", "required", "secret"],
+        "properties": {
+            "key": {"type": "string"},
+            "label": {"type": "string"},
+            "required": {"type": "boolean"},
+            "secret": {"type": "boolean"},
+            "defaultValue": nullable_string_schema(),
+            "placeholder": nullable_string_schema()
         }
     })
 }

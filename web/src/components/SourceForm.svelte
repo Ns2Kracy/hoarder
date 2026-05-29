@@ -1,6 +1,11 @@
 <script lang="ts">
   import { Check, Plus, X } from "lucide-svelte";
-  import { canSubmitSourceForm, sourceServiceOptions } from "../lib/sourceServices";
+  import {
+    canSubmitSourceForm,
+    sourceServiceOptions,
+    sourceTemplateById,
+    sourceTemplates,
+  } from "../lib/sourceServices";
   import type { OpenDalServiceKind, SourceFormInput } from "../lib/types";
 
   type SourceFormMode = "create" | "edit";
@@ -28,9 +33,12 @@
   let accessKeyId = $state("");
   let secretAccessKey = $state("");
   let token = $state("");
+  let privateKey = $state("");
+  let templateId = $state("");
   let isSaving = $state(false);
   let submitLabel = $derived(mode === "edit" ? "Save Source" : "Add Source");
   let savingLabel = $derived(mode === "edit" ? "Saving" : "Adding");
+  let selectedTemplate = $derived(sourceTemplateById(templateId));
 
   $effect(() => {
     resetFields(initialValue);
@@ -69,7 +77,8 @@
           username: blankToUndefined(username),
           accessKeyId: blankToUndefined(accessKeyId),
           secretAccessKey: blankToUndefined(secretAccessKey),
-          token: blankToUndefined(token)
+          token: blankToUndefined(token),
+          privateKey: blankToUndefined(privateKey)
         }
       });
       if (mode === "create") {
@@ -97,10 +106,51 @@
     accessKeyId = value?.config.accessKeyId ?? "";
     secretAccessKey = value?.config.secretAccessKey ?? "";
     token = value?.config.token ?? "";
+    privateKey = value?.config.privateKey ?? "";
+    templateId = "";
+  }
+
+  function applyTemplate(nextTemplateId: string) {
+    templateId = nextTemplateId;
+    const template = sourceTemplateById(nextTemplateId);
+    if (!template) {
+      return;
+    }
+
+    serviceKind = template.serviceKind;
+    if (name.trim().length === 0) {
+      name = template.label;
+    }
+    root = template.defaultConfig.root ?? root;
+    endpoint = template.defaultConfig.endpoint ?? endpoint;
+    bucket = template.defaultConfig.bucket ?? bucket;
+    region = template.defaultConfig.region ?? region;
+    username = template.defaultConfig.username ?? username;
+    accessKeyId = template.defaultConfig.accessKeyId ?? accessKeyId;
+    secretAccessKey = template.defaultConfig.secretAccessKey ?? secretAccessKey;
+    token = template.defaultConfig.token ?? token;
+    privateKey = template.defaultConfig.privateKey ?? privateKey;
   }
 </script>
 
 <form class="grid gap-3" onsubmit={(event) => { event.preventDefault(); submit(); }}>
+  <label class="grid gap-1">
+    <span class="text-xs font-semibold text-muted">Template</span>
+    <select
+      class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+      value={templateId}
+      onchange={(event) => applyTemplate(event.currentTarget.value)}
+    >
+      <option value="">Custom</option>
+      {#each sourceTemplates as template (template.id)}
+        <option value={template.id}>{template.label}</option>
+      {/each}
+    </select>
+    {#if selectedTemplate}
+      <span class="text-xs leading-snug text-subtle">{selectedTemplate.description}</span>
+    {/if}
+  </label>
+
   <div class="grid gap-3 md:grid-cols-[1fr_10rem_8rem]">
     <label class="grid gap-1">
       <span class="text-xs font-semibold text-muted">Name</span>
@@ -175,6 +225,17 @@
           <span class="text-xs font-semibold text-muted">Username</span>
           <input class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={username} />
         </label>
+        {#if serviceKind === "sftp"}
+          <label class="grid gap-1">
+            <span class="text-xs font-semibold text-muted">Private key</span>
+            <input
+              class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+              type="password"
+              autocomplete="new-password"
+              bind:value={privateKey}
+            />
+          </label>
+        {/if}
         {#if serviceKind === "webdav"}
           <label class="grid gap-1">
             <span class="text-xs font-semibold text-muted">Token</span>

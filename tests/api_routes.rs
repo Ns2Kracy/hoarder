@@ -52,6 +52,30 @@ async fn api_routes_sources_returns_repository_list() {
 }
 
 #[tokio::test]
+async fn api_routes_source_templates_return_nas_presets() {
+    let test = TestApp::new().await;
+    let response = request(test.app.clone(), "GET", "/api/source-templates", None).await;
+
+    assert_eq!(response.status, 200);
+    let templates = response.body["data"].as_array().unwrap();
+    assert!(
+        templates
+            .iter()
+            .any(|template| template["id"] == json!("synology-webdav"))
+    );
+    assert!(
+        templates
+            .iter()
+            .any(|template| template["id"] == json!("qnap-sftp"))
+    );
+    assert!(
+        templates
+            .iter()
+            .any(|template| template["id"] == json!("minio-s3"))
+    );
+}
+
+#[tokio::test]
 async fn api_routes_updates_source_and_preserves_redacted_secrets() {
     let test = TestApp::new().await;
     let source_config = ConnectorConfig::OpenDal {
@@ -217,6 +241,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
     for path in [
         "/api/health",
         "/api/openapi.json",
+        "/api/source-templates",
         "/api/sources",
         "/api/sources/{id}",
         "/api/sources/{id}/test",
@@ -232,6 +257,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
         assert!(response.body["paths"][path].is_object(), "{path}");
     }
     assert!(response.body["components"]["schemas"]["SourceDto"].is_object());
+    assert!(response.body["components"]["schemas"]["SourceTemplateDto"].is_object());
     assert!(response.body["components"]["schemas"]["ApiErrorBody"].is_object());
     assert_eq!(
         response.body["components"]["schemas"]["SourceDto"]["properties"]["id"]["type"],

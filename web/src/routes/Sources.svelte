@@ -51,6 +51,7 @@
                 accessKeyId: stringOption(config.access_key_id),
                 secretAccessKey: stringOption(config.secret_access_key),
                 token: stringOption(config.token),
+                privateKey: stringOption(config.private_key),
             },
         };
     }

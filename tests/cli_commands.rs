@@ -34,6 +34,7 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
             access_key_id: None,
             secret_access_key: None,
             token: None,
+            private_key: None,
             kind: None,
             config_json: None,
         }),
@@ -47,6 +48,10 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
 
     execute(test.cli(Command::Source {
         command: SourceCommand::List,
+    }))
+    .await?;
+    execute(test.cli(Command::Source {
+        command: SourceCommand::Templates,
     }))
     .await?;
     execute(test.cli(Command::Source {
