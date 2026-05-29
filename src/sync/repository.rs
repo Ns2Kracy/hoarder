@@ -43,6 +43,7 @@ pub trait SyncRepository: Send + Sync {
         run_id: RunId,
         status: SyncRunStatus,
         summary: SyncRunSummary,
+        next_cursor: Option<String>,
     ) -> RepositoryFuture<'_, ()>;
 }
 

@@ -13,6 +13,18 @@ pub type ConnectorFuture<'a, T> = BoxFuture<'a, AppResult<T>>;
 pub type ScanStream = Pin<Box<dyn Stream<Item = AppResult<ItemSnapshot>> + Send>>;
 pub type ByteStream = Pin<Box<dyn Stream<Item = AppResult<Bytes>> + Send>>;
 
+pub struct ScanOutcome {
+    pub items: ScanStream,
+    pub next_cursor: Option<String>,
+}
+
+impl ScanOutcome {
+    #[must_use]
+    pub fn new(items: ScanStream, next_cursor: Option<String>) -> Self {
+        Self { items, next_cursor }
+    }
+}
+
 pub trait SourceConnector: Send + Sync {
     fn kind(&self) -> ConnectorKind;
 
@@ -25,7 +37,7 @@ pub trait SourceConnector: Send + Sync {
         &'a self,
         config: &'a ConnectorConfig,
         cursor: Option<&'a str>,
-    ) -> ConnectorFuture<'a, ScanStream>;
+    ) -> ConnectorFuture<'a, ScanOutcome>;
 
     fn read<'a>(
         &'a self,

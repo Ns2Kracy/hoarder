@@ -204,6 +204,7 @@ async fn db_schema_records_last_run_metadata_on_job() -> Result<(), Box<dyn std:
                 deleted: 1,
                 bytes_written: 128,
             },
+            Some("cursor-after-run".to_owned()),
         )
         .await?;
 
@@ -218,6 +219,7 @@ async fn db_schema_records_last_run_metadata_on_job() -> Result<(), Box<dyn std:
         Some(RunStatus::CompletedWithFailures)
     );
     assert!(finished_job.last_run_at.is_some());
+    assert_eq!(finished_job.cursor, Some("cursor-after-run".to_owned()));
 
     let finished_run = hoarder::entity::sync_run::Entity::find_by_id(run_id.as_i64())
         .one(repository.connection())

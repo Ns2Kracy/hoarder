@@ -83,20 +83,21 @@ where
         let summary = self.run_started_job(run_id, &job).await;
 
         match summary {
-            Ok(summary) => {
+            Ok(completion) => {
+                let summary = completion.summary;
                 let status = if summary.failed > 0 {
                     SyncRunStatus::CompletedWithFailures
                 } else {
                     SyncRunStatus::Completed
                 };
                 self.repository
-                    .finish_run(run_id, status, summary.clone())
+                    .finish_run(run_id, status, summary.clone(), completion.next_cursor)
                     .await?;
                 Ok(summary)
             }
             Err(error) => {
                 self.repository
-                    .finish_run(run_id, SyncRunStatus::Failed, error.summary)
+                    .finish_run(run_id, SyncRunStatus::Failed, error.summary, None)
                     .await?;
                 Err(error.source)
             }
@@ -116,10 +117,11 @@ where
         let connector = (self.connector_resolver)(job.connector_kind)
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
         let cursor = job.scan_cursor.as_deref();
-        let mut snapshots = connector
+        let scan = connector
             .scan(&job.connector_config, cursor)
             .await
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
+        let mut snapshots = scan.items;
         let mut pending = FuturesUnordered::new();
 
         let mut scan_error = None;
@@ -165,7 +167,10 @@ where
             .await
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
 
-        Ok(summary)
+        Ok(SyncRunCompletion {
+            summary,
+            next_cursor: scan.next_cursor,
+        })
     }
 
     async fn apply_item_process_result(
@@ -315,7 +320,13 @@ pub struct SyncRunSummary {
     pub bytes_written: u64,
 }
 
-type SyncRunResult = Result<SyncRunSummary, SyncRunError>;
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SyncRunCompletion {
+    summary: SyncRunSummary,
+    next_cursor: Option<String>,
+}
+
+type SyncRunResult = Result<SyncRunCompletion, SyncRunError>;
 
 #[derive(Debug)]
 struct SyncRunError {

@@ -12,7 +12,7 @@ use bytes::Bytes;
 use futures::{FutureExt, stream};
 use hoarder::{
     connectors::traits::{
-        ByteStream, ConnectorConfig, ConnectorFuture, ScanStream, SourceConnector,
+        ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
     },
     core::types::{
         ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, JobId, RunId,
@@ -107,7 +107,8 @@ async fn sync_engine_records_item_failure_and_continues_run() {
         Some(&RepoEvent::FinishRun(
             run_id,
             SyncRunStatus::CompletedWithFailures,
-            summary
+            summary,
+            None
         ))
     );
 }
@@ -334,7 +335,52 @@ async fn sync_engine_preserves_processed_counts_when_scan_errors_after_items() {
         Some(&RepoEvent::FinishRun(
             run_id,
             SyncRunStatus::Failed,
-            expected_summary
+            expected_summary,
+            None
+        ))
+    );
+}
+
+#[tokio::test]
+async fn sync_engine_persists_connector_next_cursor_after_successful_scan() {
+    let source_id = SourceId::new();
+    let job_id = JobId::new();
+    let run_id = RunId::new();
+    let vault_root = temp_vault_root("next-cursor");
+    let connector = Arc::new(
+        FakeConnector::new(
+            source_id,
+            [file_snapshot(source_id, "cursor.txt", 6)],
+            BTreeMap::from([("cursor.txt".to_owned(), Ok(Bytes::from_static(b"cursor")))]),
+        )
+        .with_next_cursor("cursor-2"),
+    );
+    let repository = Arc::new(FakeRepository::new(SyncJob {
+        id: job_id,
+        source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
+        connector_kind: ConnectorKind::OpenDal,
+        connector_config: connector_config(),
+        scan_cursor: Some("cursor-1".to_owned()),
+    }));
+    repository.set_next_run_id(run_id);
+    let engine = SyncEngine::new(
+        repository.clone(),
+        Arc::new(move |_kind| Ok(connector.clone() as Arc<dyn SourceConnector>)),
+        VaultWriter::new(vault_root),
+    );
+
+    let summary = engine.run_job(job_id).await.unwrap();
+
+    assert_eq!(summary.run_id, run_id);
+    assert_eq!(
+        repository.events().last(),
+        Some(&RepoEvent::FinishRun(
+            run_id,
+            SyncRunStatus::Completed,
+            summary,
+            Some("cursor-2".to_owned())
         ))
     );
 }
@@ -345,6 +391,7 @@ struct FakeConnector {
     snapshots: Vec<ScanEvent>,
     reads: BTreeMap<String, Result<Bytes, String>>,
     read_probe: Option<Arc<ReadConcurrencyProbe>>,
+    next_cursor: Option<String>,
 }
 
 impl FakeConnector {
@@ -358,11 +405,17 @@ impl FakeConnector {
             snapshots: snapshots.into_iter().map(ScanEvent::Snapshot).collect(),
             reads,
             read_probe: None,
+            next_cursor: None,
         }
     }
 
     fn with_read_probe(mut self, probe: Arc<ReadConcurrencyProbe>) -> Self {
         self.read_probe = Some(probe);
+        self
+    }
+
+    fn with_next_cursor(mut self, next_cursor: &str) -> Self {
+        self.next_cursor = Some(next_cursor.to_owned());
         self
     }
 
@@ -381,6 +434,7 @@ impl FakeConnector {
             snapshots,
             reads,
             read_probe: None,
+            next_cursor: None,
         }
     }
 }
@@ -401,14 +455,15 @@ impl SourceConnector for FakeConnector {
         &'a self,
         _config: &'a ConnectorConfig,
         _cursor: Option<&'a str>,
-    ) -> ConnectorFuture<'a, ScanStream> {
+    ) -> ConnectorFuture<'a, ScanOutcome> {
         async move {
             let snapshots = self.snapshots.clone().into_iter().map(|event| match event {
                 ScanEvent::Snapshot(snapshot) => Ok(snapshot),
                 ScanEvent::Error(message) => Err(hoarder::AppError::Connector(message)),
             });
 
-            Ok(Box::pin(stream::iter(snapshots)) as ScanStream)
+            let items = Box::pin(stream::iter(snapshots)) as ScanStream;
+            Ok(ScanOutcome::new(items, self.next_cursor.clone()))
         }
         .boxed()
     }
@@ -566,12 +621,15 @@ impl SyncRepository for FakeRepository {
         run_id: RunId,
         status: SyncRunStatus,
         summary: SyncRunSummary,
+        next_cursor: Option<String>,
     ) -> ConnectorFuture<'_, ()> {
         async move {
-            self.events
-                .lock()
-                .unwrap()
-                .push(RepoEvent::FinishRun(run_id, status, summary));
+            self.events.lock().unwrap().push(RepoEvent::FinishRun(
+                run_id,
+                status,
+                summary,
+                next_cursor,
+            ));
             Ok(())
         }
         .boxed()
@@ -585,7 +643,7 @@ enum RepoEvent {
     RecordSkipped(String),
     RecordFailure(String),
     MarkMissingItemsDeleted(RunId, SourceId),
-    FinishRun(RunId, SyncRunStatus, SyncRunSummary),
+    FinishRun(RunId, SyncRunStatus, SyncRunSummary, Option<String>),
 }
 
 fn file_snapshot(source_id: SourceId, source_path: &str, size: u64) -> ItemSnapshot {

@@ -5,7 +5,9 @@ use futures::{FutureExt, StreamExt, stream};
 use hoarder::{
     connectors::{
         registry::ConnectorRegistry,
-        traits::{ByteStream, ConnectorConfig, ConnectorFuture, ScanStream, SourceConnector},
+        traits::{
+            ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
+        },
     },
     core::types::{
         ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
@@ -63,10 +65,11 @@ impl SourceConnector for FakeConnector {
         &'a self,
         _config: &'a ConnectorConfig,
         _cursor: Option<&'a str>,
-    ) -> ConnectorFuture<'a, ScanStream> {
+    ) -> ConnectorFuture<'a, ScanOutcome> {
         async move {
             let snapshot = self.snapshot();
-            Ok(Box::pin(stream::iter([Ok(snapshot)])) as ScanStream)
+            let items = Box::pin(stream::iter([Ok(snapshot)])) as ScanStream;
+            Ok(ScanOutcome::new(items, Some("fake-next-cursor".to_owned())))
         }
         .boxed()
     }
@@ -93,8 +96,10 @@ async fn connector_contract_trait_returns_capabilities_snapshots_and_bytes() {
     assert!(capabilities.supports_files);
     assert!(capabilities.supports_directories);
 
-    let mut scan = connector.scan(&config, None).await.unwrap();
-    let snapshot = scan.next().await.unwrap().unwrap();
+    let scan = connector.scan(&config, None).await.unwrap();
+    assert_eq!(scan.next_cursor, Some("fake-next-cursor".to_owned()));
+    let mut items = scan.items;
+    let snapshot = items.next().await.unwrap().unwrap();
     assert_eq!(snapshot.source_path, "docs/readme.md");
 
     let item_ref = snapshot.item_ref();

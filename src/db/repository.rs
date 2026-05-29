@@ -522,6 +522,7 @@ impl SyncRepository for SeaOrmRepository {
         run_id: RunId,
         status: SyncRunStatus,
         summary: SyncRunSummary,
+        next_cursor: Option<String>,
     ) -> RepositoryFuture<'_, ()> {
         Box::pin(async move {
             let run = sync_run::Entity::find_by_id(run_id.as_i64())
@@ -553,6 +554,9 @@ impl SyncRepository for SeaOrmRepository {
                 active_job.last_run_at = Set(Some(now));
                 active_job.last_run_status = Set(Some(sync_run_status_to_str(status).to_owned()));
                 active_job.last_run_id = Set(Some(run_id.as_i64()));
+                if let Some(next_cursor) = next_cursor {
+                    active_job.cursor = Set(Some(next_cursor));
+                }
                 active_job.updated_at = Set(now);
                 active_job.update(&self.db).await.map_err(map_db_error)?;
             }

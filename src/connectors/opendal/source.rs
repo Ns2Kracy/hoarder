@@ -10,7 +10,9 @@ use opendal::{
 use crate::{
     connectors::{
         opendal::config::{OpenDalServiceConfig, validate_connector_config},
-        traits::{ByteStream, ConnectorConfig, ConnectorFuture, ScanStream, SourceConnector},
+        traits::{
+            ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
+        },
     },
     core::types::{
         ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
@@ -66,7 +68,7 @@ impl SourceConnector for OpenDalSourceConnector {
         &'a self,
         config: &'a ConnectorConfig,
         _cursor: Option<&'a str>,
-    ) -> ConnectorFuture<'a, ScanStream> {
+    ) -> ConnectorFuture<'a, ScanOutcome> {
         async move {
             let config = validate_connector_config(config)?;
             let operator = build_operator(&config)?;
@@ -77,12 +79,14 @@ impl SourceConnector for OpenDalSourceConnector {
                 .map_err(|error| opendal_error("list OpenDAL source", error))?;
             let source_id = self.source_id;
 
-            Ok(Box::pin(lister.filter_map(move |entry| async move {
+            let items: ScanStream = Box::pin(lister.filter_map(move |entry| async move {
                 match entry {
                     Ok(entry) => snapshot_from_entry(source_id, entry),
                     Err(error) => Some(Err(opendal_error("list OpenDAL source", error))),
                 }
-            })) as ScanStream)
+            }));
+
+            Ok(ScanOutcome::new(items, None))
         }
         .boxed()
     }

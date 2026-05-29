@@ -45,9 +45,11 @@ async fn opendal_fs_connector_lists_nested_files() {
     let connector = OpenDalSourceConnector::new(source_id);
     let config = fs_config(&root);
 
-    let mut scan = connector.scan(&config, None).await.unwrap();
+    let scan = connector.scan(&config, None).await.unwrap();
+    assert_eq!(scan.next_cursor, None);
+    let mut items = scan.items;
     let mut files = Vec::new();
-    while let Some(snapshot) = scan.next().await {
+    while let Some(snapshot) = items.next().await {
         let snapshot = snapshot.unwrap();
         if snapshot.item_type == ItemType::File {
             files.push((snapshot.source_path, snapshot.source_id, snapshot.size));
@@ -74,9 +76,10 @@ async fn opendal_fs_connector_reads_file_contents_as_stream() {
     let config = fs_config(&root);
 
     let snapshot = {
-        let mut scan = connector.scan(&config, None).await.unwrap();
+        let scan = connector.scan(&config, None).await.unwrap();
+        let mut items = scan.items;
         let mut found = None;
-        while let Some(snapshot) = scan.next().await {
+        while let Some(snapshot) = items.next().await {
             let snapshot = snapshot.unwrap();
             if snapshot.source_path == "docs/readme.md" {
                 found = Some(snapshot);
@@ -105,9 +108,10 @@ async fn opendal_fs_connector_streams_file_without_single_buffering() {
     let connector = OpenDalSourceConnector::new(source_id());
     let config = fs_config(&root);
     let snapshot = {
-        let mut scan = connector.scan(&config, None).await.unwrap();
+        let scan = connector.scan(&config, None).await.unwrap();
+        let mut items = scan.items;
         let mut found = None;
-        while let Some(snapshot) = scan.next().await {
+        while let Some(snapshot) = items.next().await {
             let snapshot = snapshot.unwrap();
             if snapshot.source_path == "docs/large.bin" {
                 found = Some(snapshot);
