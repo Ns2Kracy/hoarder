@@ -42,7 +42,7 @@
     <div>
         <h1 class="text-[clamp(1.25rem,1.6vw,1.65rem)] font-bold leading-tight text-ink">Jobs</h1>
         <p class="mt-1 max-w-[65ch] text-sm leading-snug text-muted">
-            Inspect schedules and start one-off sync runs.
+            Inspect schedules and start one-off source-to-vault runs.
         </p>
     </div>
 
@@ -58,7 +58,7 @@
                     size={16}
                     class="text-subtle"
                 />
-                <h2 class="text-sm font-bold text-ink">Sync Jobs</h2>
+                <h2 class="text-sm font-bold text-ink">Source Sync Jobs</h2>
             </div>
             <span class="text-xs text-subtle"
                 >{jobs.data.filter((job) => job.enabled).length} enabled</span
@@ -67,7 +67,7 @@
 
         {#if jobs.data.length === 0}
             <div class="px-3 py-8 text-sm text-subtle" role="status">
-                No sync jobs configured.
+                No source sync jobs configured.
             </div>
         {:else}
             <div class="overflow-x-auto">

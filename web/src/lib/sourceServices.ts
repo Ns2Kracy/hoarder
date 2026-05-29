@@ -17,7 +17,7 @@ export const sourceTemplates: SourceTemplate[] = [
   {
     id: "local-filesystem",
     label: "Local filesystem",
-    description: "Sync a local directory into the vault.",
+    description: "Read a local directory into the vault.",
     serviceKind: "fs",
     defaultConfig: {},
   },
@@ -56,7 +56,7 @@ export const sourceTemplates: SourceTemplate[] = [
   {
     id: "notion-data-source",
     label: "Notion data source",
-    description: "Sync pages from a Notion data source into the knowledge vault.",
+    description: "Read pages from a Notion data source into the knowledge vault.",
     serviceKind: "notion",
     defaultConfig: {
       version: "2026-03-11",
@@ -65,7 +65,7 @@ export const sourceTemplates: SourceTemplate[] = [
   {
     id: "feishu-drive-folder",
     label: "Feishu Drive folder",
-    description: "Sync Feishu Drive folder documents as virtual documents.",
+    description: "Read Feishu Drive folder documents as virtual documents.",
     serviceKind: "feishu",
     defaultConfig: {},
   },

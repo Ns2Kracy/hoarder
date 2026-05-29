@@ -14,9 +14,8 @@ scheduler.
 This phase keeps the original first-release constraints:
 
 - Local-first by default.
-- One-way sync only: `source -> local vault`.
+- One-way sync only: `source -> local vault`; connectors do not modify sources.
 - No search.
-- No bidirectional sync.
 - No automatic local deletion.
 - No authentication or multi-user remote deployment mode.
 - OpenDAL remains the only implemented connector family.

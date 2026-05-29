@@ -30,7 +30,7 @@
     untested: "This source has not been validated yet.",
     disabled: "This source or job is disabled.",
     idle: "The job is enabled and waiting for its next run.",
-    running: "A sync operation is currently in progress.",
+    running: "A source-to-vault run is currently in progress.",
     paused: "This job is paused and will not run automatically.",
     completed: "The run completed without recorded item failures.",
     completed_with_failures: "The run completed, but at least one item failed.",

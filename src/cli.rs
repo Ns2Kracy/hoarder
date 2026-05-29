@@ -13,7 +13,10 @@ use crate::{
 };
 
 #[derive(Debug, Parser)]
-#[command(name = "hoarder", about = "Local-first connector sync platform")]
+#[command(
+    name = "hoarder",
+    about = "Local-first multi-source one-way sync platform"
+)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub config: Option<PathBuf>,

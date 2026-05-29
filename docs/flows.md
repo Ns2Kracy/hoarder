@@ -12,7 +12,7 @@ flowchart LR
     Serve --> Open[打开 Web 控制台或使用 CLI]
     Open --> CreateSource[创建 source]
     CreateSource --> TestSource[测试 source]
-    TestSource --> CreateJob[创建 sync job]
+    TestSource --> CreateJob[创建 source sync job]
     CreateJob --> RunNow[手动运行 job]
     RunNow --> Inspect[查看 run、items、errors]
     Inspect --> Schedule{interval job enabled?}
@@ -68,7 +68,7 @@ sequenceDiagram
 
 - API 返回的 connector config 必须脱敏。
 - 更新 source 时，如果用户提交的是 redacted secret，占位值会合并回已有 secret。
-- `validate` 当前返回 capability，不写入 vault，也不启动 sync。
+- `validate` 当前返回 capability，不写入 vault，也不启动 source-to-vault run。
 
 ## 3. Job 创建与手动运行流程
 
@@ -103,7 +103,7 @@ sequenceDiagram
         Engine->>Connector: scan(config, cursor)
         loop for each ItemSnapshot
             Engine->>Repo: item_state(source_id, source_path)
-            Engine->>Connector: read(item_ref) when sync needed
+            Engine->>Connector: read(item_ref) when vault update is needed
             Engine->>Vault: write byte stream to vault
             Engine->>Repo: record_item_outcome
         end
@@ -121,7 +121,7 @@ sequenceDiagram
 - Run 成功但有 item 失败时，run 状态是 `completed_with_failures`，用户仍可审计已成功同步的 item。
 - Connector 级失败会使整个 run 失败。
 
-## 4. 同步引擎 item 决策流程
+## 4. 单向同步引擎 item 决策流程
 
 ```mermaid
 flowchart TD
@@ -284,7 +284,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    SyncDone[Sync run finished] --> Items[Updated sync_item rows]
+    SyncDone[Source-to-vault run finished] --> Items[Updated sync_item rows]
     Items --> Changed{new or content_hash changed?}
     Changed -- no --> NoIndex[Skip indexing]
     Changed -- yes --> ReadVault[Read local_path from vault]

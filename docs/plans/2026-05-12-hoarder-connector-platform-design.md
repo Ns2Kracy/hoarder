@@ -4,7 +4,7 @@ Date: 2026-05-12
 
 ## Objective
 
-Hoarder is a local-first data aggregation and synchronization tool. It connects multiple external data sources, synchronizes them one-way into a local vault, and exposes a local CLI plus Web UI for configuration, status, and troubleshooting.
+Hoarder is a local-first, multi-source, one-way synchronization tool. It connects external data sources, synchronizes them into a local vault, and exposes a local CLI plus Web UI for configuration, status, and troubleshooting.
 
 The first release focuses on a connector platform rather than a single OpenDAL-only tool. OpenDAL is the first storage connector backend, while the internal connector contract leaves room for application connectors such as Notion and Feishu.
 
@@ -12,10 +12,10 @@ The first release focuses on a connector platform rather than a single OpenDAL-o
 
 - Multiple data sources synchronize into one local vault.
 - Synchronization is one-way: `source -> local vault`.
+- Connectors validate, scan, and read sources; they do not modify sources.
 - The first source connector family is OpenDAL-backed storage.
 - Local files use a hybrid layout: readable paths plus SQLite metadata.
 - No full-text search in the first release.
-- No bidirectional sync in the first release.
 - No automatic local deletion in the first release.
 - CLI uses `clap`.
 - Backend uses Rust, Axum, SQLite, and SeaORM 2.0 entity-first.
@@ -290,8 +290,6 @@ release artifact   single binary
 ## Out of Scope For First Release
 
 - Full-text search.
-- Bidirectional sync.
-- Conflict resolution.
 - Automatic local deletion.
 - Notion connector implementation.
 - Feishu connector implementation.

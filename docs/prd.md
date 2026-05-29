@@ -6,9 +6,9 @@
 
 ## 1. 产品定位
 
-Hoarder 是一个本地优先的数据聚合与单向同步平台，也是在 AI 盛行背景下为 RAG 和个人/团队知识库准备的本地数据底座。它把外部 source 中的文件或文档同步到用户可直接读取的本地 vault，并用 SQLite 记录 source、job、run、item、error 等元数据，让用户可以通过 CLI、HTTP API 和 Web 控制台完成配置、运行、审计和排障。
+Hoarder 是一个本地优先、多源、单向同步平台，也是在 AI 盛行背景下为 RAG 和个人/团队知识库准备的本地数据底座。它把外部 source 中的文件或文档同步到用户可直接读取的本地 vault，并用 SQLite 记录 source、job、run、item、error 等元数据，让用户可以通过 CLI、HTTP API 和 Web 控制台完成配置、运行、审计和排障。
 
-当前产品不是远程 SaaS，也不是双向网盘同步器。它优先服务个人、开发者和小团队在本地或内网环境中安全汇聚数据的需求。
+当前产品不是远程 SaaS，也不是会修改 source 的网盘客户端。它优先服务个人、开发者和小团队在本地或内网环境中安全汇聚数据的需求。
 
 ## 2. 用户与问题
 
@@ -23,7 +23,7 @@ Hoarder 是一个本地优先的数据聚合与单向同步平台，也是在 AI
 ## 3. 产品目标
 
 1. **本地优先**：默认监听 `127.0.0.1`，数据写入本地文件系统，元数据写入本地 SQLite。
-2. **单向安全同步**：只执行 `source -> local vault`，不把本地变更写回 source。
+2. **单向安全同步**：只执行 `source -> local vault`，connector 只 validate、scan 和 read source，不修改 source。
 3. **可读输出**：vault 以 `vault/{source_id}/normalized/source/path` 存储文件，不依赖 Hoarder 才能读取内容。
 4. **可审计运行**：每次 run 都记录状态、计数、耗时、item 结果、错误和 hash。
 5. **多入口一致**：CLI、API、Web 控制台复用同一套 app service 和 sync engine。
@@ -35,14 +35,14 @@ Hoarder 是一个本地优先的数据聚合与单向同步平台，也是在 AI
 当前阶段明确不做：
 
 - 远程多用户部署、认证、授权和租户隔离。
-- 双向同步、冲突合并和把本地文件推回 source。
+- 本地变更上传和 source 写入 API。
 - 默认自动删除本地 vault 文件。
 - 全文搜索、标签、集合和通知的完整产品化版本。
 - 内置 embedding model、vector database、LLM gateway 或完整 RAG query runtime。
 - 第三方编译插件的动态加载、沙箱执行和远程分发。
-- Notion、飞书等应用 connector 的完整富文本渲染、附件导出和双向写回。
+- Notion、飞书等应用 connector 的完整富文本渲染、附件导出和 source 写入。
 
-这些能力可以进入后续 roadmap，但必须建立在稳定的本地单用户同步模型之上。
+这些非目标用于约束当前产品边界；其中本地变更上传和 source 写入 API 不进入当前路线图。
 
 ## 5. 当前产品范围
 

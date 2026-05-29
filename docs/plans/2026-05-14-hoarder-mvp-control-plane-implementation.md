@@ -18,7 +18,7 @@
 - Keep commits small and lane-specific.
 - Do not rewrite unrelated files or reformat files owned by another lane.
 - Do not change the one-way sync policy.
-- Do not add search, bidirectional sync, auth, cron, or automatic local deletion.
+- Do not add search, source mutation, auth, cron, or automatic local deletion.
 - Prefer Rust/Axum boundaries: routes extract inputs, services own orchestration,
   repositories persist data.
 

@@ -51,7 +51,7 @@
     <div>
         <h1 class="text-[clamp(1.25rem,1.6vw,1.65rem)] font-bold leading-tight text-ink">Runs</h1>
         <p class="mt-1 max-w-[65ch] text-sm leading-snug text-muted">
-            Review sync outcomes, item counts, and structured errors.
+            Review source-to-vault outcomes, item counts, and structured errors.
         </p>
     </div>
 
@@ -64,7 +64,7 @@
 
         {#if runs.data.length === 0}
             <div class="px-3 py-8 text-sm text-subtle" role="status">
-                No sync runs have been recorded yet.
+                No source-to-vault runs have been recorded yet.
             </div>
         {:else}
             <RunSummaryTable

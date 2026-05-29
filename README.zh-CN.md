@@ -2,16 +2,16 @@
 
 [English](README.md)
 
-Hoarder 是一个本地优先的数据聚合和单向同步平台，也是 AI 盛行背景下面向 RAG 的本地知识库聚合底座。它用于连接外部数据源，把内容写入可读的本地 vault，并把同步状态记录到 SQLite 中，方便通过本地 CLI、API 或 Web 控制台查看运行记录、排查问题和审计同步结果。
+Hoarder 是一个本地优先、多源、单向同步平台，也是 AI 盛行背景下面向 RAG 的本地知识库聚合底座。它用于连接外部数据源，把内容写入可读的本地 vault，并把 source-to-vault 运行状态记录到 SQLite 中，方便通过本地 CLI、API 或 Web 控制台查看运行记录、排查问题和审计同步结果。
 
 当前版本优先打好本地运行基础：Rust、Axum、SeaORM 2.0 entity-first、SQLite、OpenDAL、Svelte、Tailwind CSS、Bun，以及把前端资源嵌入 Rust 单二进制文件的发布路径。
 
 ## 项目亮点
 
 - 本地优先：数据写入你自己的文件系统，元数据存储在本地 SQLite。
-- 单向同步：数据从 source 写入 vault，不会把本地文件反向推回数据源。
+- 单向 source-to-vault 模型：connector 只负责 validate、scan 和 read source；Hoarder 不修改 source。
 - 可读的 vault 结构：同步后的文件位于 `vault/{source_id}/normalized/source/path`。
-- 连接器抽象清晰：同步核心依赖 Hoarder 自己的 trait，不直接依赖 OpenDAL 或具体厂商 API。
+- 连接器抽象清晰：source-to-vault 逻辑依赖 Hoarder 自己的 trait，不直接依赖 OpenDAL 或具体厂商 API。
 - 内置 connector 家族：OpenDAL 支持 `fs`、`webdav`、`sftp`、`s3`，Notion 与飞书以 `virtual_document` 形式接入知识库聚合。
 - 安全写入：文件先流式写入临时路径，再原子替换到最终 vault 路径。
 - 默认不删除本地文件：源端消失的文件会标记为 `deleted_on_source`，但本地 vault 文件会保留。
@@ -65,7 +65,7 @@ cargo run -- --config ./hoarder.config.json serve
 
 - [产品 PRD](docs/prd.md)：产品定位、MVP 范围、用户旅程、成功指标和路线图。
 - [技术架构](docs/architecture.md)：当前技术架构、模块边界、数据模型、API 边界和扩展点。
-- [产品与技术流程](docs/flows.md)：source 配置、job 运行、同步决策、vault 写入、调度器、错误和设置流程。
+- [产品与技术流程](docs/flows.md)：source 配置、job 运行、source-to-vault 决策、vault 写入、调度器、错误和设置流程。
 
 ## 命令
 
@@ -80,10 +80,10 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | 创建 Notion 虚拟文档 source。 |
 | `cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | 创建飞书 Drive 虚拟文档 source。 |
 | `cargo run -- source test --id 1` | [x] | 校验 source 并持久化健康状态。 |
-| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | 创建手动或固定间隔 sync job。 |
-| `cargo run -- job list` | [x] | 列出 sync jobs。 |
-| `cargo run -- sync run --job-id 1` | [x] | 立即运行一个 sync job。 |
-| `cargo run -- sync status` | [x] | 输出 sync run 状态摘要。 |
+| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | 创建手动或固定间隔 source sync job。 |
+| `cargo run -- job list` | [x] | 列出 source sync jobs。 |
+| `cargo run -- sync run --job-id 1` | [x] | 立即运行一个 source-to-vault job。 |
+| `cargo run -- sync status` | [x] | 输出 source-to-vault run 状态摘要。 |
 
 ## 功能清单
 
@@ -167,9 +167,6 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] 定时同步任务
 - [x] 从 connector cursor 恢复
 - [ ] 临时性 connector 错误重试策略
-- [ ] 冲突处理
-- [ ] 双向同步
-- [ ] 自动本地删除策略
 
 ### API
 
@@ -242,8 +239,6 @@ cargo run -- --config ./hoarder.config.json serve
 
 - [ ] 全文搜索
 - [ ] 面向 RAG 的解析、切分、索引和检索 API
-- [ ] 双向同步
-- [ ] 自动本地删除策略
 - [ ] 跨 source 去重
 - [ ] 标签或集合
 - [ ] 通知

@@ -11,7 +11,7 @@ Hoarder 的架构围绕本地优先、单向同步、可审计、可扩展 conne
 - Interface 层只负责 CLI/HTTP/Web 交互，不承载同步业务逻辑。
 - App services 编排 source、job、run、settings 等业务流程，供 CLI 与 API 复用。
 - Sync runtime 只关心扫描、计划、写入和记录结果，不知道 HTTP、CLI 或 Svelte。
-- Connector trait 输出 Hoarder 领域模型，避免 OpenDAL 类型泄漏进同步核心。
+- Connector trait 输出 Hoarder 领域模型，避免 OpenDAL 类型泄漏进同步核心；connector 只 validate、scan 和 read source，不提供修改 source 的能力。
 - SQLite 记录 metadata，vault 保存用户可直接读取的文件。
 - 后续 AI/RAG 能力应建立在 vault 与 metadata 之上，通过独立 index pipeline 保留 source provenance，而不是污染同步主路径。
 
@@ -209,6 +209,8 @@ SourceConnector
   - scan(config, cursor) -> stream<ItemSnapshot>
   - read(config, item_ref) -> stream<Bytes>
 ```
+
+这个 contract 是单向 source-to-vault 边界：connector 可以读取 source 元数据与内容，但不能通过 Hoarder 写入或修改 source。
 
 `ItemSnapshot` 是同步核心的最小公共模型：`source_id`、`source_path`、`item_type`、`size`、`etag`、`modified_at`、`content_hash`、`metadata_json`。
 

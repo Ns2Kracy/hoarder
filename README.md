@@ -2,16 +2,16 @@
 
 [中文文档](README.zh-CN.md)
 
-Hoarder is a local-first data aggregation and one-way sync platform. It also acts as a local knowledge-base aggregation layer for AI and RAG workflows: it connects external sources, writes their content into a readable local vault, and records sync state in SQLite so runs can be inspected, retried, and audited from a local CLI, API, or web console.
+Hoarder is a local-first, multi-source, one-way sync platform. It also acts as a local knowledge-base aggregation layer for AI and RAG workflows: it connects external sources, writes their content into a readable local vault, and records source-to-vault run state in SQLite so runs can be inspected, retried, and audited from a local CLI, API, or web console.
 
 The first implementation focuses on a strong local foundation: Rust, Axum, SeaORM 2.0 entity-first, SQLite, OpenDAL, Svelte, Tailwind CSS, Bun, and a release path that embeds the frontend into one Rust binary.
 
 ## Highlights
 
 - Local-first by default: data is written to your own filesystem and metadata is stored in local SQLite.
-- One-way sync model: sources write into the vault; local files are not pushed back to sources.
+- One-way source-to-vault model: connectors validate, scan, and read sources; Hoarder does not mutate sources.
 - Readable vault layout: synced files live under `vault/{source_id}/normalized/source/path`.
-- Connector abstraction: sync logic depends on Hoarder traits, not OpenDAL or vendor-specific APIs.
+- Connector abstraction: source-to-vault logic depends on Hoarder traits, not OpenDAL or vendor-specific APIs.
 - Built-in connector families: OpenDAL-backed `fs`, `webdav`, `sftp`, and `s3`, plus Notion and Feishu virtual-document connectors for knowledge-base aggregation.
 - Safe writes: files stream through a temporary path and are atomically promoted into the vault.
 - No automatic local deletion: missing source files are marked `deleted_on_source`, but local vault files remain.
@@ -65,7 +65,7 @@ cargo run -- --config ./hoarder.config.json serve
 
 - [Product PRD](docs/prd.md): product positioning, MVP scope, user journeys, success metrics, and roadmap.
 - [Architecture](docs/architecture.md): current technical architecture, module boundaries, data model, API surface, and extension points.
-- [Flows](docs/flows.md): product and technical flows for source setup, job runs, sync decisions, vault writes, scheduler, errors, and settings.
+- [Flows](docs/flows.md): product and technical flows for source setup, job runs, source-to-vault decisions, vault writes, scheduler, errors, and settings.
 
 ## Commands
 
@@ -80,10 +80,10 @@ cargo run -- --config ./hoarder.config.json serve
 | `cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | Create a Notion virtual-document source. |
 | `cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | Create a Feishu Drive virtual-document source. |
 | `cargo run -- source test --id 1` | [x] | Validate a source and persist health. |
-| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval sync job. |
-| `cargo run -- job list` | [x] | List configured sync jobs. |
-| `cargo run -- sync run --job-id 1` | [x] | Run one sync job immediately. |
-| `cargo run -- sync status` | [x] | Print sync run status summaries. |
+| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval source sync job. |
+| `cargo run -- job list` | [x] | List configured source sync jobs. |
+| `cargo run -- sync run --job-id 1` | [x] | Run one source-to-vault job immediately. |
+| `cargo run -- sync status` | [x] | Print source-to-vault run status summaries. |
 
 ## Feature Checklist
 
@@ -167,9 +167,6 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Scheduled recurring sync jobs
 - [x] Resume from connector cursor
 - [ ] Retry policy for transient connector errors
-- [ ] Conflict resolution
-- [ ] Bidirectional sync
-- [ ] Automatic local deletion policy
 
 ### API
 
@@ -242,8 +239,6 @@ cargo run -- --config ./hoarder.config.json serve
 
 - [ ] Full-text search
 - [ ] RAG-ready parsing, chunking, indexing, and retrieval API
-- [ ] Bidirectional sync
-- [ ] Automatic local deletion policy
 - [ ] Cross-source deduplication
 - [ ] Tagging or collections
 - [ ] Notifications

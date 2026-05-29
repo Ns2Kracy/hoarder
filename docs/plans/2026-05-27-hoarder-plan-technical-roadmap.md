@@ -22,7 +22,7 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外
 ### 2.1 产品目标
 
 - 为个人和小团队提供一个可本地运行、可审计、可恢复的数据汇聚工具。
-- 将不同 source 的内容以单向方式同步到统一本地 vault，避免误写回源端。
+- 将不同 source 的内容以单向方式同步到统一本地 vault，connector 只读取 source，不修改 source。
 - 保持 vault 文件结构可读，让用户即使离开 Hoarder 也能直接访问同步结果。
 - 通过 Web 控制台降低配置和排障成本，通过 CLI 保持自动化和脚本友好。
 - 先打透本地、单用户、单进程场景，再谨慎扩展远程多用户模式。
@@ -70,7 +70,7 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外
 - 缺少可访问性检查、浏览器截图回归和长时间运行 soak test。
 - 缺少 connector cursor、重试策略和数据库保留策略。
 - 搜索、标签、集合、跨 source 去重和通知仍在产品 Roadmap 中。
-- 认证、授权、多用户远程部署、双向同步和自动本地删除仍应保持后置。
+- 认证、授权、多用户远程部署和自动本地删除仍应保持后置。
 
 ## 4. 范围定义
 
@@ -92,7 +92,6 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外
 
 - 远程多用户部署模式。
 - 登录、认证、授权和租户隔离。
-- 双向同步。
 - 默认自动删除本地文件。
 - 第三方编译插件 ABI。
 - Notion 和飞书完整 connector。
@@ -582,7 +581,6 @@ cargo build --release
 
 - Notion connector。
 - 飞书 connector。
-- 双向同步。
 - 自动本地删除策略。
 - 远程多用户部署。
 - 第三方插件 ABI。
@@ -605,7 +603,7 @@ cargo build --release
 | 第 7-8 周 | M4：可靠性增强 | retry、backoff、stale job recovery、retention policy、soak test |
 | 第 9-12 周 | M5：搜索 Alpha | 全文搜索技术方案、索引模型、搜索 API、Web 搜索页首版 |
 | 第 13-16 周 | M6：组织能力 | 标签/集合、跨 source 去重基础、通知设计和首个实现 |
-| 16 周以后 | M7：高级 connector 和远程模式评估 | Notion/飞书原型、双向同步风险评审、多用户架构 ADR |
+| 16 周以后 | M7：高级 connector 和远程模式评估 | Notion/飞书原型、多用户架构 ADR |
 
 优先级：
 
@@ -622,7 +620,7 @@ cargo build --release
 | 网络 connector 行为差异大 | 同步失败率高、错误难排查 | 为每个 connector 建立独立 test matrix 和稳定错误码 |
 | schema 初始化行为不清晰 | 新用户首次启动或版本变化后失败 | 用 `db_schema` 测试和启动 smoke test 覆盖空数据库与已有数据场景 |
 | Web UI mock fallback 掩盖真实 API 问题 | UI 看似正常但 live path 失败 | mock 仅用于 API 不可用预览，关键路径用集成或浏览器测试覆盖 |
-| 双向同步或自动删除过早引入 | 数据破坏风险高 | 保持后置，先实现 dry-run、审计、冲突模型和回滚策略 |
+| 自动删除过早引入 | 数据破坏风险高 | 保持后置，先实现 dry-run、审计和回滚策略 |
 | 单进程 scheduler 状态异常 | job 卡住或重复运行 | 增加 running guard、stale recovery 和 scheduler 日志 |
 | Release artifacts 缺少 smoke test | 用户下载后无法启动 | 发布流水线加入 `serve` 启动、health check 和 embedded asset check |
 | 搜索索引膨胀 | 本地磁盘占用不可控 | 索引大小指标、清理策略、可关闭索引和按 source 控制 |
@@ -668,4 +666,4 @@ cargo build --release
 - ADR：connector cursor contract。
 - ADR：全文搜索索引方案。
 - ADR：远程多用户模式是否进入项目范围。
-- ADR：双向同步和自动删除策略的安全边界。
+- ADR：自动删除策略的安全边界。

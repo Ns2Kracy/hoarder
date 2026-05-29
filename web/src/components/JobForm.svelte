@@ -103,7 +103,7 @@
             <input
                 class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink placeholder:text-subtle disabled:bg-panel-muted disabled:text-subtle"
                 bind:value={name}
-                placeholder="Sync job"
+                placeholder="Source sync job"
             />
         </label>
         <label class="grid gap-1">

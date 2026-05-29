@@ -25,6 +25,10 @@ impl ScanOutcome {
     }
 }
 
+/// Read-only source connector used by the source-to-vault sync engine.
+///
+/// Connectors can validate configuration, scan source metadata, and read source
+/// content. They intentionally do not expose source mutation methods.
 pub trait SourceConnector: Send + Sync {
     fn kind(&self) -> ConnectorKind;
 

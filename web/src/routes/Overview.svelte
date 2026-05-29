@@ -69,7 +69,7 @@
     <header class="grid gap-3 rounded-sm border border-line bg-panel-strong p-3 shadow-panel lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div class="min-w-0">
             <h1 class="max-w-[13ch] text-[clamp(2rem,4vw,3.8rem)] font-bold leading-[0.96] text-ink">
-                Local sync control
+                One-way source sync
             </h1>
             <p class="mt-2 max-w-[54ch] text-sm leading-snug text-muted">
                 Connect sources, run jobs, and audit recent activity from this local console.
@@ -184,7 +184,7 @@
                 </div>
             {:else}
                 <div class="px-3 py-8 text-sm text-subtle" role="status">
-                    No sync jobs configured yet.
+                    No source sync jobs configured yet.
                 </div>
             {/if}
         </section>
@@ -206,7 +206,7 @@
                 />
             {:else}
                 <div class="px-3 py-8 text-sm text-subtle" role="status">
-                    No sync runs have been recorded yet.
+                    No source-to-vault runs have been recorded yet.
                 </div>
             {/if}
         </section>
