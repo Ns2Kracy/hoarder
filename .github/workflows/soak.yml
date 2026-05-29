@@ -32,6 +32,17 @@ jobs:
           key: cargo-soak-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-soak-${{ runner.os }}-
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install web dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Build embedded web assets
+        working-directory: web
+        run: bun run build
+
       - name: Run local filesystem performance benchmark
         env:
           HOARDER_BENCH_FILES: 500

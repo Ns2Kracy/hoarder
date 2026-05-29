@@ -36,6 +36,17 @@ jobs:
       - name: Format
         run: cargo fmt --check
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install web dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Build embedded web assets
+        working-directory: web
+        run: bun run build
+
       - name: Clippy
         run: cargo clippy --all-targets --all-features --message-format=short
 

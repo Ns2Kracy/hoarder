@@ -8,7 +8,7 @@ Hoarder ships as a single Rust binary with the Svelte console embedded from `web
 
 The workflow has three gates:
 
-- Rust: `cargo fmt --check`, `cargo clippy --all-targets --all-features --message-format=short`, and `cargo test`.
+- Rust: `cargo fmt --check`, build embedded `web/dist` assets for `RustEmbed`, `cargo clippy --all-targets --all-features --message-format=short`, and `cargo test`.
 - Web: `bun install --frozen-lockfile`, `bun run fmt:check`, `bun run lint`, `bun run check`, `bun test`, and `bun run build`.
 - Package smoke: build `web/dist`, run `cargo build --release`, then execute `hoarder --help` and `hoarder source templates`.
 
