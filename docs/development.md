@@ -2,6 +2,12 @@
 
 Hoarder is a Rust binary with an Axum API, SQLite persistence, OpenDAL source connectors, a one-way sync engine, and a Svelte/Vite management console.
 
+## Product And Architecture Docs
+
+- [Product PRD](prd.md): product positioning, MVP scope, user journeys, success metrics, and roadmap.
+- [Architecture](architecture.md): current technical architecture, module boundaries, data model, API surface, and extension points.
+- [Flows](flows.md): product and technical flows for source setup, job runs, sync decisions, vault writes, scheduler, errors, and settings.
+
 ## Prerequisites
 
 - Rust 2024 toolchain

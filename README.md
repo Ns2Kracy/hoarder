@@ -2,7 +2,7 @@
 
 [中文文档](README.zh-CN.md)
 
-Hoarder is a local-first data aggregation and one-way sync platform. It connects external sources, writes their content into a readable local vault, and records sync state in SQLite so runs can be inspected, retried, and audited from a local CLI, API, or web console.
+Hoarder is a local-first data aggregation and one-way sync platform. It also acts as a local knowledge-base aggregation layer for AI and RAG workflows: it connects external sources, writes their content into a readable local vault, and records sync state in SQLite so runs can be inspected, retried, and audited from a local CLI, API, or web console.
 
 The first implementation focuses on a strong local foundation: Rust, Axum, SeaORM 2.0 entity-first, SQLite, OpenDAL, Svelte, Tailwind CSS, Bun, and a release path that embeds the frontend into one Rust binary.
 
@@ -16,6 +16,7 @@ The first implementation focuses on a strong local foundation: Rust, Axum, SeaOR
 - Safe writes: files stream through a temporary path and are atomically promoted into the vault.
 - No automatic local deletion: missing source files are marked `deleted_on_source`, but local vault files remain.
 - Structured run history: runs, items, errors, counts, hashes, and timestamps are persisted.
+- RAG-ready data foundation: source paths, local paths, hashes, run history, and errors are preserved so future parsing, chunking, indexing, and retrieval can keep provenance.
 - Structured request logging: Axum middleware records method, path, version, status, latency, user agent, and request id.
 - Single binary packaging: the Rust release binary embeds `web/dist` assets.
 - Strict quality gate: Rust warnings and strict Clippy groups are denied in `Cargo.toml`.
@@ -59,6 +60,12 @@ Use a custom config:
 ```bash
 cargo run -- --config ./hoarder.config.json serve
 ```
+
+## Project Docs
+
+- [Product PRD](docs/prd.md): product positioning, MVP scope, user journeys, success metrics, and roadmap.
+- [Architecture](docs/architecture.md): current technical architecture, module boundaries, data model, API surface, and extension points.
+- [Flows](docs/flows.md): product and technical flows for source setup, job runs, sync decisions, vault writes, scheduler, errors, and settings.
 
 ## Commands
 
@@ -232,6 +239,7 @@ cargo run -- --config ./hoarder.config.json serve
 ### Product Roadmap
 
 - [ ] Full-text search
+- [ ] RAG-ready parsing, chunking, indexing, and retrieval API
 - [ ] Bidirectional sync
 - [ ] Automatic local deletion policy
 - [ ] Cross-source deduplication

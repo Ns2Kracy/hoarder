@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-Hoarder 是一个本地优先的数据聚合和单向同步平台。它用于连接外部数据源，把内容写入可读的本地 vault，并把同步状态记录到 SQLite 中，方便通过本地 CLI、API 或 Web 控制台查看运行记录、排查问题和审计同步结果。
+Hoarder 是一个本地优先的数据聚合和单向同步平台，也是 AI 盛行背景下面向 RAG 的本地知识库聚合底座。它用于连接外部数据源，把内容写入可读的本地 vault，并把同步状态记录到 SQLite 中，方便通过本地 CLI、API 或 Web 控制台查看运行记录、排查问题和审计同步结果。
 
 当前版本优先打好本地运行基础：Rust、Axum、SeaORM 2.0 entity-first、SQLite、OpenDAL、Svelte、Tailwind CSS、Bun，以及把前端资源嵌入 Rust 单二进制文件的发布路径。
 
@@ -12,10 +12,11 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它用于连
 - 单向同步：数据从 source 写入 vault，不会把本地文件反向推回数据源。
 - 可读的 vault 结构：同步后的文件位于 `vault/{source_id}/normalized/source/path`。
 - 连接器抽象清晰：同步核心依赖 Hoarder 自己的 trait，不直接依赖 OpenDAL 或具体厂商 API。
-- OpenDAL 是第一组连接器能力：文件系统同步已经可用；`fs`、`webdav`、`sftp`、`s3` 的配置模型已经存在。
+- OpenDAL 是第一组连接器能力：文件系统同步已经可用；`fs`、`webdav`、`sftp`、`s3` 的配置模型和 operator wiring 已经存在。
 - 安全写入：文件先流式写入临时路径，再原子替换到最终 vault 路径。
 - 默认不删除本地文件：源端消失的文件会标记为 `deleted_on_source`，但本地 vault 文件会保留。
 - 结构化运行历史：run、item、error、计数、hash、时间戳都会持久化。
+- 面向 RAG 的数据底座：保留 source path、local path、hash、run history 和错误信息，为后续解析、切分、索引和检索保留 provenance。
 - 结构化请求日志：Axum middleware 会记录 method、path、version、status、latency、user agent 和 request id。
 - 单二进制发布：Rust release binary 会嵌入 `web/dist` 前端资源。
 - 严格质量门禁：`Cargo.toml` 中已开启 Rust warnings 和严格 Clippy deny 规则。
@@ -59,6 +60,12 @@ http://127.0.0.1:4761
 ```bash
 cargo run -- --config ./hoarder.config.json serve
 ```
+
+## 项目文档
+
+- [产品 PRD](docs/prd.md)：产品定位、MVP 范围、用户旅程、成功指标和路线图。
+- [技术架构](docs/architecture.md)：当前技术架构、模块边界、数据模型、API 边界和扩展点。
+- [产品与技术流程](docs/flows.md)：source 配置、job 运行、同步决策、vault 写入、调度器、错误和设置流程。
 
 ## 命令
 
@@ -124,9 +131,9 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] OpenDAL 文件系统扫描
 - [x] OpenDAL 文件系统文件读取
 - [x] 目录和文件元数据映射到 Hoarder snapshot
-- [ ] OpenDAL WebDAV operator 实现
-- [ ] OpenDAL SFTP operator 实现
-- [ ] OpenDAL S3 operator 实现
+- [x] OpenDAL WebDAV operator 实现
+- [x] OpenDAL SFTP operator 实现
+- [x] OpenDAL S3 operator 实现
 - [ ] NAS 专用预设或模板
 - [ ] Notion connector 实现
 - [ ] 飞书 connector 实现
@@ -232,6 +239,7 @@ cargo run -- --config ./hoarder.config.json serve
 ### 产品路线图
 
 - [ ] 全文搜索
+- [ ] 面向 RAG 的解析、切分、索引和检索 API
 - [ ] 双向同步
 - [ ] 自动本地删除策略
 - [ ] 跨 source 去重
