@@ -165,6 +165,87 @@ test("api read calls still fall back to mock data when the local endpoint is mis
   expect(result.data.length).toBeGreaterThan(0);
 });
 
+test("createSource posts app connector config variants", async () => {
+  const postBodies: unknown[] = [];
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/sources" && init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      postBodies.push(body);
+      return jsonResponse({
+        id: postBodies.length,
+        name: body.name,
+        connectorKind: body.config.kind,
+        config: {
+          service: body.config.kind,
+          options:
+            body.config.kind === "notion"
+              ? {
+                  token: "<redacted>",
+                  data_source_id: body.config.dataSourceId,
+                  version: body.config.version,
+                }
+              : {
+                  app_id: body.config.appId,
+                  app_secret: "<redacted>",
+                  folder_token: body.config.folderToken,
+                },
+        },
+        enabled: body.enabled,
+        health: "untested",
+      });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await api.createSource({
+    name: "Notion knowledge",
+    serviceKind: "notion",
+    enabled: true,
+    config: {
+      token: "secret-token",
+      dataSourceId: "ds_123",
+      version: "2026-03-11",
+    },
+  });
+  await api.createSource({
+    name: "Feishu drive",
+    serviceKind: "feishu",
+    enabled: true,
+    config: {
+      appId: "cli_xxx",
+      appSecret: "app-secret",
+      folderToken: "folder_123",
+    },
+  });
+
+  expect(postBodies).toEqual([
+    {
+      name: "Notion knowledge",
+      config: {
+        kind: "notion",
+        token: "secret-token",
+        dataSourceId: "ds_123",
+        version: "2026-03-11",
+      },
+      enabled: true,
+    },
+    {
+      name: "Feishu drive",
+      config: {
+        kind: "feishu",
+        appId: "cli_xxx",
+        appSecret: "app-secret",
+        folderToken: "folder_123",
+      },
+      enabled: true,
+    },
+  ]);
+});
+
 test("updateSource patches the live source and refreshes dependent job names", async () => {
   const patchBodies: unknown[] = [];
 

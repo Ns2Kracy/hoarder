@@ -533,7 +533,7 @@ export const api = {
         const created = {
           id: nextMockSourceId++,
           name: input.name,
-          connectorKind: "opendal" as const,
+          connectorKind: connectorKindForService(input.serviceKind),
           serviceKind: input.serviceKind,
           enabled: input.enabled,
           config: redactConfig(input),
@@ -560,7 +560,7 @@ export const api = {
         const updated: SourceDto = {
           id: sourceId,
           name: input.name,
-          connectorKind: "opendal",
+          connectorKind: connectorKindForService(input.serviceKind),
           serviceKind: input.serviceKind,
           enabled: input.enabled,
           config: redactConfig(input),
@@ -790,6 +790,33 @@ export const api = {
 };
 
 function toSourceRequest(input: SourceFormInput) {
+  if (input.serviceKind === "notion") {
+    return {
+      name: input.name,
+      config: {
+        kind: "notion",
+        token: input.config.token,
+        dataSourceId: input.config.dataSourceId,
+        pageId: input.config.pageId,
+        version: input.config.version,
+      },
+      enabled: input.enabled,
+    };
+  }
+
+  if (input.serviceKind === "feishu") {
+    return {
+      name: input.name,
+      config: {
+        kind: "feishu",
+        appId: input.config.appId,
+        appSecret: input.config.appSecret,
+        folderToken: input.config.folderToken,
+      },
+      enabled: input.enabled,
+    };
+  }
+
   const options: Record<string, string> = {};
   for (const [key, value] of Object.entries({
     root: input.config.root,
@@ -1124,6 +1151,25 @@ function durationMs(startedAt?: string | null, finishedAt?: string | null) {
 
 function redactConfig(input: SourceFormInput) {
   const config = input.config;
+  if (input.serviceKind === "notion") {
+    return {
+      service: "notion" as const,
+      token: config.token ? REDACTED : undefined,
+      data_source_id: config.dataSourceId,
+      page_id: config.pageId,
+      version: config.version,
+    };
+  }
+
+  if (input.serviceKind === "feishu") {
+    return {
+      service: "feishu" as const,
+      app_id: config.appId,
+      app_secret: config.appSecret ? REDACTED : undefined,
+      folder_token: config.folderToken,
+    };
+  }
+
   return {
     service: input.serviceKind,
     root: config.root,
@@ -1136,6 +1182,14 @@ function redactConfig(input: SourceFormInput) {
     token: config.token ? REDACTED : undefined,
     private_key: config.privateKey ? REDACTED : undefined,
   };
+}
+
+function connectorKindForService(serviceKind: SourceFormInput["serviceKind"]): ConnectorKind {
+  if (serviceKind === "notion" || serviceKind === "feishu" || serviceKind === "plugin") {
+    return serviceKind;
+  }
+
+  return "opendal";
 }
 
 function scheduleLabel(schedule: JobSchedule) {

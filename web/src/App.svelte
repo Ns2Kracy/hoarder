@@ -58,7 +58,6 @@
 
     function selectPage(page: PageId) {
         activePage = page;
-        window.history.replaceState(null, "", `#${page}`);
     }
 
     function pageFromHash(): PageId {
@@ -91,18 +90,19 @@
             <nav class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" aria-label="Primary">
                 {#each navigation as item (item.id)}
                     {@const Icon = item.icon}
-                    <button
+                    <a
                         class={`inline-flex h-9 min-w-max items-center gap-1.5 rounded-sm px-2.5 text-sm font-semibold transition duration-150 hover:-translate-y-px ${
                             activePage === item.id
                                 ? "bg-ink text-panel-strong shadow-panel"
                                 : "text-muted hover:bg-panel-muted hover:text-ink"
                         }`}
-                        type="button"
+                        href={`#${item.id}`}
+                        aria-current={activePage === item.id ? "page" : undefined}
                         onclick={() => selectPage(item.id)}
                     >
                         <Icon aria-hidden="true" size={15} />
                         {item.label}
-                    </button>
+                    </a>
                 {/each}
             </nav>
 

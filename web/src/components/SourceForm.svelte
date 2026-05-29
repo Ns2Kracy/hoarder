@@ -6,7 +6,7 @@
     sourceTemplateById,
     sourceTemplates,
   } from "../lib/sourceServices";
-  import type { OpenDalServiceKind, SourceFormInput } from "../lib/types";
+  import type { SourceFormInput, SourceServiceKind } from "../lib/types";
 
   type SourceFormMode = "create" | "edit";
 
@@ -23,7 +23,7 @@
   } = $props();
 
   let name = $state("");
-  let serviceKind = $state<OpenDalServiceKind>("fs");
+  let serviceKind = $state<SourceServiceKind>("fs");
   let enabled = $state(true);
   let root = $state("");
   let endpoint = $state("");
@@ -34,6 +34,12 @@
   let secretAccessKey = $state("");
   let token = $state("");
   let privateKey = $state("");
+  let dataSourceId = $state("");
+  let pageId = $state("");
+  let version = $state("");
+  let appId = $state("");
+  let appSecret = $state("");
+  let folderToken = $state("");
   let templateId = $state("");
   let isSaving = $state(false);
   let submitLabel = $derived(mode === "edit" ? "Save Source" : "Add Source");
@@ -54,7 +60,13 @@
       region,
       username,
       accessKeyId,
-      secretAccessKey
+      secretAccessKey,
+      token,
+      dataSourceId,
+      pageId,
+      appId,
+      appSecret,
+      folderToken
     })
   );
 
@@ -78,7 +90,13 @@
           accessKeyId: blankToUndefined(accessKeyId),
           secretAccessKey: blankToUndefined(secretAccessKey),
           token: blankToUndefined(token),
-          privateKey: blankToUndefined(privateKey)
+          privateKey: blankToUndefined(privateKey),
+          dataSourceId: blankToUndefined(dataSourceId),
+          pageId: blankToUndefined(pageId),
+          version: blankToUndefined(version),
+          appId: blankToUndefined(appId),
+          appSecret: blankToUndefined(appSecret),
+          folderToken: blankToUndefined(folderToken)
         }
       });
       if (mode === "create") {
@@ -107,6 +125,12 @@
     secretAccessKey = value?.config.secretAccessKey ?? "";
     token = value?.config.token ?? "";
     privateKey = value?.config.privateKey ?? "";
+    dataSourceId = value?.config.dataSourceId ?? "";
+    pageId = value?.config.pageId ?? "";
+    version = value?.config.version ?? "";
+    appId = value?.config.appId ?? "";
+    appSecret = value?.config.appSecret ?? "";
+    folderToken = value?.config.folderToken ?? "";
     templateId = "";
   }
 
@@ -130,6 +154,12 @@
     secretAccessKey = template.defaultConfig.secretAccessKey ?? secretAccessKey;
     token = template.defaultConfig.token ?? token;
     privateKey = template.defaultConfig.privateKey ?? privateKey;
+    dataSourceId = template.defaultConfig.dataSourceId ?? dataSourceId;
+    pageId = template.defaultConfig.pageId ?? pageId;
+    version = template.defaultConfig.version ?? version;
+    appId = template.defaultConfig.appId ?? appId;
+    appSecret = template.defaultConfig.appSecret ?? appSecret;
+    folderToken = template.defaultConfig.folderToken ?? folderToken;
   }
 </script>
 
@@ -162,7 +192,7 @@
     </label>
 
     <label class="grid gap-1">
-      <span class="text-xs font-semibold text-muted">Service</span>
+      <span class="text-xs font-semibold text-muted">Source type</span>
       <select class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle" bind:value={serviceKind}>
         {#each sourceServiceOptions as option (option.value)}
           <option value={option.value} disabled={!option.implemented}>
@@ -178,7 +208,73 @@
     </label>
   </div>
 
-  {#if serviceKind === "fs"}
+  {#if serviceKind === "notion"}
+    <div class="grid gap-3 md:grid-cols-2">
+      <label class="grid gap-1 md:col-span-2">
+        <span class="text-xs font-semibold text-muted">Integration token</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          type="password"
+          autocomplete="new-password"
+          bind:value={token}
+          placeholder="secret_..."
+        />
+      </label>
+      <label class="grid gap-1">
+        <span class="text-xs font-semibold text-muted">Data source ID</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 font-mono text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          bind:value={dataSourceId}
+          placeholder="Notion data source id"
+        />
+      </label>
+      <label class="grid gap-1">
+        <span class="text-xs font-semibold text-muted">Page ID</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 font-mono text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          bind:value={pageId}
+          placeholder="Optional page id"
+        />
+      </label>
+      <label class="grid gap-1">
+        <span class="text-xs font-semibold text-muted">API version</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 font-mono text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          bind:value={version}
+          placeholder="2026-03-11"
+        />
+      </label>
+    </div>
+  {:else if serviceKind === "feishu"}
+    <div class="grid gap-3 md:grid-cols-2">
+      <label class="grid gap-1">
+        <span class="text-xs font-semibold text-muted">App ID</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 font-mono text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          bind:value={appId}
+          placeholder="cli_..."
+        />
+      </label>
+      <label class="grid gap-1">
+        <span class="text-xs font-semibold text-muted">App secret</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          type="password"
+          autocomplete="new-password"
+          bind:value={appSecret}
+          placeholder="App secret"
+        />
+      </label>
+      <label class="grid gap-1 md:col-span-2">
+        <span class="text-xs font-semibold text-muted">Folder token</span>
+        <input
+          class="h-9 w-full rounded-sm border border-line bg-panel-strong px-2 font-mono text-sm text-ink disabled:bg-panel-muted disabled:text-subtle"
+          bind:value={folderToken}
+          placeholder="Feishu Drive folder token"
+        />
+      </label>
+    </div>
+  {:else if serviceKind === "fs"}
     <label class="grid gap-1">
       <span class="text-xs font-semibold text-muted">Root path</span>
       <input

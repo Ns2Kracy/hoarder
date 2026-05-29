@@ -4,7 +4,7 @@
     import SourceForm from "../components/SourceForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
     import { formatCount, formatDateTime } from "../lib/format";
-    import type { Loadable, LocalId, OpenDalServiceKind, SourceDto, SourceFormInput } from "../lib/types";
+    import type { Loadable, LocalId, SourceDto, SourceFormInput } from "../lib/types";
 
     let {
         sources,
@@ -52,7 +52,7 @@
 
         return {
             name: source.name,
-            serviceKind: openDalServiceKind(source.serviceKind),
+            serviceKind: source.serviceKind,
             enabled: source.enabled,
             config: {
                 root: stringOption(config.root),
@@ -64,6 +64,12 @@
                 secretAccessKey: stringOption(config.secret_access_key),
                 token: stringOption(config.token),
                 privateKey: stringOption(config.private_key),
+                dataSourceId: stringOption(config.data_source_id),
+                pageId: stringOption(config.page_id),
+                version: stringOption(config.version),
+                appId: stringOption(config.app_id),
+                appSecret: stringOption(config.app_secret),
+                folderToken: stringOption(config.folder_token),
             },
         };
     }
@@ -73,15 +79,7 @@
     }
 
     function canEditSource(source: SourceDto) {
-        return source.connectorKind === "opendal";
-    }
-
-    function openDalServiceKind(value: SourceDto["serviceKind"]): OpenDalServiceKind {
-        if (value === "fs" || value === "s3" || value === "webdav" || value === "sftp") {
-            return value;
-        }
-
-        return "fs";
+        return source.connectorKind !== "plugin";
     }
 </script>
 

@@ -62,6 +62,13 @@ export interface RedactedConfig {
   secret_access_key?: string;
   token?: string;
   private_key?: string;
+  data_source_id?: string;
+  page_id?: string;
+  version?: string;
+  app_id?: string;
+  app_secret?: string;
+  folder_token?: string;
+  plugin_id?: string;
   [key: string]: unknown;
 }
 
@@ -81,7 +88,7 @@ export interface SourceDto {
 
 export interface SourceFormInput {
   name: string;
-  serviceKind: OpenDalServiceKind;
+  serviceKind: SourceServiceKind;
   enabled: boolean;
   config: {
     root?: string;
@@ -93,6 +100,12 @@ export interface SourceFormInput {
     secretAccessKey?: string;
     token?: string;
     privateKey?: string;
+    dataSourceId?: string;
+    pageId?: string;
+    version?: string;
+    appId?: string;
+    appSecret?: string;
+    folderToken?: string;
   };
 }
 
@@ -100,7 +113,7 @@ export interface SourceTemplate {
   id: string;
   label: string;
   description: string;
-  serviceKind: OpenDalServiceKind;
+  serviceKind: SourceServiceKind;
   defaultConfig: Partial<SourceFormInput["config"]>;
 }
 
