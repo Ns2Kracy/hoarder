@@ -74,7 +74,7 @@ flowchart LR
 | P-08 | Runtime settings | 已实现 | `job_concurrency`、`file_concurrency`、`log_level` 可持久化修改 |
 | P-09 | 本地 vault 写入 | 已实现 | 流式写入临时文件后原子替换，拒绝危险路径 |
 | P-10 | 单二进制发布路径 | 已实现 | `web/dist` 被嵌入 Rust release binary |
-| P-11 | CI 与 release artifacts | 未实现 | macOS、Linux、Windows 构建与测试可在 CI 中复现 |
+| P-11 | CI 与 release artifacts | 已实现 | macOS、Linux、Windows 构建与测试可在 CI 中复现 |
 | P-12 | 可访问性与截图回归 | 未实现 | Web 控制台通过基础键盘/屏幕阅读器检查并保留浏览器回归证据 |
 | P-13 | RAG-ready knowledge base | 规划中 | 对同步内容建立可追溯的解析、chunk、索引和检索链路 |
 
@@ -162,9 +162,7 @@ hoarder sync status
 
 ### Now：MVP 稳定化
 
-- 增加 CI workflow 和 release artifact。
 - 补齐 Web 控制台可访问性与浏览器截图回归。
-- 增加长时间运行 soak test 和基础性能 benchmark。
 - 为 WebDAV/SFTP/S3 增加更贴近真实服务的 integration tests。
 
 ### Next：连接器与运行时增强

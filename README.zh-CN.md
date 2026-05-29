@@ -28,6 +28,14 @@ Hoarder 是一个本地优先、多源、单向同步平台，也是 AI 盛行�
 - Rust 2024 toolchain
 - Bun
 
+安装最新 release binary：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ns2Kracy/hoarder/main/scripts/install.sh | sh
+```
+
+也可以从源码构建。
+
 先构建 Web UI，再启动本地服务：
 
 ```bash
@@ -66,6 +74,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [产品 PRD](docs/prd.md)：产品定位、MVP 范围、用户旅程、成功指标和路线图。
 - [技术架构](docs/architecture.md)：当前技术架构、模块边界、数据模型、API 边界和扩展点。
 - [产品与技术流程](docs/flows.md)：source 配置、job 运行、source-to-vault 决策、vault 写入、调度器、错误和设置流程。
+- [发布与分发](docs/release.md)：CI gate、release artifacts、installer 脚本、benchmark 和 soak test 命令。
 
 ## 命令
 
@@ -229,11 +238,11 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] CLI command 集成测试
 - [x] Connector contract 测试
 - [x] Vault writer 安全测试
-- [ ] CI workflow
-- [ ] macOS、Linux、Windows release artifacts
-- [ ] Installer 或包管理器分发
-- [ ] 性能 benchmark
-- [ ] 长时间运行 soak test
+- [x] CI workflow
+- [x] macOS、Linux、Windows release artifacts
+- [x] Installer 或包管理器分发
+- [x] 性能 benchmark
+- [x] 长时间运行 soak test
 
 ### 产品路线图
 
@@ -314,4 +323,4 @@ cargo build --release
 
 ## 当前状态
 
-Hoarder 目前是早期本地优先 MVP。后端已经可以提供嵌入式 Web 控制台、同步 SQLite schema、暴露 MVP 控制面 API、执行 source/job/sync CLI 工作流、在 serve 模式下运行固定间隔任务，并通过本地文件系统端到端同步测试。下一步最高价值的工作是实现 filesystem 之外的更多 OpenDAL 服务，并准备 CI/release artifacts。
+Hoarder 目前是早期本地优先 MVP。后端已经可以提供嵌入式 Web 控制台、同步 SQLite schema、暴露 MVP 控制面 API、执行 source/job/sync CLI 工作流、在 serve 模式下运行固定间隔任务，并通过本地文件系统端到端同步测试。OpenDAL operator wiring 已覆盖 filesystem、WebDAV、SFTP 和 S3；CI、release artifacts、installer 脚本、benchmark 和 soak gate 已就位。下一步最高价值的工作是 connector-specific integration tests、typed config templates、可访问性检查和浏览器回归覆盖。

@@ -53,7 +53,7 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外
 - SQLite + SeaORM 2.0 entity-first 元数据存储。
 - `source`、`sync_job`、`sync_run`、`sync_item`、`sync_error`、`app_setting` 等核心实体。
 - OpenDAL connector kind 和 filesystem connector。
-- OpenDAL `fs`、`webdav`、`sftp`、`s3` 配置模型与校验。
+- OpenDAL `fs`、`webdav`、`sftp`、`s3` 配置模型、校验与 operator wiring。
 - source 测试、job 创建、手动 run、固定间隔调度。
 - 单向同步：source 到 local vault。
 - 安全 vault writer：规范化路径、拒绝路径穿越、临时文件写入、原子替换。
@@ -61,13 +61,13 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外
 - CLI、Axum API、Svelte Web 控制台三种操作入口。
 - OpenAPI specification。
 - 前端资源嵌入 Rust release binary。
+- CI workflow、跨平台 release artifacts、installer 脚本、基础性能 benchmark 和本地 filesystem soak test。
 - 现有测试覆盖 sync engine、API routes、CLI workflows、app services、connector contract 和 vault safety。
 
 ### 3.2 主要缺口
 
-- WebDAV、SFTP、S3 目前有配置模型，operator 实现仍待完成。
-- 缺少 CI workflow、跨平台 release artifacts、installer 或包管理器分发。
-- 缺少可访问性检查、浏览器截图回归和长时间运行 soak test。
+- WebDAV、SFTP、S3 仍缺少更贴近真实服务的 integration tests。
+- 缺少可访问性检查和浏览器截图回归。
 - 缺少 connector cursor、重试策略和数据库保留策略。
 - 搜索、标签、集合、跨 source 去重和通知仍在产品 Roadmap 中。
 - 认证、授权、多用户远程部署和自动本地删除仍应保持后置。
@@ -78,10 +78,6 @@ Hoarder 是一个本地优先的数据聚合和单向同步平台。它连接外
 
 下一阶段聚焦“可发布、可扩展、可长期运行”的本地产品形态：
 
-- GitHub Actions 或等价 CI。
-- 发布构建和 release artifact。
-- WebDAV、SFTP、S3 connector operator。
-- NAS 场景配置预设。
 - 前端可访问性和浏览器回归验证。
 - connector transient error 重试策略。
 - connector cursor 和增量扫描接口。
@@ -492,9 +488,9 @@ cargo build --release
 
 任务：
 
-- 建立 CI workflow。
-- 增加 release build workflow。
-- 补齐 README/development 发布说明。
+- 维护 CI workflow。
+- 维护 release build workflow。
+- 维护 README/development 发布说明。
 - 增加 Web 可访问性检查。
 - 增加浏览器截图回归。
 - 增加 stale running job recovery 设计和实现。
@@ -543,8 +539,8 @@ cargo build --release
 - 增量扫描支持。
 - run cancellation 设计。
 - scheduler skipped reason logging。
-- 长时间运行 soak tests。
-- 性能 benchmark。
+- 扩展长时间运行 soak tests。
+- 扩展性能 benchmark。
 
 验收：
 

@@ -1,0 +1,45 @@
+name: Benchmarks And Soak Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark-and-soak:
+    name: Local sync benchmark and soak
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cache cargo state
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-soak-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-soak-${{ runner.os }}-
+
+      - name: Run local filesystem performance benchmark
+        env:
+          HOARDER_BENCH_FILES: 500
+          HOARDER_BENCH_BYTES: 1024
+        run: cargo test --test performance_benchmark -- --ignored --nocapture
+
+      - name: Run local filesystem soak test
+        env:
+          HOARDER_SOAK_ITERATIONS: 40
+          HOARDER_SOAK_FILES: 100
+        run: cargo test --test soak_local_fs -- --ignored --nocapture

@@ -28,6 +28,14 @@ Prerequisites:
 - Rust 2024 toolchain
 - Bun
 
+Install the latest release binary:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ns2Kracy/hoarder/main/scripts/install.sh | sh
+```
+
+Or build from source.
+
 Build the web UI, then run the local server:
 
 ```bash
@@ -66,6 +74,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [Product PRD](docs/prd.md): product positioning, MVP scope, user journeys, success metrics, and roadmap.
 - [Architecture](docs/architecture.md): current technical architecture, module boundaries, data model, API surface, and extension points.
 - [Flows](docs/flows.md): product and technical flows for source setup, job runs, source-to-vault decisions, vault writes, scheduler, errors, and settings.
+- [Release And Distribution](docs/release.md): CI gates, release artifacts, installer scripts, benchmark, and soak test commands.
 
 ## Commands
 
@@ -229,11 +238,11 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] CLI command integration tests
 - [x] Connector contract tests
 - [x] Vault writer safety tests
-- [ ] CI workflow
-- [ ] Release artifacts for macOS, Linux, and Windows
-- [ ] Installer or package manager distribution
-- [ ] Performance benchmarks
-- [ ] Long-running soak tests
+- [x] CI workflow
+- [x] Release artifacts for macOS, Linux, and Windows
+- [x] Installer or package manager distribution
+- [x] Performance benchmarks
+- [x] Long-running soak tests
 
 ### Product Roadmap
 
@@ -314,4 +323,4 @@ cargo build --release
 
 ## Current Status
 
-Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. OpenDAL operator wiring now covers filesystem, WebDAV, SFTP, and S3; the next highest-value work is connector-specific integration tests, typed config templates, and CI/release artifacts.
+Hoarder is an early local-first MVP. The backend serves the embedded web console, syncs SQLite schema, exposes the MVP control plane API, executes source/job/sync CLI workflows, runs fixed-interval jobs in serve mode, and passes end-to-end filesystem sync tests. OpenDAL operator wiring now covers filesystem, WebDAV, SFTP, and S3; CI, release artifacts, installer scripts, benchmark, and soak gates are in place. The next highest-value work is connector-specific integration tests, typed config templates, accessibility checks, and browser regression coverage.
