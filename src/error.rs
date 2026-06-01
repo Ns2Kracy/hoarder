@@ -10,6 +10,9 @@ pub enum AppError {
     #[error("connector error: {0}")]
     Connector(String),
 
+    #[error("connector error: {0}")]
+    ConnectorTransient(String),
+
     #[error("conflict: {0}")]
     Conflict(String),
 
@@ -30,4 +33,11 @@ pub enum AppError {
 
     #[error("unprocessable entity: {0}")]
     Unprocessable(String),
+}
+
+impl AppError {
+    #[must_use]
+    pub const fn is_transient_connector(&self) -> bool {
+        matches!(self, Self::ConnectorTransient(_))
+    }
 }

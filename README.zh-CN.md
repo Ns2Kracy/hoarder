@@ -175,7 +175,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Job 级并发控制
 - [x] 定时同步任务
 - [x] 从 connector cursor 恢复
-- [ ] 临时性 connector 错误重试策略
+- [x] 临时性 connector 错误重试策略
 
 ### API
 

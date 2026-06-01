@@ -64,7 +64,7 @@ impl From<AppError> for ApiError {
             AppError::Config(message) => {
                 Self::new(StatusCode::BAD_REQUEST, "CONFIG_ERROR", message)
             }
-            AppError::Connector(message) => {
+            AppError::Connector(message) | AppError::ConnectorTransient(message) => {
                 Self::new(StatusCode::BAD_GATEWAY, "CONNECTOR_ERROR", message)
             }
             AppError::Conflict(message) => Self::conflict(message),

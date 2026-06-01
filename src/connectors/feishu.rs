@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, stream};
-use reqwest::{Client, Method, RequestBuilder};
+use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use serde_json::{Value, json};
 
 use crate::{
@@ -352,15 +352,17 @@ impl JsonRequestExt for RequestBuilder {
             let response = self
                 .send()
                 .await
-                .map_err(|error| AppError::Connector(format!("{context}: {error}")))?;
+                .map_err(|error| reqwest_error(context, &error))?;
             let status = response.status();
-            let body = response.text().await.map_err(|error| {
-                AppError::Connector(format!("read {context} response: {error}"))
-            })?;
+            let body = response
+                .text()
+                .await
+                .map_err(|error| reqwest_error(format!("read {context} response"), &error))?;
             if !status.is_success() {
-                return Err(AppError::Connector(format!(
-                    "{context}: Feishu API returned HTTP {status}: {body}"
-                )));
+                return Err(connector_error(
+                    format!("{context}: Feishu API returned HTTP {status}: {body}"),
+                    is_transient_http_status(status),
+                ));
             }
 
             serde_json::from_str(&body)
@@ -368,4 +370,26 @@ impl JsonRequestExt for RequestBuilder {
         }
         .boxed()
     }
+}
+
+fn reqwest_error(context: impl Into<String>, error: &reqwest::Error) -> AppError {
+    let transient = error.is_timeout()
+        || error.is_connect()
+        || error.is_body()
+        || error.status().is_some_and(is_transient_http_status);
+    connector_error(format!("{}: {error}", context.into()), transient)
+}
+
+const fn connector_error(message: String, transient: bool) -> AppError {
+    if transient {
+        AppError::ConnectorTransient(message)
+    } else {
+        AppError::Connector(message)
+    }
+}
+
+fn is_transient_http_status(status: StatusCode) -> bool {
+    status == StatusCode::REQUEST_TIMEOUT
+        || status == StatusCode::TOO_MANY_REQUESTS
+        || status.is_server_error()
 }

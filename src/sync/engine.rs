@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{future::Future, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::{StreamExt, stream::FuturesUnordered};
 
@@ -117,8 +117,10 @@ where
         let connector = (self.connector_resolver)(job.connector_kind)
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
         let cursor = job.scan_cursor.as_deref();
-        let scan = connector
-            .scan(&job.connector_config, cursor)
+        let scan = self
+            .retry_connector_operation("scan connector", || {
+                connector.scan(&job.connector_config, cursor)
+            })
             .await
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
         let mut snapshots = scan.items;
@@ -247,38 +249,73 @@ where
             return Ok(0);
         }
 
-        let item_ref = snapshot.item_ref();
-        let bytes = connector
-            .read(connector_config, &item_ref)
-            .await
-            .map_err(|source| ItemFailure::new(snapshot.clone(), source))?;
-        let write = self
-            .vault_writer
-            .write(&item_ref, bytes)
-            .await
-            .map_err(|source| ItemFailure::new(snapshot.clone(), source))?;
-        let bytes_written = write.bytes_written;
+        let bytes_written = self
+            .retry_connector_operation("sync connector item", || async {
+                let item_ref = snapshot.item_ref();
+                let bytes = connector.read(connector_config, &item_ref).await?;
+                let write = self.vault_writer.write(&item_ref, bytes).await?;
+                let bytes_written = write.bytes_written;
 
-        self.repository
-            .record_item_outcome(
-                run_id,
-                synced_file_outcome(
-                    snapshot.clone(),
-                    write.target_path,
-                    write.content_hash,
-                    bytes_written,
-                ),
-            )
+                self.repository
+                    .record_item_outcome(
+                        run_id,
+                        synced_file_outcome(
+                            snapshot.clone(),
+                            write.target_path,
+                            write.content_hash,
+                            bytes_written,
+                        ),
+                    )
+                    .await?;
+
+                Ok(bytes_written)
+            })
             .await
             .map_err(|source| ItemFailure::new(snapshot, source))?;
 
         Ok(bytes_written)
+    }
+
+    async fn retry_connector_operation<T, Fut, Op>(
+        &self,
+        operation: &'static str,
+        mut operation_call: Op,
+    ) -> AppResult<T>
+    where
+        Fut: Future<Output = AppResult<T>>,
+        Op: FnMut() -> Fut,
+    {
+        let policy = self.options.connector_retry_policy();
+        let mut attempt = 1;
+        let mut delay = policy.initial_backoff();
+
+        loop {
+            match operation_call().await {
+                Ok(value) => return Ok(value),
+                Err(error) if error.is_transient_connector() && attempt < policy.max_attempts() => {
+                    tracing::warn!(
+                        operation,
+                        attempt,
+                        max_attempts = policy.max_attempts(),
+                        error = %error,
+                        "transient connector error; retrying"
+                    );
+                    if !delay.is_zero() {
+                        tokio::time::sleep(delay).await;
+                    }
+                    delay = policy.next_backoff(delay);
+                    attempt += 1;
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SyncEngineOptions {
     file_concurrency: NonZeroUsize,
+    connector_retry_policy: ConnectorRetryPolicy,
 }
 
 impl SyncEngineOptions {
@@ -286,12 +323,24 @@ impl SyncEngineOptions {
     pub fn new(file_concurrency: usize) -> Self {
         Self {
             file_concurrency: NonZeroUsize::new(file_concurrency).unwrap_or(NonZeroUsize::MIN),
+            connector_retry_policy: ConnectorRetryPolicy::default(),
         }
+    }
+
+    #[must_use]
+    pub const fn with_connector_retry_policy(mut self, policy: ConnectorRetryPolicy) -> Self {
+        self.connector_retry_policy = policy;
+        self
     }
 
     #[must_use]
     pub const fn file_concurrency(self) -> usize {
         self.file_concurrency.get()
+    }
+
+    #[must_use]
+    pub const fn connector_retry_policy(self) -> ConnectorRetryPolicy {
+        self.connector_retry_policy
     }
 }
 
@@ -299,7 +348,56 @@ impl Default for SyncEngineOptions {
     fn default() -> Self {
         Self {
             file_concurrency: NonZeroUsize::MIN,
+            connector_retry_policy: ConnectorRetryPolicy::default(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ConnectorRetryPolicy {
+    max_attempts: NonZeroUsize,
+    initial_backoff: Duration,
+    max_backoff: Duration,
+}
+
+impl ConnectorRetryPolicy {
+    #[must_use]
+    pub fn new(max_attempts: usize, initial_backoff: Duration, max_backoff: Duration) -> Self {
+        Self {
+            max_attempts: NonZeroUsize::new(max_attempts).unwrap_or(NonZeroUsize::MIN),
+            initial_backoff,
+            max_backoff: max_backoff.max(initial_backoff),
+        }
+    }
+
+    #[must_use]
+    pub const fn max_attempts(self) -> usize {
+        self.max_attempts.get()
+    }
+
+    #[must_use]
+    pub const fn initial_backoff(self) -> Duration {
+        self.initial_backoff
+    }
+
+    #[must_use]
+    pub const fn max_backoff(self) -> Duration {
+        self.max_backoff
+    }
+
+    #[must_use]
+    pub fn next_backoff(self, current: Duration) -> Duration {
+        if current.is_zero() {
+            return Duration::ZERO;
+        }
+
+        current.saturating_mul(2).min(self.max_backoff)
+    }
+}
+
+impl Default for ConnectorRetryPolicy {
+    fn default() -> Self {
+        Self::new(3, Duration::from_millis(100), Duration::from_secs(2))
     }
 }
 

@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{io::ErrorKind, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, StreamExt};
@@ -245,10 +245,36 @@ fn snapshot_from_entry(source_id: SourceId, entry: Entry) -> Option<AppResult<It
 
 #[allow(clippy::needless_pass_by_value)]
 fn opendal_error(context: &str, error: opendal::Error) -> AppError {
-    AppError::Connector(format!("{context}: {error}"))
+    connector_error(
+        context,
+        &error,
+        error.is_temporary() || error.kind() == opendal::ErrorKind::RateLimited,
+    )
 }
 
 #[allow(clippy::needless_pass_by_value)]
 fn io_error(context: &str, error: std::io::Error) -> AppError {
-    AppError::Connector(format!("{context}: {error}"))
+    connector_error(
+        context,
+        &error,
+        matches!(
+            error.kind(),
+            ErrorKind::Interrupted
+                | ErrorKind::TimedOut
+                | ErrorKind::WouldBlock
+                | ErrorKind::ConnectionReset
+                | ErrorKind::ConnectionAborted
+                | ErrorKind::NotConnected
+                | ErrorKind::BrokenPipe
+        ),
+    )
+}
+
+fn connector_error(context: &str, error: &dyn std::fmt::Display, transient: bool) -> AppError {
+    let message = format!("{context}: {error}");
+    if transient {
+        AppError::ConnectorTransient(message)
+    } else {
+        AppError::Connector(message)
+    }
 }

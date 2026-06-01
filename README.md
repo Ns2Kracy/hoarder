@@ -175,7 +175,7 @@ cargo run -- --config ./hoarder.config.json serve
 - [x] Job-level concurrency control
 - [x] Scheduled recurring sync jobs
 - [x] Resume from connector cursor
-- [ ] Retry policy for transient connector errors
+- [x] Retry policy for transient connector errors
 
 ### API
 

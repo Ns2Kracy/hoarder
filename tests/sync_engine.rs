@@ -19,7 +19,10 @@ use hoarder::{
         SourceId, SyncStatus,
     },
     sync::{
-        engine::{SyncEngine, SyncEngineOptions, SyncJob, SyncRunStatus, SyncRunSummary},
+        engine::{
+            ConnectorRetryPolicy, SyncEngine, SyncEngineOptions, SyncJob, SyncRunStatus,
+            SyncRunSummary,
+        },
         planner::StoredItemState,
         repository::{ItemSyncOutcome, SyncRepository},
         vault_writer::VaultWriter,
@@ -110,6 +113,112 @@ async fn sync_engine_records_item_failure_and_continues_run() {
             summary,
             None
         ))
+    );
+}
+
+#[tokio::test]
+async fn sync_engine_retries_transient_scan_errors_before_failing_run() {
+    let source_id = SourceId::new();
+    let job_id = JobId::new();
+    let run_id = RunId::new();
+    let vault_root = temp_vault_root("retry-scan");
+    let connector = Arc::new(
+        FakeConnector::new(
+            source_id,
+            [file_snapshot(source_id, "ok.txt", 2)],
+            BTreeMap::from([("ok.txt".to_owned(), Ok(Bytes::from_static(b"ok")))]),
+        )
+        .with_transient_scan_failures(2),
+    );
+    let repository = Arc::new(FakeRepository::new(SyncJob {
+        id: job_id,
+        source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
+        connector_kind: ConnectorKind::OpenDal,
+        connector_config: connector_config(),
+        scan_cursor: None,
+    }));
+    repository.set_next_run_id(run_id);
+    let engine = SyncEngine::with_options(
+        repository.clone(),
+        Arc::new({
+            let connector = connector.clone();
+            move |_kind| Ok(connector.clone() as Arc<dyn SourceConnector>)
+        }),
+        VaultWriter::new(vault_root.clone()),
+        retry_options(),
+    );
+
+    let summary = engine.run_job(job_id).await.unwrap();
+
+    assert_eq!(connector.scan_attempts(), 3);
+    assert_eq!(summary.synced, 1);
+    assert_eq!(summary.failed, 0);
+    assert_eq!(
+        tokio::fs::read(vault_root.join(source_id.to_string()).join("ok.txt"))
+            .await
+            .unwrap(),
+        b"ok"
+    );
+}
+
+#[tokio::test]
+async fn sync_engine_retries_transient_stream_read_errors_for_item() {
+    let source_id = SourceId::new();
+    let job_id = JobId::new();
+    let run_id = RunId::new();
+    let vault_root = temp_vault_root("retry-stream-read");
+    let connector = Arc::new(
+        FakeConnector::new(
+            source_id,
+            [file_snapshot(source_id, "flaky.txt", 5)],
+            BTreeMap::new(),
+        )
+        .with_read_attempts(
+            "flaky.txt",
+            [
+                ReadAttempt::StreamTransient("temporary stream reset".to_owned()),
+                ReadAttempt::Bytes(Bytes::from_static(b"flaky")),
+            ],
+        ),
+    );
+    let repository = Arc::new(FakeRepository::new(SyncJob {
+        id: job_id,
+        source_id,
+        source_name: "Local Docs".to_owned(),
+        job_name: "Docs sync".to_owned(),
+        connector_kind: ConnectorKind::OpenDal,
+        connector_config: connector_config(),
+        scan_cursor: None,
+    }));
+    repository.set_next_run_id(run_id);
+    let engine = SyncEngine::with_options(
+        repository.clone(),
+        Arc::new({
+            let connector = connector.clone();
+            move |_kind| Ok(connector.clone() as Arc<dyn SourceConnector>)
+        }),
+        VaultWriter::new(vault_root.clone()),
+        retry_options(),
+    );
+
+    let summary = engine.run_job(job_id).await.unwrap();
+
+    assert_eq!(connector.read_attempts("flaky.txt"), 2);
+    assert_eq!(summary.synced, 1);
+    assert_eq!(summary.failed, 0);
+    assert_eq!(summary.bytes_written, 5);
+    assert_eq!(
+        tokio::fs::read(vault_root.join(source_id.to_string()).join("flaky.txt"))
+            .await
+            .unwrap(),
+        b"flaky"
+    );
+    assert!(
+        repository
+            .events()
+            .contains(&RepoEvent::RecordSynced("flaky.txt".to_owned()))
     );
 }
 
@@ -389,9 +498,12 @@ async fn sync_engine_persists_connector_next_cursor_after_successful_scan() {
 struct FakeConnector {
     source_id: SourceId,
     snapshots: Vec<ScanEvent>,
-    reads: BTreeMap<String, Result<Bytes, String>>,
+    reads: Mutex<BTreeMap<String, VecDeque<ReadAttempt>>>,
+    read_attempts: Mutex<BTreeMap<String, usize>>,
     read_probe: Option<Arc<ReadConcurrencyProbe>>,
     next_cursor: Option<String>,
+    transient_scan_failures: AtomicUsize,
+    scan_attempts: AtomicUsize,
 }
 
 impl FakeConnector {
@@ -403,9 +515,12 @@ impl FakeConnector {
         Self {
             source_id,
             snapshots: snapshots.into_iter().map(ScanEvent::Snapshot).collect(),
-            reads,
+            reads: Mutex::new(read_attempts_from_legacy(reads)),
+            read_attempts: Mutex::new(BTreeMap::new()),
             read_probe: None,
             next_cursor: None,
+            transient_scan_failures: AtomicUsize::new(0),
+            scan_attempts: AtomicUsize::new(0),
         }
     }
 
@@ -417,6 +532,37 @@ impl FakeConnector {
     fn with_next_cursor(mut self, next_cursor: &str) -> Self {
         self.next_cursor = Some(next_cursor.to_owned());
         self
+    }
+
+    fn with_transient_scan_failures(self, failures: usize) -> Self {
+        self.transient_scan_failures
+            .store(failures, Ordering::SeqCst);
+        self
+    }
+
+    fn with_read_attempts<const N: usize>(
+        self,
+        source_path: &str,
+        attempts: [ReadAttempt; N],
+    ) -> Self {
+        self.reads.lock().unwrap().insert(
+            source_path.to_owned(),
+            attempts.into_iter().collect::<VecDeque<_>>(),
+        );
+        self
+    }
+
+    fn scan_attempts(&self) -> usize {
+        self.scan_attempts.load(Ordering::SeqCst)
+    }
+
+    fn read_attempts(&self, source_path: &str) -> usize {
+        self.read_attempts
+            .lock()
+            .unwrap()
+            .get(source_path)
+            .copied()
+            .unwrap_or_default()
     }
 
     fn with_scan_error_after<const N: usize>(
@@ -432,9 +578,12 @@ impl FakeConnector {
         Self {
             source_id,
             snapshots,
-            reads,
+            reads: Mutex::new(read_attempts_from_legacy(reads)),
+            read_attempts: Mutex::new(BTreeMap::new()),
             read_probe: None,
             next_cursor: None,
+            transient_scan_failures: AtomicUsize::new(0),
+            scan_attempts: AtomicUsize::new(0),
         }
     }
 }
@@ -457,6 +606,19 @@ impl SourceConnector for FakeConnector {
         _cursor: Option<&'a str>,
     ) -> ConnectorFuture<'a, ScanOutcome> {
         async move {
+            self.scan_attempts.fetch_add(1, Ordering::SeqCst);
+            if self
+                .transient_scan_failures
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok()
+            {
+                return Err(hoarder::AppError::ConnectorTransient(
+                    "transient scan failed".to_owned(),
+                ));
+            }
+
             let snapshots = self.snapshots.clone().into_iter().map(|event| match event {
                 ScanEvent::Snapshot(snapshot) => Ok(snapshot),
                 ScanEvent::Error(message) => Err(hoarder::AppError::Connector(message)),
@@ -478,16 +640,53 @@ impl SourceConnector for FakeConnector {
             if let Some(probe) = &self.read_probe {
                 probe.observe().await;
             }
-            let result = self.reads.get(&item_ref.source_path).unwrap().clone();
-            match result {
-                Ok(bytes) => Ok(Box::pin(stream::iter([Ok(bytes)])) as ByteStream),
-                Err(message) => Ok(Box::pin(stream::iter([Err(hoarder::AppError::Connector(
-                    message,
-                ))])) as ByteStream),
+            *self
+                .read_attempts
+                .lock()
+                .unwrap()
+                .entry(item_ref.source_path.clone())
+                .or_default() += 1;
+            let attempt = self
+                .reads
+                .lock()
+                .unwrap()
+                .get_mut(&item_ref.source_path)
+                .and_then(VecDeque::pop_front)
+                .expect("fake read attempt must exist");
+            match attempt {
+                ReadAttempt::Bytes(bytes) => Ok(Box::pin(stream::iter([Ok(bytes)])) as ByteStream),
+                ReadAttempt::StreamPermanent(message) => Ok(Box::pin(stream::iter([Err(
+                    hoarder::AppError::Connector(message),
+                )])) as ByteStream),
+                ReadAttempt::StreamTransient(message) => Ok(Box::pin(stream::iter([Err(
+                    hoarder::AppError::ConnectorTransient(message),
+                )])) as ByteStream),
             }
         }
         .boxed()
     }
+}
+
+fn read_attempts_from_legacy(
+    reads: BTreeMap<String, Result<Bytes, String>>,
+) -> BTreeMap<String, VecDeque<ReadAttempt>> {
+    reads
+        .into_iter()
+        .map(|(source_path, result)| {
+            let attempt = match result {
+                Ok(bytes) => ReadAttempt::Bytes(bytes),
+                Err(message) => ReadAttempt::StreamPermanent(message),
+            };
+            (source_path, VecDeque::from([attempt]))
+        })
+        .collect()
+}
+
+#[derive(Clone, Debug)]
+enum ReadAttempt {
+    Bytes(Bytes),
+    StreamPermanent(String),
+    StreamTransient(String),
 }
 
 #[derive(Clone, Debug)]
@@ -664,6 +863,14 @@ fn connector_config() -> ConnectorConfig {
         service: "fs".to_owned(),
         options: BTreeMap::new(),
     }
+}
+
+fn retry_options() -> SyncEngineOptions {
+    SyncEngineOptions::new(1).with_connector_retry_policy(ConnectorRetryPolicy::new(
+        3,
+        Duration::ZERO,
+        Duration::ZERO,
+    ))
 }
 
 fn temp_vault_root(name: &str) -> PathBuf {
