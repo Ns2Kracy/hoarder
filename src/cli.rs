@@ -283,6 +283,7 @@ async fn execute_sync(config_path: Option<PathBuf>, command: SyncCommand) -> App
             let settings = repository.load_runtime_settings(&config).await?;
             let response = job_service::run_job(
                 repository,
+                None,
                 config.vault_path.clone(),
                 job_id,
                 settings.file_concurrency,

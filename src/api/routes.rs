@@ -42,11 +42,15 @@ fn api_routes_without_state() -> Router<ApiState> {
         .route("/api/openapi.json", get(openapi_spec))
         .route("/api/source-templates", get(list_source_templates))
         .route("/api/sources", get(list_sources).post(create_source))
-        .route("/api/sources/{id}", patch(update_source))
+        .route(
+            "/api/sources/{id}",
+            patch(update_source).delete(delete_source),
+        )
         .route("/api/sources/{id}/test", post(test_source))
         .route("/api/jobs", get(list_jobs).post(create_job))
         .route("/api/jobs/{id}", patch(update_job))
         .route("/api/jobs/{id}/run", post(run_job))
+        .route("/api/jobs/{id}/stop", post(stop_job))
         .route("/api/runs", get(list_runs))
         .route("/api/runs/{id}", get(get_run_detail))
         .route("/api/files", get(browse_files))
@@ -96,6 +100,16 @@ async fn update_source(
     Ok(Json(
         source_service::update_source(state.repository(), source_id, request).await?,
     ))
+}
+
+async fn delete_source(
+    State(state): State<ApiState>,
+    path: Result<Path<SourceId>, PathRejection>,
+) -> Result<StatusCode, ApiError> {
+    let Path(source_id) = path?;
+    source_service::delete_source(state.repository(), source_id).await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn test_source(
@@ -151,12 +165,23 @@ async fn run_job(
     Ok(Json(
         job_service::run_job(
             std::sync::Arc::clone(state.repository()),
+            Some(state.run_registry()),
             state.vault_path(),
             job_id,
             settings.file_concurrency,
         )
         .await?,
     ))
+}
+
+async fn stop_job(
+    State(state): State<ApiState>,
+    path: Result<Path<JobId>, PathRejection>,
+) -> Result<StatusCode, ApiError> {
+    let Path(job_id) = path?;
+    job_service::stop_job(state.repository(), state.run_registry().as_ref(), job_id).await?;
+
+    Ok(StatusCode::ACCEPTED)
 }
 
 async fn list_runs(State(state): State<ApiState>) -> Result<Json<ListResponse<RunDto>>, ApiError> {

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Pencil, Play, TimerReset } from "lucide-svelte";
+    import { Pencil, Play, Square, TimerReset } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
     import JobForm from "../components/JobForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
@@ -18,12 +18,14 @@
         onCreateJob,
         onUpdateJob,
         onRunJob,
+        onStopJob,
     }: {
         jobs: Loadable<SyncJobDto[]>;
         sources: Loadable<SourceDto[]>;
         onCreateJob: (input: JobFormInput) => Promise<void> | void;
         onUpdateJob: (jobId: LocalId, input: JobFormInput) => Promise<void> | void;
         onRunJob: (jobId: LocalId) => Promise<void> | void;
+        onStopJob: (jobId: LocalId) => Promise<void> | void;
     } = $props();
 
     let editingJobId = $state<LocalId | undefined>(undefined);
@@ -125,16 +127,26 @@
                                         <Pencil aria-hidden="true" size={14} />
                                         Edit
                                     </button>
-                                    <button
-                                        class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-2 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
-                                        type="button"
-                                        disabled={!job.enabled ||
-                                            job.status === "running"}
-                                        onclick={() => onRunJob(job.id)}
-                                    >
-                                        <Play aria-hidden="true" size={14} />
-                                        Run Now
-                                    </button>
+                                    {#if job.status === "running"}
+                                        <button
+                                            class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-rose-300/70 bg-panel-strong px-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 hover:text-rose-800 active:translate-y-px dark:border-rose-500/50 dark:text-rose-200 dark:hover:bg-rose-500/10"
+                                            type="button"
+                                            onclick={() => onStopJob(job.id)}
+                                        >
+                                            <Square aria-hidden="true" size={14} />
+                                            Stop
+                                        </button>
+                                    {:else}
+                                        <button
+                                            class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-2 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
+                                            type="button"
+                                            disabled={!job.enabled}
+                                            onclick={() => onRunJob(job.id)}
+                                        >
+                                            <Play aria-hidden="true" size={14} />
+                                            Run Now
+                                        </button>
+                                    {/if}
                                 </td>
                             </tr>
                             {#if editingJobId === job.id}

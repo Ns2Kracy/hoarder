@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Cable, CheckCircle2, FlaskConical, Pencil } from "lucide-svelte";
+    import { Cable, CheckCircle2, FlaskConical, Pencil, Trash2 } from "lucide-svelte";
     import FallbackNotice from "../components/FallbackNotice.svelte";
     import SourceForm from "../components/SourceForm.svelte";
     import StatusBadge from "../components/StatusBadge.svelte";
@@ -11,6 +11,7 @@
         onAddSource,
         onTestSource,
         onUpdateSource,
+        onDeleteSource,
     }: {
         sources: Loadable<SourceDto[]>;
         onAddSource: (input: SourceFormInput) => Promise<void> | void;
@@ -19,6 +20,7 @@
             sourceId: LocalId,
             input: SourceFormInput,
         ) => Promise<void> | void;
+        onDeleteSource: (sourceId: LocalId) => Promise<void> | void;
     } = $props();
 
     let editingSourceId = $state<LocalId | undefined>(undefined);
@@ -80,6 +82,20 @@
 
     function canEditSource(source: SourceDto) {
         return source.connectorKind !== "plugin";
+    }
+
+    async function confirmDeleteSource(source: SourceDto) {
+        const confirmed = window.confirm(
+            `Delete source "${source.name}" and its sync jobs? Synced files and run history will be kept.`,
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        await onDeleteSource(source.id);
+        if (editingSourceId === source.id) {
+            editingSourceId = undefined;
+        }
     }
 </script>
 
@@ -210,7 +226,7 @@
                                         </button>
                                     {/if}
                                     <button
-                                        class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
+                                        class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px"
                                         type="button"
                                         onclick={() => onTestSource(source.id)}
                                     >
@@ -219,6 +235,14 @@
                                             size={14}
                                         />
                                         Test
+                                    </button>
+                                    <button
+                                        class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-rose-300/70 bg-panel-strong px-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 hover:text-rose-800 active:translate-y-px dark:border-rose-500/50 dark:text-rose-200 dark:hover:bg-rose-500/10"
+                                        type="button"
+                                        onclick={() => confirmDeleteSource(source)}
+                                    >
+                                        <Trash2 aria-hidden="true" size={14} />
+                                        Delete
                                     </button>
                                 </td>
                             </tr>

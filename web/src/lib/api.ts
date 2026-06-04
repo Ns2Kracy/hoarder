@@ -393,6 +393,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw normalizeApiError(body, response.status);
   }
 
+  if (response.status === 202 || response.status === 204) {
+    return undefined as T;
+  }
+
   if (!contentType.includes("application/json")) {
     throw {
       code: "API_UNAVAILABLE",
@@ -627,6 +631,27 @@ export const api = {
       },
     ),
 
+  deleteSource: async (sourceId: LocalId): Promise<ApiData<void>> =>
+    withMockFallback(
+      async () => {
+        await request<void>(`/sources/${sourceId}`, {
+          method: "DELETE",
+        });
+      },
+      () => {
+        const sourceIndex = mockSources.findIndex((candidate) => candidate.id === sourceId);
+        if (sourceIndex >= 0) {
+          mockSources.splice(sourceIndex, 1);
+        }
+
+        for (let index = mockJobs.length - 1; index >= 0; index -= 1) {
+          if (mockJobs[index]?.sourceId === sourceId) {
+            mockJobs.splice(index, 1);
+          }
+        }
+      },
+    ),
+
   testSource: async (sourceId: LocalId): Promise<ApiData<{ ok: boolean; checkedAt: string }>> =>
     withMockFallback(
       () =>
@@ -742,11 +767,12 @@ export const api = {
           sourceId: job?.sourceId,
           sourceName: job?.sourceName ?? "Unknown source",
           jobName: job?.name,
-          status: "running",
+          status: "completed",
           startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
           counts: {
-            processed: 0,
-            synced: 0,
+            processed: 1,
+            synced: 1,
             skipped: 0,
             failed: 0,
             deleted: 0,
@@ -755,11 +781,40 @@ export const api = {
         };
         mockRuns.unshift(run);
         if (job) {
-          job.status = "running";
+          job.status = "idle";
           job.lastRunAt = run.startedAt;
           job.lastRunStatus = run.status;
+          job.lastRunId = run.id;
         }
         return run;
+      },
+    ),
+
+  stopJob: async (jobId: LocalId): Promise<ApiData<void>> =>
+    withMockFallback(
+      async () => {
+        await request<void>(`/jobs/${jobId}/stop`, {
+          method: "POST",
+        });
+      },
+      () => {
+        const job = mockJobs.find((candidate) => candidate.id === jobId);
+        if (job) {
+          job.status = "idle";
+          job.lastRunStatus = "cancelled";
+        }
+
+        const run = mockRuns.find(
+          (candidate) => candidate.jobId === jobId && candidate.status === "running",
+        );
+        if (run) {
+          run.status = "cancelled";
+          run.finishedAt = new Date().toISOString();
+          if (job) {
+            job.lastRunId = run.id;
+            job.lastRunAt = run.startedAt;
+          }
+        }
       },
     ),
 

@@ -67,6 +67,7 @@ impl From<AppError> for ApiError {
             AppError::Connector(message) | AppError::ConnectorTransient(message) => {
                 Self::new(StatusCode::BAD_GATEWAY, "CONNECTOR_ERROR", message)
             }
+            AppError::Cancelled(message) => Self::new(StatusCode::CONFLICT, "CANCELLED", message),
             AppError::Conflict(message) => Self::conflict(message),
             AppError::Database(_) | AppError::Io(_) => Self::new(
                 StatusCode::INTERNAL_SERVER_ERROR,

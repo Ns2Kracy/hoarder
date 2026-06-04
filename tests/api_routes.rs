@@ -77,6 +77,46 @@ async fn api_routes_source_templates_return_nas_presets() {
 }
 
 #[tokio::test]
+async fn api_routes_deletes_source_and_its_jobs() {
+    let test = TestApp::new().await;
+
+    let response = request(
+        test.app.clone(),
+        "DELETE",
+        &format!("/api/sources/{}", test.source_id),
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status, 204);
+
+    let sources = request(test.app.clone(), "GET", "/api/sources", None).await;
+    assert_eq!(sources.status, 200);
+    assert_eq!(sources.body, json!({ "data": [] }));
+
+    let jobs = request(test.app.clone(), "GET", "/api/jobs", None).await;
+    assert_eq!(jobs.status, 200);
+    assert_eq!(jobs.body, json!({ "data": [] }));
+}
+
+#[tokio::test]
+async fn api_routes_rejects_deleting_source_with_running_job() {
+    let test = TestApp::new().await;
+    set_job_running(&test.repository, test.job_id).await;
+
+    let response = request(
+        test.app.clone(),
+        "DELETE",
+        &format!("/api/sources/{}", test.source_id),
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status, 409);
+    assert_eq!(response.body["error"]["code"], json!("CONFLICT"));
+}
+
+#[tokio::test]
 async fn api_routes_updates_source_and_preserves_redacted_secrets() {
     let test = TestApp::new().await;
     let source_config = ConnectorConfig::OpenDal {
@@ -409,6 +449,25 @@ async fn api_routes_updates_sync_job_name_schedule_and_enabled_state() {
 }
 
 #[tokio::test]
+async fn api_routes_stops_running_job() {
+    let test = TestApp::new().await;
+    set_job_running(&test.repository, test.job_id).await;
+
+    let response = request(
+        test.app.clone(),
+        "POST",
+        &format!("/api/jobs/{}/stop", test.job_id),
+        Some(""),
+    )
+    .await;
+    assert_eq!(response.status, 202);
+
+    let jobs = request(test.app.clone(), "GET", "/api/jobs", None).await;
+    assert_eq!(jobs.status, 200);
+    assert_eq!(jobs.body["data"][0]["status"], json!("idle"));
+}
+
+#[tokio::test]
 async fn api_routes_openapi_spec_lists_current_routes() {
     let test = TestApp::new().await;
     let response = request(test.app.clone(), "GET", "/api/openapi.json", None).await;
@@ -425,6 +484,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
         "/api/jobs",
         "/api/jobs/{id}",
         "/api/jobs/{id}/run",
+        "/api/jobs/{id}/stop",
         "/api/runs",
         "/api/runs/{id}",
         "/api/files",
@@ -700,7 +760,11 @@ fn decode_response(response: &[u8]) -> HttpResponse {
 
     HttpResponse {
         status,
-        body: serde_json::from_slice(&body).unwrap(),
+        body: if body.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&body).unwrap()
+        },
     }
 }
 

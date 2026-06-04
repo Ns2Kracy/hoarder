@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, NotSet, QueryFilter,
-    Set,
+    Set, TransactionTrait,
 };
 use serde_json::Value;
 
@@ -139,6 +139,8 @@ pub trait SourceRepository: Send + Sync {
     ) -> RepositoryFuture<'_, SourceRecord>;
 
     fn list_sources(&self) -> RepositoryFuture<'_, Vec<SourceRecord>>;
+
+    fn delete_source(&self, source_id: SourceId) -> RepositoryFuture<'_, ()>;
 }
 
 pub trait SyncJobRepository: Send + Sync {
@@ -225,6 +227,42 @@ impl SourceRepository for SeaOrmRepository {
                 .map_err(map_db_error)?;
 
             models.into_iter().map(source_record_from_model).collect()
+        })
+    }
+
+    fn delete_source(&self, source_id: SourceId) -> RepositoryFuture<'_, ()> {
+        Box::pin(async move {
+            let db = &self.db;
+            source::Entity::find_by_id(source_id.as_i64())
+                .one(db)
+                .await
+                .map_err(map_db_error)?
+                .ok_or_else(|| AppError::NotFound(format!("source not found: {source_id}")))?;
+            let running_job = sync_job::Entity::find()
+                .filter(sync_job::Column::SourceId.eq(source_id.as_i64()))
+                .filter(sync_job::Column::Status.eq("running"))
+                .one(db)
+                .await
+                .map_err(map_db_error)?;
+            if running_job.is_some() {
+                return Err(AppError::Conflict(format!(
+                    "source has running sync jobs: {source_id}"
+                )));
+            }
+
+            let transaction = db.begin().await.map_err(map_db_error)?;
+            sync_job::Entity::delete_many()
+                .filter(sync_job::Column::SourceId.eq(source_id.as_i64()))
+                .exec(&transaction)
+                .await
+                .map_err(map_db_error)?;
+            source::Entity::delete_by_id(source_id.as_i64())
+                .exec(&transaction)
+                .await
+                .map_err(map_db_error)?;
+            transaction.commit().await.map_err(map_db_error)?;
+
+            Ok(())
         })
     }
 }
@@ -904,6 +942,7 @@ const fn sync_run_status_to_str(status: SyncRunStatus) -> &'static str {
         SyncRunStatus::Completed => "completed",
         SyncRunStatus::CompletedWithFailures => "completed_with_failures",
         SyncRunStatus::Failed => "failed",
+        SyncRunStatus::Cancelled => "cancelled",
     }
 }
 
@@ -922,7 +961,9 @@ fn run_status_from_str(status: &str) -> AppResult<RunStatus> {
 
 const fn job_status_after_run(status: SyncRunStatus) -> &'static str {
     match status {
-        SyncRunStatus::Completed | SyncRunStatus::CompletedWithFailures => "idle",
+        SyncRunStatus::Completed
+        | SyncRunStatus::CompletedWithFailures
+        | SyncRunStatus::Cancelled => "idle",
         SyncRunStatus::Failed => "failed",
     }
 }

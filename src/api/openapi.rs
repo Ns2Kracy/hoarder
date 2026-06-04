@@ -30,6 +30,7 @@ fn paths() -> Value {
         "/api/jobs": jobs_path(),
         "/api/jobs/{id}": job_path(),
         "/api/jobs/{id}/run": job_run_path(),
+        "/api/jobs/{id}/stop": job_stop_path(),
         "/api/runs": runs_path(),
         "/api/runs/{id}": run_detail_path(),
         "/api/files": files_path(),
@@ -125,6 +126,17 @@ fn source_path() -> Value {
                 "404": error_response(),
                 "500": error_response()
             }
+        },
+        "delete": {
+            "tags": ["sources"],
+            "operationId": "deleteSource",
+            "parameters": [path_local_id_parameter("id", "Source identifier")],
+            "responses": {
+                "204": {"description": "Deleted"},
+                "404": error_response(),
+                "409": error_response(),
+                "500": error_response()
+            }
         }
     })
 }
@@ -203,6 +215,23 @@ fn job_run_path() -> Value {
                 "404": error_response(),
                 "409": error_response(),
                 "422": error_response(),
+                "500": error_response()
+            }
+        }
+    })
+}
+
+#[must_use]
+fn job_stop_path() -> Value {
+    json!({
+        "post": {
+            "tags": ["jobs"],
+            "operationId": "stopJob",
+            "parameters": [path_local_id_parameter("id", "Job identifier")],
+            "responses": {
+                "202": {"description": "Stop requested"},
+                "404": error_response(),
+                "409": error_response(),
                 "500": error_response()
             }
         }

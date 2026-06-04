@@ -152,6 +152,42 @@ export async function updateSource(sourceId: LocalId, input: SourceFormInput) {
   }
 }
 
+export async function deleteSource(sourceId: LocalId) {
+  try {
+    const result = await api.deleteSource(sourceId);
+    const updatedAt = new Date().toISOString();
+    sources.update((current) => {
+      const nextData = current.data.filter((source) => source.id !== sourceId);
+      return {
+        ...current,
+        status: nextData.length > 0 ? "ready" : "empty",
+        origin: result.origin,
+        error: result.error,
+        data: nextData,
+        updatedAt,
+      };
+    });
+    jobs.update((current) => {
+      const nextData = current.data.filter((job) => job.sourceId !== sourceId);
+      return {
+        ...current,
+        status: nextData.length > 0 ? current.status : "empty",
+        origin: result.origin,
+        error: result.error,
+        data: nextData,
+        updatedAt,
+      };
+    });
+    fileBrowser.update((current) =>
+      current.data?.sourceId === sourceId
+        ? { ...current, status: "idle", data: undefined, updatedAt }
+        : current,
+    );
+  } catch (error) {
+    sources.update((current) => loadableWithError(current, error));
+  }
+}
+
 export async function testSourceConnection(sourceId: LocalId) {
   try {
     const result = await api.testSource(sourceId);
@@ -235,6 +271,36 @@ export async function triggerJobRun(jobId: LocalId) {
           error: jobResult.error ?? runResult.error,
         },
         statusFor(jobResult),
+      ),
+    );
+  } catch (error) {
+    jobs.update((current) => loadableWithError(current, error));
+    runs.update((current) => loadableWithError(current, error));
+  }
+}
+
+export async function stopJob(jobId: LocalId) {
+  try {
+    const stopResult = await api.stopJob(jobId);
+    const jobResult = await api.getJobs(get(sources).data);
+    const runResult = await api.getRuns();
+
+    jobs.set(
+      applyResult(
+        {
+          ...jobResult,
+          error: jobResult.error ?? stopResult.error,
+        },
+        statusFor(jobResult),
+      ),
+    );
+    runs.set(
+      applyResult(
+        {
+          ...runResult,
+          error: runResult.error ?? stopResult.error,
+        },
+        statusFor(runResult),
       ),
     );
   } catch (error) {

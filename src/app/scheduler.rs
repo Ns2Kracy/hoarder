@@ -54,6 +54,7 @@ pub async fn run_due_jobs_once(
     for job in due_jobs {
         match job_service::run_job(
             Arc::clone(&repository),
+            None,
             config.vault_path.clone(),
             job.id,
             settings.file_concurrency,

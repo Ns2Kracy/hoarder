@@ -4,6 +4,7 @@ use futures::{StreamExt, stream::FuturesUnordered};
 
 use crate::{
     AppError, AppResult,
+    app::run_control::CancellationToken,
     connectors::traits::{ConnectorConfig, SourceConnector},
     core::types::{ConnectorKind, ItemSnapshot, ItemType, JobId, RunId, SourceId, SyncStatus},
 };
@@ -96,8 +97,13 @@ where
                 Ok(summary)
             }
             Err(error) => {
+                let status = if matches!(error.source, AppError::Cancelled(_)) {
+                    SyncRunStatus::Cancelled
+                } else {
+                    SyncRunStatus::Failed
+                };
                 self.repository
-                    .finish_run(run_id, SyncRunStatus::Failed, error.summary, None)
+                    .finish_run(run_id, status, error.summary, None)
                     .await?;
                 Err(error.source)
             }
@@ -116,6 +122,7 @@ where
         };
         let connector = (self.connector_resolver)(job.connector_kind)
             .map_err(|source| SyncRunError::new(source, summary.clone()))?;
+        self.ensure_not_cancelled(&summary)?;
         let cursor = job.scan_cursor.as_deref();
         let scan = self
             .retry_connector_operation("scan connector", || {
@@ -128,6 +135,7 @@ where
 
         let mut scan_error = None;
         while let Some(snapshot_result) = snapshots.next().await {
+            self.ensure_not_cancelled(&summary)?;
             let snapshot = match snapshot_result {
                 Ok(snapshot) => snapshot,
                 Err(error) => {
@@ -147,6 +155,7 @@ where
                 let Some(result) = pending.next().await else {
                     continue;
                 };
+                self.ensure_not_cancelled(&summary)?;
                 self.apply_item_process_result(run_id, result, &mut summary)
                     .await
                     .map_err(|source| SyncRunError::new(source, summary.clone()))?;
@@ -154,6 +163,7 @@ where
         }
 
         while let Some(result) = pending.next().await {
+            self.ensure_not_cancelled(&summary)?;
             self.apply_item_process_result(run_id, result, &mut summary)
                 .await
                 .map_err(|source| SyncRunError::new(source, summary.clone()))?;
@@ -162,6 +172,8 @@ where
         if let Some(error) = scan_error {
             return Err(SyncRunError::new(error, summary));
         }
+
+        self.ensure_not_cancelled(&summary)?;
 
         summary.deleted = self
             .repository
@@ -208,6 +220,8 @@ where
         connector: &dyn SourceConnector,
         snapshot: ItemSnapshot,
     ) -> Result<ItemProcess, ItemFailure> {
+        self.ensure_item_not_cancelled()
+            .map_err(|source| ItemFailure::new(snapshot.clone(), source))?;
         let stored = self
             .repository
             .item_state(snapshot.source_id, &snapshot.source_path)
@@ -223,6 +237,8 @@ where
                 Ok(ItemProcess::Skipped)
             }
             PlanDecision::Sync => {
+                self.ensure_item_not_cancelled()
+                    .map_err(|source| ItemFailure::new(snapshot.clone(), source))?;
                 let outcome = self
                     .sync_snapshot(run_id, connector_config, connector, snapshot)
                     .await?;
@@ -251,9 +267,12 @@ where
 
         let bytes_written = self
             .retry_connector_operation("sync connector item", || async {
+                self.ensure_app_not_cancelled()?;
                 let item_ref = snapshot.item_ref();
                 let bytes = connector.read(connector_config, &item_ref).await?;
+                self.ensure_app_not_cancelled()?;
                 let write = self.vault_writer.write(&item_ref, bytes).await?;
+                self.ensure_app_not_cancelled()?;
                 let bytes_written = write.bytes_written;
 
                 self.repository
@@ -274,6 +293,33 @@ where
             .map_err(|source| ItemFailure::new(snapshot, source))?;
 
         Ok(bytes_written)
+    }
+
+    fn ensure_not_cancelled(&self, summary: &SyncRunSummary) -> Result<(), SyncRunError> {
+        if self.options.is_cancelled() {
+            Err(SyncRunError::new(
+                AppError::Cancelled("sync job was cancelled".to_owned()),
+                summary.clone(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_item_not_cancelled(&self) -> AppResult<()> {
+        if self.options.is_cancelled() {
+            Err(AppError::Cancelled("sync job was cancelled".to_owned()))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_app_not_cancelled(&self) -> AppResult<()> {
+        if self.options.is_cancelled() {
+            Err(AppError::Cancelled("sync job was cancelled".to_owned()))
+        } else {
+            Ok(())
+        }
     }
 
     async fn retry_connector_operation<T, Fut, Op>(
@@ -312,10 +358,11 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct SyncEngineOptions {
     file_concurrency: NonZeroUsize,
     connector_retry_policy: ConnectorRetryPolicy,
+    cancellation_token: Option<CancellationToken>,
 }
 
 impl SyncEngineOptions {
@@ -324,6 +371,7 @@ impl SyncEngineOptions {
         Self {
             file_concurrency: NonZeroUsize::new(file_concurrency).unwrap_or(NonZeroUsize::MIN),
             connector_retry_policy: ConnectorRetryPolicy::default(),
+            cancellation_token: None,
         }
     }
 
@@ -334,12 +382,25 @@ impl SyncEngineOptions {
     }
 
     #[must_use]
-    pub const fn file_concurrency(self) -> usize {
+    pub fn with_cancellation_token(mut self, token: CancellationToken) -> Self {
+        self.cancellation_token = Some(token);
+        self
+    }
+
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancellation_token
+            .as_ref()
+            .is_some_and(CancellationToken::is_cancelled)
+    }
+
+    #[must_use]
+    pub const fn file_concurrency(&self) -> usize {
         self.file_concurrency.get()
     }
 
     #[must_use]
-    pub const fn connector_retry_policy(self) -> ConnectorRetryPolicy {
+    pub const fn connector_retry_policy(&self) -> ConnectorRetryPolicy {
         self.connector_retry_policy
     }
 }
@@ -349,6 +410,7 @@ impl Default for SyncEngineOptions {
         Self {
             file_concurrency: NonZeroUsize::MIN,
             connector_retry_policy: ConnectorRetryPolicy::default(),
+            cancellation_token: None,
         }
     }
 }
@@ -443,6 +505,7 @@ pub enum SyncRunStatus {
     Completed,
     CompletedWithFailures,
     Failed,
+    Cancelled,
 }
 
 #[derive(Debug)]

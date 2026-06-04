@@ -21,6 +21,7 @@
         addSource,
         consoleOrigin,
         createJob,
+        deleteSource,
         fileBrowser,
         isRefreshing,
         jobs,
@@ -33,6 +34,7 @@
         selectedRunDetail,
         settings,
         sources,
+        stopJob,
         summary,
         testSourceConnection,
         triggerJobRun,
@@ -171,6 +173,7 @@
                         onAddSource={addSource}
                         onTestSource={testSourceConnection}
                         onUpdateSource={updateSource}
+                        onDeleteSource={deleteSource}
                     />
                 {:else if activePage === "jobs"}
                     <Jobs
@@ -179,6 +182,7 @@
                         onCreateJob={createJob}
                         onUpdateJob={updateJob}
                         onRunJob={triggerJobRun}
+                        onStopJob={stopJob}
                     />
                 {:else if activePage === "files"}
                     <Files

@@ -304,6 +304,17 @@ pub async fn update_source(
     ))
 }
 
+/// Deletes a source and its sync jobs while retaining historical runs, items,
+/// errors, and vault data.
+///
+/// # Errors
+///
+/// Returns an error when the source is missing, has running jobs, or the
+/// database delete fails.
+pub async fn delete_source(repository: &SeaOrmRepository, source_id: SourceId) -> AppResult<()> {
+    repository.delete_source(source_id).await
+}
+
 /// Validates a source connector and records the latest health check.
 ///
 /// # Errors

@@ -5,17 +5,19 @@ use std::{
     sync::Arc,
 };
 
+use chrono::Utc;
 use hoarder::{
     AppConfig, AppError,
     api::types::{
         CreateJobRequest, CreateSourceRequest, ErrorListQuery, ItemListQuery, JobScheduleDto,
         UpdateSettingsRequest,
     },
+    app::run_control::JobRunRegistry,
     app::{job_service, run_service, settings_service, source_service},
     connectors::traits::ConnectorConfig,
     core::types::{JobStatus, SyncStatus},
     db::{connect_sqlite, repository::SeaOrmRepository, schema::sync_schema},
-    entity::sync_job,
+    entity::{sync_job, sync_run},
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use uuid::Uuid;
@@ -52,6 +54,7 @@ async fn app_services_run_local_fs_job_and_filter_results() -> Result<(), Box<dy
     .await?;
     let response = job_service::run_job(
         Arc::clone(&test.repository),
+        None,
         test.config.vault_path.clone(),
         job.id,
         test.config.file_concurrency,
@@ -120,6 +123,7 @@ async fn app_services_reject_disabled_and_running_jobs() -> Result<(), Box<dyn s
 
     let disabled_error = job_service::run_job(
         Arc::clone(&test.repository),
+        None,
         test.config.vault_path.clone(),
         disabled.id,
         test.config.file_concurrency,
@@ -141,6 +145,7 @@ async fn app_services_reject_disabled_and_running_jobs() -> Result<(), Box<dyn s
     set_job_running(test.repository.as_ref(), running.id).await?;
     let running_error = job_service::run_job(
         Arc::clone(&test.repository),
+        None,
         test.config.vault_path.clone(),
         running.id,
         test.config.file_concurrency,
@@ -148,6 +153,90 @@ async fn app_services_reject_disabled_and_running_jobs() -> Result<(), Box<dyn s
     .await
     .expect_err("running jobs are rejected");
     assert!(matches!(running_error, AppError::Conflict(_)));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn app_services_recovers_stale_running_job_without_running_run()
+-> Result<(), Box<dyn std::error::Error>> {
+    let test = TestServices::new("stale-running-job").await?;
+    let source = source_service::create_source(
+        test.repository.as_ref(),
+        CreateSourceRequest {
+            name: "Local Docs".to_owned(),
+            config: fs_config(&test.source_root),
+            enabled: true,
+        },
+    )
+    .await?;
+    let job = job_service::create_job(
+        test.repository.as_ref(),
+        CreateJobRequest {
+            source_id: source.id,
+            name: "Recoverable sync".to_owned(),
+            enabled: true,
+            schedule: JobScheduleDto::Manual,
+        },
+    )
+    .await?;
+    insert_completed_run(test.repository.as_ref(), job.id, source.id).await?;
+    set_job_running(test.repository.as_ref(), job.id).await?;
+
+    let jobs = job_service::list_jobs(test.repository.as_ref()).await?;
+    let recovered = jobs
+        .iter()
+        .find(|candidate| candidate.id == job.id)
+        .expect("job is listed");
+    assert_eq!(recovered.status, JobStatus::Idle);
+
+    fs::write(test.source_root.join("readme.md"), "hello")?;
+    let response = job_service::run_job(
+        Arc::clone(&test.repository),
+        None,
+        test.config.vault_path.clone(),
+        job.id,
+        test.config.file_concurrency,
+    )
+    .await?;
+    assert_eq!(response.status, SyncStatus::Synced);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn app_services_stops_stale_running_job() -> Result<(), Box<dyn std::error::Error>> {
+    let test = TestServices::new("stop-stale-running").await?;
+    let source = source_service::create_source(
+        test.repository.as_ref(),
+        CreateSourceRequest {
+            name: "Local Docs".to_owned(),
+            config: fs_config(&test.source_root),
+            enabled: true,
+        },
+    )
+    .await?;
+    let job = job_service::create_job(
+        test.repository.as_ref(),
+        CreateJobRequest {
+            source_id: source.id,
+            name: "Stoppable sync".to_owned(),
+            enabled: true,
+            schedule: JobScheduleDto::Manual,
+        },
+    )
+    .await?;
+    set_job_running(test.repository.as_ref(), job.id).await?;
+
+    let registry = JobRunRegistry::new();
+    job_service::stop_job(test.repository.as_ref(), &registry, job.id).await?;
+
+    let jobs = job_service::list_jobs(test.repository.as_ref()).await?;
+    let stopped = jobs
+        .iter()
+        .find(|candidate| candidate.id == job.id)
+        .expect("job is listed");
+    assert_eq!(stopped.status, JobStatus::Idle);
 
     Ok(())
 }
@@ -221,6 +310,35 @@ async fn set_job_running(
     let mut active: sync_job::ActiveModel = job.into();
     active.status = Set("running".to_owned());
     active.update(repository.connection()).await?;
+
+    Ok(())
+}
+
+async fn insert_completed_run(
+    repository: &SeaOrmRepository,
+    job_id: hoarder::core::types::JobId,
+    source_id: hoarder::core::types::SourceId,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let now = Utc::now();
+    let run = sync_run::ActiveModel {
+        id: sea_orm::NotSet,
+        job_id: Set(job_id.as_i64()),
+        source_id: Set(source_id.as_i64()),
+        source_name: Set("Local Docs".to_owned()),
+        job_name: Set("Recoverable sync".to_owned()),
+        status: Set("completed".to_owned()),
+        started_at: Set(now),
+        finished_at: Set(Some(now)),
+        processed_count: Set(1),
+        synced_count: Set(1),
+        skipped_count: Set(0),
+        failed_count: Set(0),
+        deleted_count: Set(0),
+        bytes_written: Set(0),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    run.insert(repository.connection()).await?;
 
     Ok(())
 }

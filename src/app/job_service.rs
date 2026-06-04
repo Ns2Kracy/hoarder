@@ -5,6 +5,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrde
 use crate::{
     AppError, AppResult,
     api::types::{CreateJobRequest, JobDto, JobRunResponse, JobScheduleDto, UpdateJobRequest},
+    app::run_control::JobRunRegistry,
     connectors::{
         feishu::FeishuSourceConnector, notion::NotionSourceConnector,
         opendal::source::OpenDalSourceConnector, traits::SourceConnector,
@@ -14,7 +15,7 @@ use crate::{
         NewScheduledSyncJob, SeaOrmRepository, SyncJobRecord, SyncJobRepository, SyncJobSchedule,
         UpdateScheduledSyncJob,
     },
-    entity::sync_job,
+    entity::{sync_job, sync_run},
     sync::{
         engine::{SyncEngine, SyncEngineOptions},
         vault_writer::VaultWriter,
@@ -27,6 +28,8 @@ use crate::{
 ///
 /// Returns an error when database reads fail or stored job metadata is invalid.
 pub async fn list_jobs(repository: &SeaOrmRepository) -> AppResult<Vec<JobDto>> {
+    recover_stale_running_jobs(repository).await?;
+
     let jobs = sync_job::Entity::find()
         .order_by_asc(sync_job::Column::Name)
         .all(repository.connection())
@@ -116,19 +119,25 @@ pub async fn update_job(
 /// the sync engine fails.
 pub async fn run_job(
     repository: Arc<SeaOrmRepository>,
+    registry: Option<Arc<JobRunRegistry>>,
     vault_path: PathBuf,
     job_id: JobId,
     file_concurrency: usize,
 ) -> AppResult<JobRunResponse> {
     let source_id = mark_job_running(repository.as_ref(), job_id).await?;
+    let token = registry.as_ref().map(|registry| registry.register(job_id));
+    let options = token.clone().map_or_else(
+        || SyncEngineOptions::new(file_concurrency),
+        |token| SyncEngineOptions::new(file_concurrency).with_cancellation_token(token),
+    );
     let engine = SyncEngine::with_options(
         Arc::clone(&repository),
         Arc::new(move |kind| source_connector(kind, source_id)),
         VaultWriter::new(vault_path),
-        SyncEngineOptions::new(file_concurrency),
+        options,
     );
 
-    match engine.run_job(job_id).await {
+    let result = match engine.run_job(job_id).await {
         Ok(summary) => Ok(JobRunResponse {
             run_id: summary.run_id,
             status: if summary.failed == 0 {
@@ -138,13 +147,94 @@ pub async fn run_job(
             },
         }),
         Err(error) => {
-            set_job_status(repository.as_ref(), job_id, JobStatus::Failed).await?;
+            if !matches!(error, AppError::Cancelled(_)) {
+                set_job_status(repository.as_ref(), job_id, JobStatus::Failed).await?;
+            }
             Err(error)
         }
+    };
+    if let Some(registry) = registry {
+        registry.unregister(job_id);
     }
+
+    result
+}
+
+/// Stop a running sync job by signalling an in-process run or unlocking stale state.
+///
+/// # Errors
+///
+/// Returns an error if the job cannot be loaded, is not currently running, or the
+/// repository update used to unlock stale state fails.
+pub async fn stop_job(
+    repository: &SeaOrmRepository,
+    registry: &JobRunRegistry,
+    job_id: JobId,
+) -> AppResult<()> {
+    recover_stale_running_jobs(repository).await?;
+    let job = sync_job::Entity::find_by_id(job_id.as_i64())
+        .one(repository.connection())
+        .await
+        .map_err(map_db_error)?
+        .ok_or_else(|| AppError::NotFound(format!("sync job not found: {job_id}")))?;
+    if job_status_from_str(&job.status)? != JobStatus::Running {
+        return Err(AppError::Conflict(format!(
+            "sync job is not running: {job_id}"
+        )));
+    }
+    if !registry.cancel(job_id) {
+        recover_stale_running_jobs(repository).await?;
+        let refreshed = sync_job::Entity::find_by_id(job_id.as_i64())
+            .one(repository.connection())
+            .await
+            .map_err(map_db_error)?
+            .ok_or_else(|| AppError::NotFound(format!("sync job not found: {job_id}")))?;
+        if job_status_from_str(&refreshed.status)? == JobStatus::Running {
+            force_cancel_stale_job(repository, refreshed).await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn force_cancel_stale_job(
+    repository: &SeaOrmRepository,
+    job: sync_job::Model,
+) -> AppResult<()> {
+    let db = repository.connection();
+    let now = chrono::Utc::now();
+    let latest_running_run = sync_run::Entity::find()
+        .filter(sync_run::Column::JobId.eq(job.id))
+        .filter(sync_run::Column::Status.eq("running"))
+        .order_by_desc(sync_run::Column::StartedAt)
+        .one(db)
+        .await
+        .map_err(map_db_error)?;
+
+    let mut active_job: sync_job::ActiveModel = job.into();
+    active_job.status = sea_orm::ActiveValue::Set("idle".to_owned());
+    active_job.updated_at = sea_orm::ActiveValue::Set(now);
+
+    if let Some(run) = latest_running_run {
+        let run_id = run.id;
+        let mut active_run: sync_run::ActiveModel = run.into();
+        active_run.status = sea_orm::ActiveValue::Set("cancelled".to_owned());
+        active_run.finished_at = sea_orm::ActiveValue::Set(Some(now));
+        active_run.updated_at = sea_orm::ActiveValue::Set(now);
+        active_run.update(db).await.map_err(map_db_error)?;
+        active_job.last_run_at = sea_orm::ActiveValue::Set(Some(now));
+        active_job.last_run_status = sea_orm::ActiveValue::Set(Some("cancelled".to_owned()));
+        active_job.last_run_id = sea_orm::ActiveValue::Set(Some(run_id));
+    }
+
+    active_job.update(db).await.map_err(map_db_error)?;
+
+    Ok(())
 }
 
 async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppResult<SourceId> {
+    recover_stale_running_jobs(repository).await?;
+
     let db = repository.connection();
     let job_id_value = job_id.as_i64();
     let job = sync_job::Entity::find_by_id(job_id_value)
@@ -191,6 +281,77 @@ async fn mark_job_running(repository: &SeaOrmRepository, job_id: JobId) -> AppRe
     }
 
     Ok(source_id)
+}
+
+async fn recover_stale_running_jobs(repository: &SeaOrmRepository) -> AppResult<()> {
+    let db = repository.connection();
+    let running_jobs = sync_job::Entity::find()
+        .filter(sync_job::Column::Status.eq("running"))
+        .all(db)
+        .await
+        .map_err(map_db_error)?;
+
+    for job in running_jobs {
+        let running_run = sync_run::Entity::find()
+            .filter(sync_run::Column::JobId.eq(job.id))
+            .filter(sync_run::Column::Status.eq("running"))
+            .one(db)
+            .await
+            .map_err(map_db_error)?;
+        if running_run.is_some() {
+            continue;
+        }
+
+        let latest_run = sync_run::Entity::find()
+            .filter(sync_run::Column::JobId.eq(job.id))
+            .order_by_desc(sync_run::Column::StartedAt)
+            .one(db)
+            .await
+            .map_err(map_db_error)?;
+        let recovered_status = stale_job_status_after_run(
+            latest_run.as_ref().map(|run| run.status.as_str()),
+            job.updated_at,
+        )?;
+        if recovered_status == "running" {
+            continue;
+        }
+
+        let now = chrono::Utc::now();
+        let mut active_job: sync_job::ActiveModel = job.into();
+        active_job.status = sea_orm::ActiveValue::Set(recovered_status.to_owned());
+        if let Some(run) = latest_run {
+            active_job.last_run_at =
+                sea_orm::ActiveValue::Set(run.finished_at.or(Some(run.started_at)));
+            active_job.last_run_status = sea_orm::ActiveValue::Set(Some(run.status));
+            active_job.last_run_id = sea_orm::ActiveValue::Set(Some(run.id));
+        }
+        active_job.updated_at = sea_orm::ActiveValue::Set(now);
+        active_job.update(db).await.map_err(map_db_error)?;
+    }
+
+    Ok(())
+}
+
+fn stale_job_status_after_run(
+    run_status: Option<&str>,
+    job_updated_at: chrono::DateTime<chrono::Utc>,
+) -> AppResult<&'static str> {
+    match run_status {
+        Some("completed" | "completed_with_failures") => Ok("idle"),
+        Some("failed" | "cancelled") => Ok("failed"),
+        Some("running") => Ok("running"),
+        None => {
+            let age = chrono::Utc::now() - job_updated_at;
+            if age > chrono::Duration::minutes(5) {
+                Ok("idle")
+            } else {
+                Ok("running")
+            }
+        }
+        Some(other) => Err(AppError::Database(format!(
+            "unknown run status stored in database: {other}"
+        ))),
+    }
 }
 
 async fn set_job_status(

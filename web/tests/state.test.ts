@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { get } from "svelte/store";
 import { api } from "../src/lib/api";
 import {
+  deleteSource,
   fileBrowser,
   jobs,
   loadConsoleData,
@@ -10,6 +11,7 @@ import {
   runs,
   selectedRunDetail,
   sources,
+  stopJob,
   testSourceConnection,
   triggerJobRun,
   updateJob,
@@ -428,6 +430,48 @@ test("updateJob patches the live sync job and replaces it in state", async () =>
   });
 });
 
+test("deleteSource deletes the live source and clears dependent console state", async () => {
+  const requests: string[] = [];
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+    const pathWithSearch = requestPathWithSearch(input);
+    requests.push(`${init?.method ?? "GET"} ${pathWithSearch}`);
+
+    if (pathWithSearch === "/api/files?sourceId=src-local&path=docs") {
+      return jsonResponse({
+        sourceId: "src-local",
+        path: "docs",
+        entries: [
+          {
+            name: "guide.md",
+            path: "docs/guide.md",
+            kind: "file",
+          },
+        ],
+      });
+    }
+
+    if (path === "/api/sources/src-local" && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  await loadFiles({ sourceId: "src-local", path: "docs" });
+
+  expect(get(fileBrowser).data?.sourceId).toBe("src-local");
+
+  await deleteSource("src-local");
+
+  expect(requests).toContain("DELETE /api/sources/src-local");
+  expect(get(sources).data).toEqual([]);
+  expect(get(jobs).data).toEqual([]);
+  expect(get(fileBrowser).data).toBeUndefined();
+});
+
 test("triggerJobRun keeps refreshed run list data when the live API returns the new run", async () => {
   globalThis.fetch = (async (input, init) => {
     const path = requestPath(input);
@@ -464,6 +508,89 @@ test("triggerJobRun keeps refreshed run list data when the live API returns the 
     synced: 4,
     skipped: 1,
     failed: 0,
+  });
+});
+
+test("triggerJobRun mock fallback does not leave the job running", async () => {
+  globalThis.fetch = (async () =>
+    new Response("not found", {
+      status: 404,
+      headers: {
+        "Content-Type": "text/plain",
+      },
+    })) as typeof fetch;
+
+  await triggerJobRun(1);
+
+  const job = get(jobs).data.find((candidate) => candidate.id === 1);
+  expect(job?.status).toBe("idle");
+  expect(job?.lastRunStatus).toBe("completed");
+});
+
+test("stopJob posts to the live stop endpoint and refreshes running job state", async () => {
+  const requests: string[] = [];
+  let stopped = false;
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+    requests.push(`${init?.method ?? "GET"} ${path}`);
+
+    if (path === "/api/jobs/job-local/stop" && init?.method === "POST") {
+      stopped = true;
+      return new Response(null, { status: 202 });
+    }
+
+    if (path === "/api/jobs") {
+      return jsonResponse({
+        data: [
+          {
+            id: "job-local",
+            sourceId: "src-local",
+            name: "Local job",
+            enabled: true,
+            status: stopped ? "idle" : "running",
+            schedule: "Manual",
+            lastRunStatus: stopped ? "cancelled" : "running",
+          },
+        ],
+      });
+    }
+
+    if (path === "/api/runs") {
+      return jsonResponse({
+        data: [
+          {
+            id: "run-local",
+            jobId: "job-local",
+            status: stopped ? "cancelled" : "running",
+            startedAt: "2026-05-12T09:24:00.000Z",
+            finishedAt: stopped ? "2026-05-12T09:25:00.000Z" : null,
+            processedCount: 1,
+            syncedCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+          },
+        ],
+      });
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+  expect(get(jobs).data[0]?.status).toBe("running");
+
+  await stopJob("job-local");
+
+  expect(requests).toContain("POST /api/jobs/job-local/stop");
+  expect(get(jobs).data[0]).toMatchObject({
+    id: "job-local",
+    status: "idle",
+    lastRunStatus: "cancelled",
+  });
+  expect(get(runs).data[0]).toMatchObject({
+    id: "run-local",
+    status: "cancelled",
   });
 });
 

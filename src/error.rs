@@ -13,6 +13,9 @@ pub enum AppError {
     #[error("connector error: {0}")]
     ConnectorTransient(String),
 
+    #[error("cancelled: {0}")]
+    Cancelled(String),
+
     #[error("conflict: {0}")]
     Conflict(String),
 
