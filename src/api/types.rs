@@ -354,6 +354,38 @@ pub struct ItemDto {
     pub metadata_json: Option<Value>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileBrowseQuery {
+    pub source_id: SourceId,
+    pub path: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileBrowseResponse {
+    pub source_id: SourceId,
+    pub path: String,
+    pub entries: Vec<FileEntryDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntryDto {
+    pub name: String,
+    pub path: String,
+    pub kind: FileEntryKind,
+    pub item: Option<ItemDto>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileEntryKind {
+    Directory,
+    File,
+    VirtualDocument,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncErrorDto {

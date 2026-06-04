@@ -12,10 +12,11 @@ use crate::{
     api::{
         openapi,
         types::{
-            CreateJobRequest, CreateSourceRequest, ErrorListQuery, HealthResponse, ItemDto,
-            ItemListQuery, JobDto, JobRunResponse, ListResponse, RunDetailDto, RunDto, SettingsDto,
-            SourceDto, SourceTemplateDto, SourceTestResponse, SyncErrorDto, UpdateJobRequest,
-            UpdateSettingsRequest, UpdateSourceRequest,
+            CreateJobRequest, CreateSourceRequest, ErrorListQuery, FileBrowseQuery,
+            FileBrowseResponse, HealthResponse, ItemDto, ItemListQuery, JobDto, JobRunResponse,
+            ListResponse, RunDetailDto, RunDto, SettingsDto, SourceDto, SourceTemplateDto,
+            SourceTestResponse, SyncErrorDto, UpdateJobRequest, UpdateSettingsRequest,
+            UpdateSourceRequest,
         },
     },
     app::{job_service, run_service, settings_service, source_service},
@@ -48,6 +49,7 @@ fn api_routes_without_state() -> Router<ApiState> {
         .route("/api/jobs/{id}/run", post(run_job))
         .route("/api/runs", get(list_runs))
         .route("/api/runs/{id}", get(get_run_detail))
+        .route("/api/files", get(browse_files))
         .route("/api/items", get(list_items))
         .route("/api/errors", get(list_errors))
         .route("/api/settings", get(settings).patch(update_settings))
@@ -181,6 +183,15 @@ async fn list_items(
     Ok(Json(ListResponse::new(
         run_service::list_items(state.repository(), query).await?,
     )))
+}
+
+async fn browse_files(
+    State(state): State<ApiState>,
+    Query(query): Query<FileBrowseQuery>,
+) -> Result<Json<FileBrowseResponse>, ApiError> {
+    Ok(Json(
+        run_service::browse_files(state.repository(), query).await?,
+    ))
 }
 
 async fn list_errors(

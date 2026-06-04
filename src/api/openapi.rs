@@ -32,6 +32,7 @@ fn paths() -> Value {
         "/api/jobs/{id}/run": job_run_path(),
         "/api/runs": runs_path(),
         "/api/runs/{id}": run_detail_path(),
+        "/api/files": files_path(),
         "/api/items": items_path(),
         "/api/errors": errors_path(),
         "/api/settings": settings_path()
@@ -239,6 +240,26 @@ fn run_detail_path() -> Value {
 }
 
 #[must_use]
+fn files_path() -> Value {
+    json!({
+        "get": {
+            "tags": ["items"],
+            "operationId": "browseFiles",
+            "parameters": [
+                required_query_local_id_parameter("sourceId", "Source identifier"),
+                query_string_parameter("path", "Source-relative directory path")
+            ],
+            "responses": {
+                "200": json_response("FileBrowseResponse"),
+                "400": error_response(),
+                "404": error_response(),
+                "500": error_response()
+            }
+        }
+    })
+}
+
+#[must_use]
 fn items_path() -> Value {
     json!({
         "get": {
@@ -307,6 +328,9 @@ fn schemas() -> Value {
         "ApiErrorBody": api_error_body_schema(),
         "CreateJobRequest": create_job_request_schema(),
         "CreateSourceRequest": create_source_request_schema(),
+        "FileBrowseResponse": file_browse_response_schema(),
+        "FileEntryDto": file_entry_schema(),
+        "FileEntryKind": file_entry_kind_schema(),
         "HealthResponse": health_response_schema(),
         "ItemDto": item_schema(),
         "JobDto": job_schema(),
@@ -393,6 +417,43 @@ fn health_response_schema() -> Value {
             "status": {"type": "string", "enum": ["ok"]}
         }
     })
+}
+
+#[must_use]
+fn file_browse_response_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["sourceId", "path", "entries"],
+        "properties": {
+            "sourceId": local_id_schema(),
+            "path": {"type": "string"},
+            "entries": array_ref_schema("FileEntryDto")
+        }
+    })
+}
+
+#[must_use]
+fn file_entry_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["name", "path", "kind", "item"],
+        "properties": {
+            "name": {"type": "string"},
+            "path": {"type": "string"},
+            "kind": ref_schema("FileEntryKind"),
+            "item": {
+                "oneOf": [
+                    ref_schema("ItemDto"),
+                    {"type": "null"}
+                ]
+            }
+        }
+    })
+}
+
+#[must_use]
+fn file_entry_kind_schema() -> Value {
+    json!({"type": "string", "enum": ["directory", "file", "virtual_document"]})
 }
 
 #[must_use]
@@ -748,6 +809,28 @@ fn query_local_id_parameter(name: &str, description: &str) -> Value {
         "required": false,
         "description": description,
         "schema": local_id_schema()
+    })
+}
+
+#[must_use]
+fn required_query_local_id_parameter(name: &str, description: &str) -> Value {
+    json!({
+        "name": name,
+        "in": "query",
+        "required": true,
+        "description": description,
+        "schema": local_id_schema()
+    })
+}
+
+#[must_use]
+fn query_string_parameter(name: &str, description: &str) -> Value {
+    json!({
+        "name": name,
+        "in": "query",
+        "required": false,
+        "description": description,
+        "schema": {"type": "string"}
     })
 }
 

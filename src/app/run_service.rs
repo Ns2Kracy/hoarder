@@ -1,11 +1,17 @@
+use std::collections::BTreeMap;
+
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::{
     AppError, AppResult,
     api::types::{
-        ErrorListQuery, ItemDto, ItemListQuery, RunCountsDto, RunDetailDto, RunDto, SyncErrorDto,
+        ErrorListQuery, FileBrowseQuery, FileBrowseResponse, FileEntryDto, FileEntryKind, ItemDto,
+        ItemListQuery, RunCountsDto, RunDetailDto, RunDto, SyncErrorDto,
     },
-    core::types::{ItemId, ItemType, RunId, RunStatus, SyncStatus},
+    core::{
+        types::{ItemId, ItemType, RunId, RunStatus, SyncStatus},
+        vault_path::normalize_source_path,
+    },
     db::repository::SeaOrmRepository,
     entity::{sync_error, sync_item, sync_run},
 };
@@ -120,6 +126,74 @@ pub async fn list_items(
         .collect()
 }
 
+/// Browses synced source items as one directory level.
+///
+/// # Errors
+///
+/// Returns an error when the source does not exist, the requested path is
+/// invalid, database reads fail, or stored item metadata is invalid.
+pub async fn browse_files(
+    repository: &SeaOrmRepository,
+    query: FileBrowseQuery,
+) -> AppResult<FileBrowseResponse> {
+    repository.load_source(query.source_id).await?;
+
+    let path = normalize_browse_path(query.path.as_deref())?;
+    let mut entries = BTreeMap::<String, FileEntryDto>::new();
+    let items = sync_item::Entity::find()
+        .filter(sync_item::Column::SourceId.eq(query.source_id.as_i64()))
+        .filter(sync_item::Column::Status.ne(sync_status_to_str(SyncStatus::DeletedOnSource)))
+        .order_by_asc(sync_item::Column::SourcePath)
+        .all(repository.connection())
+        .await
+        .map_err(map_db_error)?;
+
+    for item in items {
+        let Some(relative_path) = child_relative_path(&path, &item.source_path) else {
+            continue;
+        };
+        let Some((name, is_nested)) = child_name(relative_path) else {
+            continue;
+        };
+        let name = name.to_owned();
+        let child_path = join_browse_path(&path, &name);
+
+        if is_nested {
+            entries.entry(child_path.clone()).or_insert(FileEntryDto {
+                name,
+                path: child_path,
+                kind: FileEntryKind::Directory,
+                item: None,
+            });
+            continue;
+        }
+
+        let item_dto = item_dto_from_model(item)?;
+        entries.insert(
+            child_path.clone(),
+            FileEntryDto {
+                name,
+                path: child_path,
+                kind: file_entry_kind(item_dto.item_type),
+                item: Some(item_dto),
+            },
+        );
+    }
+
+    let mut entries = entries.into_values().collect::<Vec<_>>();
+    entries.sort_by(|left, right| {
+        file_entry_sort_rank(left.kind)
+            .cmp(&file_entry_sort_rank(right.kind))
+            .then_with(|| left.name.cmp(&right.name))
+    });
+
+    Ok(FileBrowseResponse {
+        source_id: query.source_id,
+        path,
+        entries,
+    })
+}
+
 /// Lists sync errors with optional source and run filters.
 ///
 /// # Errors
@@ -171,6 +245,61 @@ fn item_dto_from_model(item: sync_item::Model) -> AppResult<ItemDto> {
         content_hash: item.content_hash,
         metadata_json: item.metadata_json,
     })
+}
+
+fn normalize_browse_path(path: Option<&str>) -> AppResult<String> {
+    let Some(path) = path.map(str::trim).filter(|path| !path.is_empty()) else {
+        return Ok(String::new());
+    };
+
+    normalize_source_path(path)
+}
+
+fn child_relative_path<'a>(browse_path: &str, source_path: &'a str) -> Option<&'a str> {
+    if browse_path.is_empty() {
+        return Some(source_path);
+    }
+
+    if source_path == browse_path {
+        return None;
+    }
+
+    source_path.strip_prefix(&format!("{browse_path}/"))
+}
+
+fn child_name(relative_path: &str) -> Option<(&str, bool)> {
+    if relative_path.is_empty() {
+        return None;
+    }
+
+    match relative_path.split_once('/') {
+        Some((name, _)) if !name.is_empty() => Some((name, true)),
+        Some(_) => None,
+        None => Some((relative_path, false)),
+    }
+}
+
+fn join_browse_path(parent: &str, name: &str) -> String {
+    if parent.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{parent}/{name}")
+    }
+}
+
+const fn file_entry_kind(item_type: ItemType) -> FileEntryKind {
+    match item_type {
+        ItemType::File => FileEntryKind::File,
+        ItemType::Directory => FileEntryKind::Directory,
+        ItemType::VirtualDocument => FileEntryKind::VirtualDocument,
+    }
+}
+
+const fn file_entry_sort_rank(kind: FileEntryKind) -> u8 {
+    match kind {
+        FileEntryKind::Directory => 0,
+        FileEntryKind::File | FileEntryKind::VirtualDocument => 1,
+    }
 }
 
 fn item_type_from_str(item_type: &str) -> AppResult<ItemType> {

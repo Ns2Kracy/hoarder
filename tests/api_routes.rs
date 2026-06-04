@@ -10,7 +10,7 @@ use hoarder::{
     api::{routes::router, state::ApiState},
     config::AppConfig,
     connectors::traits::ConnectorConfig,
-    core::types::{ConnectorKind, JobId, SourceId},
+    core::types::{ConnectorKind, ItemType, JobId, SourceId, SyncStatus},
     db::{
         connect_sqlite,
         repository::{
@@ -19,6 +19,7 @@ use hoarder::{
         schema::sync_schema,
     },
     entity::{source, sync_job},
+    sync::repository::{ItemSyncOutcome, SyncRepository},
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::{Value, json};
@@ -253,6 +254,121 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
 }
 
 #[tokio::test]
+async fn api_routes_files_returns_source_root_children() {
+    let test = TestApp::new().await;
+    let now = chrono::Utc::now();
+    record_item(
+        &test.repository,
+        test.job_id,
+        item_outcome(
+            test.source_id,
+            "readme.md",
+            ItemType::File,
+            SyncStatus::Synced,
+            now,
+        ),
+    )
+    .await;
+    record_item(
+        &test.repository,
+        test.job_id,
+        item_outcome(
+            test.source_id,
+            "docs/guide.md",
+            ItemType::File,
+            SyncStatus::Synced,
+            now,
+        ),
+    )
+    .await;
+
+    let response = request(
+        test.app.clone(),
+        "GET",
+        &format!("/api/files?sourceId={}", test.source_id),
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["sourceId"], json!(test.source_id.as_i64()));
+    assert_eq!(response.body["path"], json!(""));
+    assert_eq!(response.body["entries"][0]["kind"], json!("directory"));
+    assert_eq!(response.body["entries"][0]["name"], json!("docs"));
+    assert_eq!(response.body["entries"][0]["path"], json!("docs"));
+    assert_eq!(response.body["entries"][0]["item"], Value::Null);
+    assert_eq!(response.body["entries"][1]["kind"], json!("file"));
+    assert_eq!(response.body["entries"][1]["name"], json!("readme.md"));
+    assert_eq!(response.body["entries"][1]["path"], json!("readme.md"));
+    assert_eq!(
+        response.body["entries"][1]["item"]["status"],
+        json!("synced")
+    );
+}
+
+#[tokio::test]
+async fn api_routes_files_returns_nested_directory_children() {
+    let test = TestApp::new().await;
+    let now = chrono::Utc::now();
+    for path in ["docs/guide.md", "docs/nested/deep.md", "readme.md"] {
+        record_item(
+            &test.repository,
+            test.job_id,
+            item_outcome(
+                test.source_id,
+                path,
+                ItemType::File,
+                SyncStatus::Synced,
+                now,
+            ),
+        )
+        .await;
+    }
+
+    let response = request(
+        test.app.clone(),
+        "GET",
+        &format!("/api/files?sourceId={}&path=docs", test.source_id),
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["path"], json!("docs"));
+    assert_eq!(response.body["entries"].as_array().unwrap().len(), 2);
+    assert_eq!(response.body["entries"][0]["kind"], json!("directory"));
+    assert_eq!(response.body["entries"][0]["name"], json!("nested"));
+    assert_eq!(response.body["entries"][0]["path"], json!("docs/nested"));
+    assert_eq!(response.body["entries"][1]["kind"], json!("file"));
+    assert_eq!(response.body["entries"][1]["name"], json!("guide.md"));
+    assert_eq!(response.body["entries"][1]["path"], json!("docs/guide.md"));
+}
+
+#[tokio::test]
+async fn api_routes_files_rejects_invalid_path() {
+    let test = TestApp::new().await;
+    let response = request(
+        test.app.clone(),
+        "GET",
+        &format!("/api/files?sourceId={}&path=../escape", test.source_id),
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status, 400);
+    assert_eq!(response.body["error"]["code"], json!("PATH_ERROR"));
+}
+
+#[tokio::test]
+async fn api_routes_files_returns_not_found_for_unknown_source() {
+    let test = TestApp::new().await;
+    let response = request(test.app.clone(), "GET", "/api/files?sourceId=999999", None).await;
+
+    assert_eq!(response.status, 404);
+    assert_eq!(response.body["error"]["code"], json!("NOT_FOUND"));
+}
+
+#[tokio::test]
 async fn api_routes_updates_sync_job_name_schedule_and_enabled_state() {
     let test = TestApp::new().await;
     let response = request(
@@ -311,6 +427,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
         "/api/jobs/{id}/run",
         "/api/runs",
         "/api/runs/{id}",
+        "/api/files",
         "/api/items",
         "/api/errors",
         "/api/settings",
@@ -318,6 +435,7 @@ async fn api_routes_openapi_spec_lists_current_routes() {
         assert!(response.body["paths"][path].is_object(), "{path}");
     }
     assert!(response.body["components"]["schemas"]["SourceDto"].is_object());
+    assert!(response.body["components"]["schemas"]["FileBrowseResponse"].is_object());
     assert!(response.body["components"]["schemas"]["SourceTemplateDto"].is_object());
     assert!(response.body["components"]["schemas"]["ApiErrorBody"].is_object());
     assert_eq!(
@@ -356,6 +474,10 @@ async fn api_routes_openapi_spec_lists_current_routes() {
     assert_eq!(
         response.body["paths"]["/api/jobs/{id}/run"]["post"]["parameters"][0]["schema"]["type"],
         json!("integer")
+    );
+    assert_eq!(
+        response.body["paths"]["/api/files"]["get"]["parameters"][0]["required"],
+        json!(true)
     );
 }
 
@@ -666,6 +788,38 @@ async fn set_job_running(repository: &SeaOrmRepository, job_id: JobId) {
     let mut active_model: sync_job::ActiveModel = job.into();
     active_model.status = Set("running".to_owned());
     active_model.update(repository.connection()).await.unwrap();
+}
+
+async fn record_item(repository: &SeaOrmRepository, job_id: JobId, outcome: ItemSyncOutcome) {
+    let job = repository.load_job(job_id).await.unwrap();
+    let run_id = repository.start_run(&job).await.unwrap();
+
+    repository
+        .record_item_outcome(run_id, outcome)
+        .await
+        .unwrap();
+}
+
+fn item_outcome(
+    source_id: SourceId,
+    source_path: &str,
+    item_type: ItemType,
+    status: SyncStatus,
+    modified_at: chrono::DateTime<chrono::Utc>,
+) -> ItemSyncOutcome {
+    ItemSyncOutcome {
+        source_id,
+        source_path: source_path.to_owned(),
+        item_type,
+        status,
+        target_path: Some(PathBuf::from(format!("/vault/{source_id}/{source_path}"))),
+        size: Some(12),
+        etag: Some(format!("{source_path}-etag")),
+        modified_at: Some(modified_at),
+        content_hash: Some(format!("sha256:{source_path}")),
+        bytes_written: 12,
+        error_message: None,
+    }
 }
 
 fn fs_config(root: &Path) -> ConnectorConfig {
