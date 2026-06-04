@@ -2,8 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import { get } from "svelte/store";
 import { api } from "../src/lib/api";
 import {
+  fileBrowser,
   jobs,
   loadConsoleData,
+  loadFiles,
   loadRunDetail,
   runs,
   selectedRunDetail,
@@ -163,6 +165,57 @@ test("api read calls still fall back to mock data when the local endpoint is mis
     status: 404,
   });
   expect(result.data.length).toBeGreaterThan(0);
+});
+
+test("loadFiles requests the file browser endpoint and stores directory entries", async () => {
+  const paths: string[] = [];
+
+  globalThis.fetch = (async (input) => {
+    const path = requestPathWithSearch(input);
+    paths.push(path);
+
+    if (path === "/api/files?sourceId=1&path=docs") {
+      return jsonResponse({
+        sourceId: 1,
+        path: "docs",
+        entries: [
+          {
+            name: "guide.md",
+            path: "docs/guide.md",
+            kind: "file",
+            item: {
+              id: 10,
+              sourceId: 1,
+              sourcePath: "docs/guide.md",
+              itemType: "file",
+              status: "synced",
+              size: 2048,
+            },
+          },
+        ],
+      });
+    }
+
+    return jsonResponse(responseFor(requestPath(input)));
+  }) as typeof fetch;
+
+  await loadFiles({ sourceId: 1, path: "docs" });
+
+  expect(paths).toEqual(["/api/files?sourceId=1&path=docs"]);
+  expect(get(fileBrowser).data).toMatchObject({
+    sourceId: 1,
+    path: "docs",
+    entries: [
+      {
+        name: "guide.md",
+        kind: "file",
+        item: {
+          sourcePath: "docs/guide.md",
+          status: "synced",
+        },
+      },
+    ],
+  });
 });
 
 test("createSource posts app connector config variants", async () => {
@@ -568,6 +621,14 @@ function requestPath(input: RequestInfo | URL) {
   }
 
   return new URL(input.url).pathname;
+}
+
+function requestPathWithSearch(input: RequestInfo | URL) {
+  const url =
+    typeof input === "string"
+      ? new URL(input, "http://localhost")
+      : new URL(input instanceof URL ? input.href : input.url);
+  return `${url.pathname}${url.search}`;
 }
 
 function jsonResponse(body: unknown, status = 200) {

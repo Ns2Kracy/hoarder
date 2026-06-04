@@ -2,6 +2,7 @@
     import {
         Activity,
         Database,
+        Files as FilesIcon,
         FolderCog,
         Gauge,
         PlaySquare,
@@ -11,6 +12,7 @@
     import { Tooltip } from "bits-ui";
     import { onMount } from "svelte";
     import Jobs from "./routes/Jobs.svelte";
+    import Files from "./routes/Files.svelte";
     import Overview from "./routes/Overview.svelte";
     import Runs from "./routes/Runs.svelte";
     import Settings from "./routes/Settings.svelte";
@@ -19,9 +21,11 @@
         addSource,
         consoleOrigin,
         createJob,
+        fileBrowser,
         isRefreshing,
         jobs,
         loadConsoleData,
+        loadFiles,
         loadRunDetail,
         runs,
         runItems,
@@ -42,6 +46,7 @@
         { id: "overview", label: "Overview", icon: Gauge },
         { id: "sources", label: "Sources", icon: Database },
         { id: "jobs", label: "Jobs", icon: PlaySquare },
+        { id: "files", label: "Files", icon: FilesIcon },
         { id: "runs", label: "Runs", icon: Activity },
         { id: "settings", label: "Settings", icon: SettingsIcon },
     ] satisfies { id: PageId; label: string; icon: typeof Gauge }[];
@@ -59,6 +64,10 @@
 
     function selectPage(page: PageId) {
         activePage = page;
+    }
+
+    function browseFiles(sourceId: number, path?: string) {
+        return loadFiles({ sourceId, path });
     }
 
     function pageFromHash(): PageId {
@@ -170,6 +179,12 @@
                         onCreateJob={createJob}
                         onUpdateJob={updateJob}
                         onRunJob={triggerJobRun}
+                    />
+                {:else if activePage === "files"}
+                    <Files
+                        sources={$sources}
+                        fileBrowser={$fileBrowser}
+                        onBrowse={browseFiles}
                     />
                 {:else if activePage === "runs"}
                     <Runs

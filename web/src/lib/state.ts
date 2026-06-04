@@ -4,6 +4,8 @@ import type {
   ApiData,
   ConsoleSummary,
   ErrorFilters,
+  FileBrowseDto,
+  FileBrowseFilters,
   ItemFilters,
   JobFormInput,
   LocalId,
@@ -50,6 +52,7 @@ export const runs = writable<Loadable<SyncRunDto[]>>(emptyList());
 export const selectedRunDetail = writable<Loadable<SyncRunDto | undefined>>(emptyValue(undefined));
 export const runItems = writable<Loadable<SyncItemDto[]>>(emptyList());
 export const runErrors = writable<Loadable<SyncErrorDto[]>>(emptyList());
+export const fileBrowser = writable<Loadable<FileBrowseDto | undefined>>(emptyValue(undefined));
 export const settings = writable<Loadable<SettingsDto>>(emptyValue(defaultSettings));
 
 let runDetailRequestSequence = 0;
@@ -295,6 +298,17 @@ export async function loadRunDetail(runId: LocalId, filters: Omit<ItemFilters, "
     data: upsertRun(current.data, detail),
     updatedAt: new Date().toISOString(),
   }));
+}
+
+export async function loadFiles(filters: FileBrowseFilters) {
+  fileBrowser.update((current) => ({ ...current, status: "loading" }));
+
+  try {
+    const result = await api.getFiles(filters);
+    fileBrowser.set(applyResult(result));
+  } catch (error) {
+    fileBrowser.update((current) => loadableWithError(current, error));
+  }
 }
 
 export async function saveSettings(nextSettings: SettingsUpdate) {

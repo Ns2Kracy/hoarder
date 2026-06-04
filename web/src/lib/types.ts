@@ -1,4 +1,4 @@
-export type PageId = "overview" | "sources" | "jobs" | "runs" | "settings";
+export type PageId = "overview" | "sources" | "jobs" | "files" | "runs" | "settings";
 
 export type DataOrigin = "api" | "mock";
 
@@ -185,6 +185,26 @@ export interface SyncItemDto {
   modifiedAt?: string;
   contentHash?: string;
   metadataJson?: unknown;
+}
+
+export type FileEntryKind = "directory" | "file" | "virtual_document";
+
+export interface FileEntryDto {
+  name: string;
+  path: string;
+  kind: FileEntryKind;
+  item?: SyncItemDto;
+}
+
+export interface FileBrowseDto {
+  sourceId: LocalId;
+  path: string;
+  entries: FileEntryDto[];
+}
+
+export interface FileBrowseFilters {
+  sourceId: LocalId;
+  path?: string;
 }
 
 export interface ItemFilters {

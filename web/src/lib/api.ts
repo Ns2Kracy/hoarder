@@ -2,6 +2,9 @@ import type {
   ApiData,
   ApiErrorBody,
   ErrorFilters,
+  FileBrowseDto,
+  FileBrowseFilters,
+  FileEntryDto,
   FrontendApiError,
   ItemFilters,
   JobFormInput,
@@ -226,6 +229,32 @@ const mockItems: SyncItemDto[] = [
     status: "skipped",
     size: 1298,
     modifiedAt: isoMinutesAgo(80),
+    metadataJson: {
+      runId: 11,
+    },
+  },
+  {
+    id: 6,
+    sourceId: 1,
+    sourcePath: "docs/guide.md",
+    itemType: "file",
+    status: "synced",
+    size: 18_420,
+    modifiedAt: isoMinutesAgo(54),
+    contentHash: "sha256:docs-guide",
+    metadataJson: {
+      runId: 11,
+    },
+  },
+  {
+    id: 7,
+    sourceId: 1,
+    sourcePath: "docs/nested/reference.json",
+    itemType: "virtual_document",
+    status: "synced",
+    size: 5_482,
+    modifiedAt: isoMinutesAgo(57),
+    contentHash: "sha256:nested-reference",
     metadataJson: {
       runId: 11,
     },
@@ -483,6 +512,19 @@ interface BackendItemDto {
   modifiedAt?: string | null;
   contentHash?: string | null;
   metadataJson?: unknown;
+}
+
+interface BackendFileBrowseDto {
+  sourceId: number;
+  path: string;
+  entries: BackendFileEntryDto[];
+}
+
+interface BackendFileEntryDto {
+  name: string;
+  path: string;
+  kind: FileEntryDto["kind"];
+  item?: BackendItemDto | null;
 }
 
 interface BackendSyncErrorDto {
@@ -756,6 +798,13 @@ export const api = {
       () => filterMockItems(filters),
     ),
 
+  getFiles: (filters: FileBrowseFilters) =>
+    withMockFallback(
+      async () =>
+        toFileBrowseDto(await request<BackendFileBrowseDto>(`/files${queryString(filters)}`)),
+      () => browseMockFiles(filters),
+    ),
+
   getErrors: (filters: ErrorFilters = {}) =>
     withMockFallback(
       async () => {
@@ -976,6 +1025,19 @@ function toItemDto(item: BackendItemDto): SyncItemDto {
   };
 }
 
+function toFileBrowseDto(response: BackendFileBrowseDto): FileBrowseDto {
+  return {
+    sourceId: response.sourceId,
+    path: response.path,
+    entries: response.entries.map((entry) => ({
+      name: entry.name,
+      path: entry.path,
+      kind: entry.kind,
+      item: entry.item ? toItemDto(entry.item) : undefined,
+    })),
+  };
+}
+
 function toSyncErrorDto(error: BackendSyncErrorDto): SyncErrorDto {
   return {
     id: error.id,
@@ -1106,6 +1168,79 @@ function filterMockItems(filters: ItemFilters): SyncItemDto[] {
 
     return true;
   });
+}
+
+function browseMockFiles(filters: FileBrowseFilters): FileBrowseDto {
+  const path = normalizeBrowsePath(filters.path);
+  const entries = new Map<string, FileEntryDto>();
+
+  for (const item of filterMockItems({ sourceId: filters.sourceId })) {
+    if (item.status === "deleted_on_source") {
+      continue;
+    }
+
+    const relativePath = childRelativePath(path, item.sourcePath);
+    if (!relativePath) {
+      continue;
+    }
+
+    const [name, ...rest] = relativePath.split("/");
+    if (!name) {
+      continue;
+    }
+
+    const childPath = path ? `${path}/${name}` : name;
+    if (rest.length > 0) {
+      entries.set(childPath, {
+        name,
+        path: childPath,
+        kind: "directory",
+      });
+      continue;
+    }
+
+    entries.set(childPath, {
+      name,
+      path: childPath,
+      kind: item.itemType === "directory" ? "directory" : item.itemType,
+      item: { ...item },
+    });
+  }
+
+  return {
+    sourceId: filters.sourceId,
+    path,
+    entries: [...entries.values()].sort(compareFileEntries),
+  };
+}
+
+function normalizeBrowsePath(path?: string) {
+  return (
+    path
+      ?.trim()
+      .replaceAll("\\", "/")
+      .split("/")
+      .filter((part) => part && part !== ".")
+      .join("/") ?? ""
+  );
+}
+
+function childRelativePath(path: string, sourcePath: string) {
+  if (!path) {
+    return sourcePath;
+  }
+
+  if (sourcePath === path) {
+    return undefined;
+  }
+
+  return sourcePath.startsWith(`${path}/`) ? sourcePath.slice(path.length + 1) : undefined;
+}
+
+function compareFileEntries(left: FileEntryDto, right: FileEntryDto) {
+  const leftRank = left.kind === "directory" ? 0 : 1;
+  const rightRank = right.kind === "directory" ? 0 : 1;
+  return leftRank - rightRank || left.name.localeCompare(right.name);
 }
 
 function filterMockErrors(filters: ErrorFilters): SyncErrorDto[] {

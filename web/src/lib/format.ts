@@ -38,3 +38,24 @@ export function formatDuration(milliseconds?: number) {
 export function formatCount(value: number) {
   return numberFormatter.format(value);
 }
+
+export function formatBytes(value?: number) {
+  if (value === undefined) {
+    return "-";
+  }
+
+  if (value < 1024) {
+    return `${numberFormatter.format(value)} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = value / 1024;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${units[unitIndex]}`;
+}
