@@ -22,6 +22,17 @@ async fn static_assets_serves_app_shell_for_frontend_routes() {
 }
 
 #[tokio::test]
+async fn static_assets_return_not_found_for_missing_files() {
+    for path in ["/missing.js", "/favicon.ico", "/assets/missing.css"] {
+        let response = request(test_app().await, "GET", path).await;
+
+        assert_eq!(response.status, 404, "{path} should not serve app shell");
+        assert!(response.content_type().starts_with("text/plain"));
+        assert_eq!(response.body_text(), "asset not found");
+    }
+}
+
+#[tokio::test]
 async fn static_assets_keep_unmatched_api_routes_json() {
     let response = request(test_app().await, "GET", "/api/missing").await;
 

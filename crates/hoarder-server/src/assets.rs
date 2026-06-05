@@ -1,11 +1,12 @@
 use axum::{
-    body::Body,
     http::{StatusCode, Uri, header},
     response::{IntoResponse, Response},
 };
 use rust_embed::RustEmbed;
 
 use crate::api::error::ApiError;
+
+const INDEX_HTML: &str = "index.html";
 
 #[derive(RustEmbed)]
 #[folder = "../../web/dist"]
@@ -17,41 +18,38 @@ pub async fn serve(uri: Uri) -> Response {
 
 #[must_use]
 pub fn response_for_path(path: &str) -> Response {
-    let asset_path = path.trim_start_matches('/');
+    let path = path.trim_start_matches('/');
 
-    if let Some((path, file)) = asset_file(asset_path) {
+    if path.is_empty() || path == INDEX_HTML {
+        return index_html();
+    }
+
+    if let Some(file) = WebAssets::get(path) {
         return file_response(path, file);
     }
 
-    if is_api_path(asset_path) {
+    if path == "api" || path.starts_with("api/") {
         return ApiError::not_found("API route not found").into_response();
     }
 
-    if asset_path.starts_with("assets/") {
+    if path.contains('.') {
         return not_found("asset not found");
     }
 
-    WebAssets::get("index.html").map_or_else(
+    index_html()
+}
+
+fn index_html() -> Response {
+    WebAssets::get(INDEX_HTML).map_or_else(
         || not_found("frontend assets have not been built"),
-        |file| file_response("index.html", file),
+        |file| file_response(INDEX_HTML, file),
     )
 }
 
-fn asset_file(path: &str) -> Option<(&str, rust_embed::EmbeddedFile)> {
-    let path = match path {
-        "" => "index.html",
-        path => path,
-    };
-
-    WebAssets::get(path).map(|file| (path, file))
-}
-
 fn file_response(path: &str, file: rust_embed::EmbeddedFile) -> Response {
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, content_type(path))
-        .body(Body::from(file.data.into_owned()))
-        .unwrap()
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+
+    ([(header::CONTENT_TYPE, mime.as_ref())], file.data).into_response()
 }
 
 fn not_found(message: &'static str) -> Response {
@@ -61,20 +59,4 @@ fn not_found(message: &'static str) -> Response {
         message,
     )
         .into_response()
-}
-
-fn is_api_path(path: &str) -> bool {
-    path == "api" || path.starts_with("api/")
-}
-
-fn content_type(path: &str) -> &'static str {
-    match path.rsplit_once('.').map(|(_, extension)| extension) {
-        Some("css") => "text/css; charset=utf-8",
-        Some("html") => "text/html; charset=utf-8",
-        Some("js") => "text/javascript; charset=utf-8",
-        Some("json" | "map") => "application/json; charset=utf-8",
-        Some("svg") => "image/svg+xml",
-        Some("wasm") => "application/wasm",
-        _ => "application/octet-stream",
-    }
 }
