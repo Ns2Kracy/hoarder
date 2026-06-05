@@ -11,14 +11,19 @@ use tokio::{
 async fn server_cors_allows_embedded_console_and_local_vite_origins() {
     let app = test_app().await;
 
-    for origin in ["http://127.0.0.1:4761", "http://localhost:5173"] {
+    for origin in [
+        "http://127.0.0.1:4761",
+        "http://localhost:5173",
+        "http://0.0.0.0:4761",
+        "http://192.168.1.10:5173",
+    ] {
         let response = raw_request(
             app.clone(),
             &format!(
                 "OPTIONS /api/settings HTTP/1.1\r\n\
                  Host: 127.0.0.1:4761\r\n\
                  Origin: {origin}\r\n\
-                 Access-Control-Request-Method: PATCH\r\n\
+                 Access-Control-Request-Method: DELETE\r\n\
                  Access-Control-Request-Headers: content-type\r\n\
                  Connection: close\r\n\r\n"
             ),
@@ -30,7 +35,7 @@ async fn server_cors_allows_embedded_console_and_local_vite_origins() {
         assert!(
             response
                 .header("access-control-allow-methods")
-                .is_some_and(|methods| methods.contains("PATCH"))
+                .is_some_and(|methods| methods == "*" || methods.contains("DELETE"))
         );
         assert!(
             response

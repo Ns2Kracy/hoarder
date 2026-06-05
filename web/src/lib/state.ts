@@ -54,8 +54,15 @@ export const runItems = writable<Loadable<SyncItemDto[]>>(emptyList());
 export const runErrors = writable<Loadable<SyncErrorDto[]>>(emptyList());
 export const fileBrowser = writable<Loadable<FileBrowseDto | undefined>>(emptyValue(undefined));
 export const settings = writable<Loadable<SettingsDto>>(emptyValue(defaultSettings));
+export const jobActions = writable({
+  runningJobIds: [] as LocalId[],
+  stoppingJobIds: [] as LocalId[],
+});
 
 let runDetailRequestSequence = 0;
+
+const STOP_REFRESH_ATTEMPTS = 5;
+const STOP_REFRESH_DELAY_MS = 900;
 
 export const summary = derived([sources, jobs, runs], ([$sources, $jobs, $runs]) =>
   summarizeConsole($sources.data, $jobs.data, $runs.data),
@@ -99,15 +106,35 @@ export async function loadConsoleData() {
   const sourceResultPromise = api.getSources();
   const settingsResultPromise = api.getSettings();
 
-  const sourceResult = await sourceResultPromise;
-  const jobResult = await api.getJobs(sourceResult.data);
-  const runResult = await api.getRuns();
-  const settingsResult = await settingsResultPromise;
+  let sourceResult: Awaited<ReturnType<typeof api.getSources>> | undefined;
+  try {
+    sourceResult = await sourceResultPromise;
+    sources.set(applyResult(sourceResult, statusFor(sourceResult)));
+  } catch (error) {
+    sources.update((current) => loadableWithError(current, error));
+  }
 
-  sources.set(applyResult(sourceResult, statusFor(sourceResult)));
-  jobs.set(applyResult(jobResult, statusFor(jobResult)));
-  runs.set(applyResult(runResult, statusFor(runResult)));
-  settings.set(applyResult(settingsResult));
+  try {
+    const jobResult = await api.getJobs(sourceResult?.data ?? get(sources).data);
+    jobs.set(applyResult(jobResult, statusFor(jobResult)));
+    reconcileJobActions(jobResult.data);
+  } catch (error) {
+    jobs.update((current) => loadableWithError(current, error));
+  }
+
+  try {
+    const runResult = await api.getRuns();
+    runs.set(applyResult(runResult, statusFor(runResult)));
+  } catch (error) {
+    runs.update((current) => loadableWithError(current, error));
+  }
+
+  try {
+    const settingsResult = await settingsResultPromise;
+    settings.set(applyResult(settingsResult));
+  } catch (error) {
+    settings.update((current) => loadableWithError(current, error));
+  }
 }
 
 export async function addSource(input: SourceFormInput) {
@@ -246,6 +273,13 @@ export async function updateJob(jobId: LocalId, input: JobFormInput) {
 }
 
 export async function triggerJobRun(jobId: LocalId) {
+  if (get(jobActions).runningJobIds.includes(jobId)) {
+    return;
+  }
+
+  addJobAction("runningJobIds", jobId);
+  markJobStatus(jobId, "running");
+
   try {
     const runResult = await api.runJob(jobId, get(jobs).data);
     const jobResult = await api.getJobs(get(sources).data);
@@ -273,37 +307,34 @@ export async function triggerJobRun(jobId: LocalId) {
         statusFor(jobResult),
       ),
     );
+    reconcileJobActions(jobResult.data);
   } catch (error) {
     jobs.update((current) => loadableWithError(current, error));
     runs.update((current) => loadableWithError(current, error));
+  } finally {
+    removeJobAction("runningJobIds", jobId);
   }
 }
 
 export async function stopJob(jobId: LocalId) {
+  if (get(jobActions).stoppingJobIds.includes(jobId)) {
+    return;
+  }
+
+  addJobAction("stoppingJobIds", jobId);
+
   try {
     const stopResult = await api.stopJob(jobId);
-    const jobResult = await api.getJobs(get(sources).data);
-    const runResult = await api.getRuns();
+    await refreshJobsAndRuns(stopResult);
 
-    jobs.set(
-      applyResult(
-        {
-          ...jobResult,
-          error: jobResult.error ?? stopResult.error,
-        },
-        statusFor(jobResult),
-      ),
-    );
-    runs.set(
-      applyResult(
-        {
-          ...runResult,
-          error: runResult.error ?? stopResult.error,
-        },
-        statusFor(runResult),
-      ),
-    );
+    if (get(jobs).data.find((job) => job.id === jobId)?.status !== "running") {
+      removeJobAction("stoppingJobIds", jobId);
+      return;
+    }
+
+    await waitForJobToStop(jobId, stopResult);
   } catch (error) {
+    removeJobAction("stoppingJobIds", jobId);
     jobs.update((current) => loadableWithError(current, error));
     runs.update((current) => loadableWithError(current, error));
   }
@@ -423,6 +454,85 @@ export function isEmptyLoadable<T>(loadable: Loadable<T[]>) {
 
 function upsertRun(runList: SyncRunDto[], run: SyncRunDto) {
   return [run, ...runList.filter((candidate) => candidate.id !== run.id)];
+}
+
+function addJobAction(key: "runningJobIds" | "stoppingJobIds", jobId: LocalId) {
+  jobActions.update((current) =>
+    current[key].includes(jobId)
+      ? current
+      : {
+          ...current,
+          [key]: [...current[key], jobId],
+        },
+  );
+}
+
+function removeJobAction(key: "runningJobIds" | "stoppingJobIds", jobId: LocalId) {
+  jobActions.update((current) => ({
+    ...current,
+    [key]: current[key].filter((candidate) => candidate !== jobId),
+  }));
+}
+
+function markJobStatus(jobId: LocalId, status: SyncJobDto["status"]) {
+  jobs.update((current) => ({
+    ...current,
+    data: current.data.map((job) => (job.id === jobId ? { ...job, status } : job)),
+    updatedAt: new Date().toISOString(),
+  }));
+}
+
+function reconcileJobActions(jobList: SyncJobDto[]) {
+  const runningJobIds = new Set(
+    jobList.filter((job) => job.status === "running").map((job) => job.id),
+  );
+  jobActions.update((current) => ({
+    runningJobIds: current.runningJobIds.filter((jobId) => runningJobIds.has(jobId)),
+    stoppingJobIds: current.stoppingJobIds.filter((jobId) => runningJobIds.has(jobId)),
+  }));
+}
+
+async function refreshJobsAndRuns(actionResult?: ApiData<void>) {
+  const jobResult = await api.getJobs(get(sources).data);
+  const runResult = await api.getRuns();
+
+  jobs.set(
+    applyResult(
+      {
+        ...jobResult,
+        error: jobResult.error ?? actionResult?.error,
+      },
+      statusFor(jobResult),
+    ),
+  );
+  reconcileJobActions(jobResult.data);
+  runs.set(
+    applyResult(
+      {
+        ...runResult,
+        error: runResult.error ?? actionResult?.error,
+      },
+      statusFor(runResult),
+    ),
+  );
+}
+
+async function waitForJobToStop(jobId: LocalId, actionResult?: ApiData<void>) {
+  for (let attempt = 0; attempt < STOP_REFRESH_ATTEMPTS; attempt += 1) {
+    await delay(STOP_REFRESH_DELAY_MS);
+    await refreshJobsAndRuns(actionResult);
+
+    if (get(jobs).data.find((job) => job.id === jobId)?.status !== "running") {
+      removeJobAction("stoppingJobIds", jobId);
+      return;
+    }
+  }
+
+  removeJobAction("stoppingJobIds", jobId);
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function loadableWithError<T>(loadable: Loadable<T>, error: unknown): Loadable<T> {

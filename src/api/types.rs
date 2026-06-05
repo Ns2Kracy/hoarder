@@ -303,7 +303,7 @@ pub struct RunDto {
     pub source_id: SourceId,
     pub source_name: String,
     pub job_name: String,
-    pub status: SyncStatus,
+    pub status: RunStatus,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
     pub processed_count: u64,

@@ -4,6 +4,7 @@ import { api } from "../src/lib/api";
 import {
   deleteSource,
   fileBrowser,
+  jobActions,
   jobs,
   loadConsoleData,
   loadFiles,
@@ -22,6 +23,7 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  jobActions.set({ runningJobIds: [], stoppingJobIds: [] });
 });
 
 test("loadConsoleData requests each top-level resource once", async () => {
@@ -41,6 +43,45 @@ test("loadConsoleData requests each top-level resource once", async () => {
   await loadConsoleData();
 
   expect(paths.sort()).toEqual(["/api/jobs", "/api/runs", "/api/settings", "/api/sources"]);
+});
+
+test("loadConsoleData keeps successful resources when one endpoint fails", async () => {
+  globalThis.fetch = (async (input) => {
+    const path = requestPath(input);
+
+    if (path === "/api/runs") {
+      return jsonResponse(
+        {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "internal server error",
+          },
+        },
+        500,
+      );
+    }
+
+    return jsonResponse(responseFor(path));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+
+  expect(get(sources)).toMatchObject({
+    origin: "api",
+    status: "ready",
+    data: [{ id: "src-local", name: "Local source" }],
+  });
+  expect(get(jobs)).toMatchObject({
+    origin: "api",
+    status: "ready",
+    data: [{ id: "job-local", sourceName: "Local source" }],
+  });
+  expect(get(runs)).toMatchObject({
+    error: {
+      code: "INTERNAL_ERROR",
+      status: 500,
+    },
+  });
 });
 
 test("testSourceConnection persists healthy status after reload when api returns source health", async () => {
@@ -594,6 +635,41 @@ test("stopJob posts to the live stop endpoint and refreshes running job state", 
   });
 });
 
+test("stopJob ignores duplicate clicks while a stop request is in flight", async () => {
+  let stopRequests = 0;
+  let stopped = false;
+  let resolveStop: ((response: Response) => void) | undefined;
+
+  globalThis.fetch = (async (input, init) => {
+    const path = requestPath(input);
+
+    if (path === "/api/jobs/job-local/stop" && init?.method === "POST") {
+      stopRequests += 1;
+      return new Promise<Response>((resolve) => {
+        resolveStop = (response) => {
+          stopped = true;
+          resolve(response);
+        };
+      });
+    }
+
+    return jsonResponse(responseFor(path, { runningJob: !stopped }));
+  }) as typeof fetch;
+
+  await loadConsoleData();
+
+  const firstStop = stopJob("job-local");
+  const secondStop = stopJob("job-local");
+  await Promise.resolve();
+
+  expect(stopRequests).toBe(1);
+  expect(get(jobActions).stoppingJobIds).toEqual(["job-local"]);
+
+  resolveStop?.(new Response(null, { status: 202 }));
+  await firstStop;
+  await secondStop;
+});
+
 test("loadRunDetail keeps the latest selected run when detail responses resolve out of order", async () => {
   const detailResolvers = new Map<string, (response: Response) => void>();
 
@@ -789,7 +865,10 @@ function runDetailResponse(id: string) {
   };
 }
 
-function responseFor(path: string, options: { includeNewRun?: boolean } = {}) {
+function responseFor(
+  path: string,
+  options: { includeNewRun?: boolean; runningJob?: boolean } = {},
+) {
   switch (path) {
     case "/api/sources":
       return {
@@ -816,6 +895,7 @@ function responseFor(path: string, options: { includeNewRun?: boolean } = {}) {
             sourceId: "src-local",
             name: "Local job",
             enabled: true,
+            status: options.runningJob ? "running" : "idle",
             schedule: "Manual",
           },
         ],

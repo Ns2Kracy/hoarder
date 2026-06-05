@@ -645,7 +645,7 @@ fn run_schema() -> Value {
             "sourceId": local_id_schema(),
             "sourceName": {"type": "string"},
             "jobName": {"type": "string"},
-            "status": sync_status_schema(),
+            "status": run_status_schema(),
             "startedAt": nullable_datetime_schema(),
             "finishedAt": nullable_datetime_schema(),
             "processedCount": {"type": "integer", "minimum": 0},

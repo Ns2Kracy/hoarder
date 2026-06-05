@@ -238,6 +238,8 @@ async fn app_services_stops_stale_running_job() -> Result<(), Box<dyn std::error
         .expect("job is listed");
     assert_eq!(stopped.status, JobStatus::Idle);
 
+    job_service::stop_job(test.repository.as_ref(), &registry, job.id).await?;
+
     Ok(())
 }
 

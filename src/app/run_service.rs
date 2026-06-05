@@ -35,7 +35,7 @@ pub async fn list_runs(repository: &SeaOrmRepository) -> AppResult<Vec<RunDto>> 
                 source_id: crate::core::types::SourceId::from_i64(run.source_id),
                 source_name: run.source_name,
                 job_name: run.job_name,
-                status: run_summary_status_from_str(&run.status)?,
+                status: run_status_from_str(&run.status)?,
                 started_at: Some(run.started_at),
                 finished_at: run.finished_at,
                 processed_count: i64_to_u64(run.processed_count, "processed_count")?,
@@ -322,17 +322,6 @@ fn sync_status_from_str(status: &str) -> AppResult<SyncStatus> {
         "deleted_on_source" => Ok(SyncStatus::DeletedOnSource),
         other => Err(AppError::Database(format!(
             "unknown sync status stored in database: {other}"
-        ))),
-    }
-}
-
-fn run_summary_status_from_str(status: &str) -> AppResult<SyncStatus> {
-    match status {
-        "running" => Ok(SyncStatus::Pending),
-        "completed" => Ok(SyncStatus::Synced),
-        "completed_with_failures" | "failed" => Ok(SyncStatus::Failed),
-        other => Err(AppError::Database(format!(
-            "unknown run status stored in database: {other}"
         ))),
     }
 }

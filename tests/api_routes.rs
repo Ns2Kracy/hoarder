@@ -19,7 +19,10 @@ use hoarder::{
         schema::sync_schema,
     },
     entity::{source, sync_job},
-    sync::repository::{ItemSyncOutcome, SyncRepository},
+    sync::{
+        engine::{SyncRunStatus, SyncRunSummary},
+        repository::{ItemSyncOutcome, SyncRepository},
+    },
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::{Value, json};
@@ -288,9 +291,39 @@ async fn api_routes_collection_endpoints_return_lists_and_settings() {
 
     let settings = request(test.app.clone(), "GET", "/api/settings", None).await;
     assert_eq!(settings.status, 200);
-    assert_eq!(settings.body["listenAddr"], json!("127.0.0.1:4761"));
+    assert_eq!(settings.body["listenAddr"], json!("0.0.0.0:4761"));
     assert_eq!(settings.body["logLevel"], json!("info"));
     assert_eq!(settings.body["readOnly"]["vaultPath"], json!(true));
+}
+
+#[tokio::test]
+async fn api_routes_lists_cancelled_runs() {
+    let test = TestApp::new().await;
+    let job = test.repository.load_job(test.job_id).await.unwrap();
+    let run_id = test.repository.start_run(&job).await.unwrap();
+    test.repository
+        .finish_run(
+            run_id,
+            SyncRunStatus::Cancelled,
+            SyncRunSummary {
+                run_id,
+                processed: 0,
+                synced: 0,
+                skipped: 0,
+                failed: 0,
+                deleted: 0,
+                bytes_written: 0,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let response = request(test.app.clone(), "GET", "/api/runs", None).await;
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["data"][0]["id"], json!(run_id.as_i64()));
+    assert_eq!(response.body["data"][0]["status"], json!("cancelled"));
 }
 
 #[tokio::test]
@@ -513,6 +546,16 @@ async fn api_routes_openapi_spec_lists_current_routes() {
     assert_eq!(
         response.body["components"]["schemas"]["RunDto"]["properties"]["deletedCount"]["type"],
         json!("integer")
+    );
+    assert_eq!(
+        response.body["components"]["schemas"]["RunDto"]["properties"]["status"]["enum"],
+        json!([
+            "running",
+            "completed",
+            "completed_with_failures",
+            "failed",
+            "cancelled"
+        ])
     );
     assert_eq!(
         response.body["components"]["schemas"]["RunDetailDto"]["properties"]["runId"],

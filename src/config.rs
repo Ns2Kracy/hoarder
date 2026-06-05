@@ -22,7 +22,7 @@ impl Default for AppConfig {
         Self {
             database_path: PathBuf::from("./hoarder.db"),
             vault_path: PathBuf::from("./vault"),
-            listen_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 4761),
+            listen_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 4761),
             job_concurrency: 1,
             file_concurrency: 4,
             log_level: default_log_level(),

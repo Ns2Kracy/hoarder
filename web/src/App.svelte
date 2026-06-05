@@ -24,6 +24,7 @@
         deleteSource,
         fileBrowser,
         isRefreshing,
+        jobActions,
         jobs,
         loadConsoleData,
         loadFiles,
@@ -178,6 +179,7 @@
                 {:else if activePage === "jobs"}
                     <Jobs
                         jobs={$jobs}
+                        jobActions={$jobActions}
                         sources={$sources}
                         onCreateJob={createJob}
                         onUpdateJob={updateJob}

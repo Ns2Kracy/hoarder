@@ -6,7 +6,7 @@ use hoarder::{
     cli::{
         Cli, Command, DbCommand, JobCommand, SourceAddArgs, SourceCommand, SyncCommand, execute,
     },
-    core::types::SyncStatus,
+    core::types::RunStatus,
     server,
     sync::repository::SyncRepository,
 };
@@ -90,7 +90,7 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
 
     let runs = hoarder::app::run_service::list_runs(repository.as_ref()).await?;
     let run = runs.first().expect("sync run was created");
-    assert_eq!(run.status, SyncStatus::Synced);
+    assert_eq!(run.status, RunStatus::Completed);
     assert!(run.processed_count >= 1);
 
     execute(test.cli(Command::Sync {

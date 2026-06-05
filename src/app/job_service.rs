@@ -164,8 +164,8 @@ pub async fn run_job(
 ///
 /// # Errors
 ///
-/// Returns an error if the job cannot be loaded, is not currently running, or the
-/// repository update used to unlock stale state fails.
+/// Returns an error if the job cannot be loaded or the repository update used to
+/// unlock stale state fails. Stopping an already idle job is a no-op.
 pub async fn stop_job(
     repository: &SeaOrmRepository,
     registry: &JobRunRegistry,
@@ -178,9 +178,7 @@ pub async fn stop_job(
         .map_err(map_db_error)?
         .ok_or_else(|| AppError::NotFound(format!("sync job not found: {job_id}")))?;
     if job_status_from_str(&job.status)? != JobStatus::Running {
-        return Err(AppError::Conflict(format!(
-            "sync job is not running: {job_id}"
-        )));
+        return Ok(());
     }
     if !registry.cancel(job_id) {
         recover_stale_running_jobs(repository).await?;

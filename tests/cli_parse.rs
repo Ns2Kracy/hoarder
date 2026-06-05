@@ -40,12 +40,12 @@ fn cli_parse_serve_defaults_to_no_addr_override() {
 }
 
 #[test]
-fn cli_parse_default_server_binding_remains_loopback() {
+fn cli_parse_default_server_binding_uses_all_interfaces() {
     let config = server::config_with_addr(None);
 
     assert_eq!(
         config.listen_addr,
-        "127.0.0.1:4761".parse::<SocketAddr>().unwrap()
+        "0.0.0.0:4761".parse::<SocketAddr>().unwrap()
     );
 }
 

@@ -14,6 +14,7 @@
 
     let {
         jobs,
+        jobActions,
         sources,
         onCreateJob,
         onUpdateJob,
@@ -21,6 +22,10 @@
         onStopJob,
     }: {
         jobs: Loadable<SyncJobDto[]>;
+        jobActions: {
+            runningJobIds: LocalId[];
+            stoppingJobIds: LocalId[];
+        };
         sources: Loadable<SourceDto[]>;
         onCreateJob: (input: JobFormInput) => Promise<void> | void;
         onUpdateJob: (jobId: LocalId, input: JobFormInput) => Promise<void> | void;
@@ -37,6 +42,14 @@
             enabled: job.enabled,
             schedule: job.schedule,
         };
+    }
+
+    function isStarting(jobId: LocalId) {
+        return jobActions.runningJobIds.includes(jobId);
+    }
+
+    function isStopping(jobId: LocalId) {
+        return jobActions.stoppingJobIds.includes(jobId);
     }
 </script>
 
@@ -117,7 +130,7 @@
                                     <button
                                         class="mr-2 inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-line bg-panel-strong px-2 text-sm font-semibold text-muted transition hover:bg-panel-muted hover:text-ink active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
                                         type="button"
-                                        disabled={job.status === "running"}
+                                        disabled={job.status === "running" || isStarting(job.id) || isStopping(job.id)}
                                         onclick={() =>
                                             (editingJobId =
                                                 editingJobId === job.id
@@ -129,22 +142,31 @@
                                     </button>
                                     {#if job.status === "running"}
                                         <button
-                                            class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-rose-300/70 bg-panel-strong px-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 hover:text-rose-800 active:translate-y-px dark:border-rose-500/50 dark:text-rose-200 dark:hover:bg-rose-500/10"
+                                            class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-rose-300/70 bg-panel-strong px-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 hover:text-rose-800 active:translate-y-px disabled:cursor-wait disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle dark:border-rose-500/50 dark:text-rose-200 dark:hover:bg-rose-500/10"
                                             type="button"
+                                            disabled={isStopping(job.id)}
                                             onclick={() => onStopJob(job.id)}
                                         >
-                                            <Square aria-hidden="true" size={14} />
-                                            Stop
+                                            <Square
+                                                aria-hidden="true"
+                                                size={14}
+                                                class={isStopping(job.id) ? "animate-refreshing" : ""}
+                                            />
+                                            {isStopping(job.id) ? "Stopping" : "Stop"}
                                         </button>
                                     {:else}
                                         <button
                                             class="inline-flex h-8 min-w-max items-center justify-center gap-1 rounded-sm border border-ink bg-ink px-2 text-sm font-semibold text-panel-strong transition hover:border-accent hover:bg-accent hover:text-white active:translate-y-px disabled:cursor-not-allowed disabled:border-line-soft disabled:bg-panel-muted disabled:text-subtle"
                                             type="button"
-                                            disabled={!job.enabled}
+                                            disabled={!job.enabled || isStarting(job.id) || isStopping(job.id)}
                                             onclick={() => onRunJob(job.id)}
                                         >
-                                            <Play aria-hidden="true" size={14} />
-                                            Run Now
+                                            <Play
+                                                aria-hidden="true"
+                                                size={14}
+                                                class={isStarting(job.id) ? "animate-refreshing" : ""}
+                                            />
+                                            {isStarting(job.id) ? "Starting" : "Run Now"}
                                         </button>
                                     {/if}
                                 </td>

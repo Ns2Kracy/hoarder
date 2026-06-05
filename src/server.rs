@@ -1,19 +1,19 @@
 use std::{
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use axum::{
     Router,
-    http::{HeaderName, Method, header},
+    http::{HeaderName, header},
     middleware,
 };
 use sea_orm::{ConnectOptions, DatabaseConnection};
 use tokio::net::TcpListener;
 use tower_http::{
     compression::CompressionLayer,
-    cors::{AllowOrigin, CorsLayer},
+    cors::{AllowOrigin, Any, CorsLayer},
     propagate_header::PropagateHeaderLayer,
     request_id::{MakeRequestUuid, SetRequestIdLayer},
 };
@@ -186,20 +186,30 @@ fn app_with_state(state: ApiState) -> Router {
                     let Some((host, port)) = host_port.rsplit_once(':') else {
                         return false;
                     };
-                    if !matches!(host, "127.0.0.1" | "localhost" | "[::1]") {
+                    if !is_allowed_local_console_host(host) {
                         return false;
                     }
 
                     port.parse::<u16>()
                         .is_ok_and(|port| matches!(port, 4761 | 5173 | 4173))
                 }))
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PATCH,
-                    Method::OPTIONS,
-                    Method::HEAD,
-                ])
+                .allow_methods(Any)
                 .allow_headers([header::CONTENT_TYPE]),
         )
+}
+
+fn is_allowed_local_console_host(host: &str) -> bool {
+    if matches!(host, "localhost") {
+        return true;
+    }
+
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    let Ok(ip) = host.parse::<IpAddr>() else {
+        return false;
+    };
+
+    match ip {
+        IpAddr::V4(ip) => ip.is_loopback() || ip.is_unspecified() || ip.is_private(),
+        IpAddr::V6(ip) => ip.is_loopback() || ip.is_unspecified(),
+    }
 }
