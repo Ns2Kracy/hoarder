@@ -78,6 +78,11 @@ description = "Run frontend formatting, linting, type checks, and build"
 dir = "web"
 run = "bun run verify"
 
+[tasks."web:test"]
+description = "Run frontend tests"
+dir = "web"
+run = "bun test"
+
 [tasks.verify]
 description = "Run the full local quality gate"
 run = """
@@ -86,6 +91,7 @@ mise run rust:fmt
 mise run rust:clippy
 mise run rust:test
 mise run web:verify
+mise run web:test
 mise run cli:build
 mise run cli:smoke
 """
@@ -93,6 +99,7 @@ mise run cli:smoke
 [tasks."release:build"]
 description = "Build the web assets and release hoarder binary"
 run = """
+mise run web:install
 mise run web:build
 cargo build -p hoarder-cli --release
 """
@@ -113,3 +120,31 @@ run = "cargo test -p hoarder-server --test performance_benchmark -- --ignored --
 [tasks."soak:local-fs"]
 description = "Run the ignored local filesystem sync soak test"
 run = "HOARDER_SOAK_ITERATIONS=${HOARDER_SOAK_ITERATIONS:-40} HOARDER_SOAK_FILES=${HOARDER_SOAK_FILES:-100} cargo test -p hoarder-server --test soak_local_fs -- --ignored --nocapture"
+
+[tasks."ci:rust"]
+description = "Run the CI Rust quality gate"
+run = """
+mise run web:install
+mise run rust:metadata
+mise run rust:fmt
+mise run web:build
+mise run rust:clippy
+mise run rust:test
+"""
+
+[tasks."ci:web"]
+description = "Run the CI web quality gate"
+run = """
+mise run web:install
+mise run web:verify
+mise run web:test
+"""
+
+[tasks."ci:soak"]
+description = "Run the CI benchmark and soak gate"
+run = """
+mise run web:install
+mise run web:build
+mise run bench:local-fs
+mise run soak:local-fs
+"""

@@ -223,7 +223,7 @@ mise run cli -- --config ./hoarder.config.json serve
 ### 打包和质量
 
 - [x] 单个 Rust binary 嵌入 `web/dist` 前端资源
-- [x] `mise run verify` 封装 Rust metadata、格式、Clippy、测试、前端验证和 CLI smoke checks
+- [x] `mise run verify` 封装 Rust metadata、格式、Clippy、测试、前端验证与测试，以及 CLI smoke checks
 - [x] `mise run release:build` 构建嵌入式前端资源和 release binary
 - [x] 本地文件系统端到端同步测试
 - [x] 静态资源 fallback 测试

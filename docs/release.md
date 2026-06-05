@@ -8,13 +8,13 @@ Hoarder ships as a single Rust binary with the Svelte console embedded from `web
 
 The workflow has three gates:
 
-- Rust: `cargo fmt --check`, build embedded `web/dist` assets for `RustEmbed`, `cargo clippy --workspace --all-targets --all-features --message-format=short`, and `cargo test --workspace`.
-- Web: `bun install --frozen-lockfile`, `bun run fmt:check`, `bun run lint`, `bun run check`, `bun test`, and `bun run build`.
-- Package smoke: build `web/dist`, run `cargo build -p hoarder-cli --release`, then execute `hoarder --help` and `hoarder source templates`.
+- Rust: `mise run ci:rust` runs Cargo metadata, Rust formatting, embedded web asset build, Clippy, and Rust tests.
+- Web: `mise run ci:web` runs frontend dependency install, formatting, linting, type checks, build, and tests.
+- Package smoke: `mise run release:smoke` builds `web/dist`, builds the release binary, then executes `hoarder --help`, `hoarder source templates`, and `hoarder db --help`.
 
 ## Release Artifacts
 
-`.github/workflows/release.yml` runs on `v*` tags and can also be started manually from GitHub Actions.
+`.github/workflows/release.yml` runs on `v*` tags and can also be started manually from GitHub Actions. Each matrix job uses `mise run release:build` before packaging the native binary.
 
 It builds native artifacts for:
 
@@ -56,6 +56,7 @@ Installer environment variables:
 ## Benchmark And Soak Gates
 
 Benchmarks and soak tests are intentionally excluded from default `cargo test --workspace` because they are longer-running and environment-sensitive.
+The scheduled workflow uses `mise run ci:soak` to build embedded assets, run the local filesystem benchmark, and run the soak test.
 
 Run the performance benchmark locally:
 

@@ -44,22 +44,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install web dependencies
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      - name: Build embedded web assets
-        working-directory: web
-        run: bun run build
+      - name: Setup mise
+        uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
 
       - name: Build release binary
-        run: cargo build -p hoarder-cli --release
+        run: mise run release:build
 
       - name: Stage package
         shell: bash

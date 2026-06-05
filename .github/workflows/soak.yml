@@ -19,8 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal
+      - name: Setup mise
+        uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
 
       - name: Cache cargo state
         uses: actions/cache@v5
@@ -32,25 +35,10 @@ jobs:
           key: cargo-soak-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-soak-${{ runner.os }}-
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install web dependencies
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      - name: Build embedded web assets
-        working-directory: web
-        run: bun run build
-
-      - name: Run local filesystem performance benchmark
+      - name: Run benchmark and soak gate
         env:
           HOARDER_BENCH_FILES: 500
           HOARDER_BENCH_BYTES: 1024
-        run: cargo test -p hoarder-server --test performance_benchmark -- --ignored --nocapture
-
-      - name: Run local filesystem soak test
-        env:
           HOARDER_SOAK_ITERATIONS: 40
           HOARDER_SOAK_FILES: 100
-        run: cargo test -p hoarder-server --test soak_local_fs -- --ignored --nocapture
+        run: mise run ci:soak

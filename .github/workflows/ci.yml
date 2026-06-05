@@ -20,8 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal
+      - name: Setup mise
+        uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
 
       - name: Cache cargo state
         uses: actions/cache@v5
@@ -33,25 +36,8 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
-      - name: Format
-        run: cargo fmt --check
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install web dependencies
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      - name: Build embedded web assets
-        working-directory: web
-        run: bun run build
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features --message-format=short
-
-      - name: Test
-        run: cargo test --workspace
+      - name: Run Rust quality gate
+        run: mise run ci:rust
 
   web:
     name: Web quality gate
@@ -60,32 +46,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup mise
+        uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
 
-      - name: Install dependencies
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      - name: Format
-        working-directory: web
-        run: bun run fmt:check
-
-      - name: Lint
-        working-directory: web
-        run: bun run lint
-
-      - name: Type check
-        working-directory: web
-        run: bun run check
-
-      - name: Test
-        working-directory: web
-        run: bun test
-
-      - name: Build
-        working-directory: web
-        run: bun run build
+      - name: Run web quality gate
+        run: mise run ci:web
 
   package-smoke:
     name: Release binary smoke test
@@ -95,24 +63,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal
+      - name: Setup mise
+        uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install web dependencies
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      - name: Build embedded web assets
-        working-directory: web
-        run: bun run build
-
-      - name: Build release binary
-        run: cargo build -p hoarder-cli --release
-
-      - name: Smoke test binary
-        run: |
-          ./target/release/hoarder --help
-          ./target/release/hoarder source templates
+      - name: Build and smoke-test release binary
+        run: mise run release:smoke

@@ -21,7 +21,7 @@ Hoarder is a Rust 2024 workspace with a CLI binary, Axum API, SQLite persistence
 - `mise run serve`: build the web console, then run the local API and embedded console at `127.0.0.1:4761`.
 - `mise run db:sync`: synchronize the SQLite schema from SeaORM entities.
 - `mise run release:build`: build `web/dist` and the packaged release binary.
-- `mise run verify`: run Cargo metadata, Rust formatting, Clippy, Rust tests, frontend verification, debug CLI build, and CLI smoke checks.
+- `mise run verify`: run Cargo metadata, Rust formatting, Clippy, Rust tests, frontend verification and tests, debug CLI build, and CLI smoke checks.
 
 ## Coding Style & Naming Conventions
 

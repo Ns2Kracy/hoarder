@@ -223,7 +223,7 @@ mise run cli -- --config ./hoarder.config.json serve
 ### Packaging And Quality
 
 - [x] Single Rust binary embeds frontend assets from `web/dist`
-- [x] `mise run verify` wraps Rust metadata, formatting, Clippy, tests, frontend verification, and CLI smoke checks
+- [x] `mise run verify` wraps Rust metadata, formatting, Clippy, tests, frontend verification and tests, and CLI smoke checks
 - [x] `mise run release:build` builds embedded frontend assets and the release binary
 - [x] End-to-end local filesystem sync test
 - [x] Static asset fallback tests
