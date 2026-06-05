@@ -1,5 +1,9 @@
 use std::collections::BTreeMap;
 
+use hoarder_core::{
+    types::{ItemId, ItemType, RunId, RunStatus, SyncStatus},
+    vault_path::normalize_source_path,
+};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::{
@@ -7,10 +11,6 @@ use crate::{
     api::types::{
         ErrorListQuery, FileBrowseQuery, FileBrowseResponse, FileEntryDto, FileEntryKind, ItemDto,
         ItemListQuery, RunCountsDto, RunDetailDto, RunDto, SyncErrorDto,
-    },
-    core::{
-        types::{ItemId, ItemType, RunId, RunStatus, SyncStatus},
-        vault_path::normalize_source_path,
     },
     db::repository::SeaOrmRepository,
     entity::{sync_error, sync_item, sync_run},
@@ -31,8 +31,8 @@ pub async fn list_runs(repository: &SeaOrmRepository) -> AppResult<Vec<RunDto>> 
         .map(|run| {
             Ok(RunDto {
                 id: RunId::from_i64(run.id),
-                job_id: crate::core::types::JobId::from_i64(run.job_id),
-                source_id: crate::core::types::SourceId::from_i64(run.source_id),
+                job_id: hoarder_core::types::JobId::from_i64(run.job_id),
+                source_id: hoarder_core::types::SourceId::from_i64(run.source_id),
                 source_name: run.source_name,
                 job_name: run.job_name,
                 status: run_status_from_str(&run.status)?,
@@ -75,8 +75,8 @@ pub async fn get_run_detail(
 
     Ok(RunDetailDto {
         id: run_id,
-        job_id: crate::core::types::JobId::from_i64(run.job_id),
-        source_id: crate::core::types::SourceId::from_i64(run.source_id),
+        job_id: hoarder_core::types::JobId::from_i64(run.job_id),
+        source_id: hoarder_core::types::SourceId::from_i64(run.source_id),
         source_name: run.source_name,
         job_name: run.job_name,
         status: run_status_from_str(&run.status)?,
@@ -220,7 +220,7 @@ pub async fn list_errors(
         .map(|error| SyncErrorDto {
             id: error.id,
             run_id: error.run_id.map(RunId::from_i64),
-            source_id: error.source_id.map(crate::core::types::SourceId::from_i64),
+            source_id: error.source_id.map(hoarder_core::types::SourceId::from_i64),
             source_path: error.source_path,
             code: error.error_kind,
             message: error.message,
@@ -232,7 +232,7 @@ pub async fn list_errors(
 fn item_dto_from_model(item: sync_item::Model) -> AppResult<ItemDto> {
     Ok(ItemDto {
         id: ItemId::from_i64(item.id),
-        source_id: crate::core::types::SourceId::from_i64(item.source_id),
+        source_id: hoarder_core::types::SourceId::from_i64(item.source_id),
         source_path: item.source_path,
         item_type: item_type_from_str(&item.item_type)?,
         status: sync_status_from_str(&item.status)?,

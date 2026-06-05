@@ -1,6 +1,13 @@
 use std::collections::BTreeMap;
 
 use chrono::Utc;
+use hoarder_connectors::{
+    feishu::FeishuSourceConnector,
+    notion::NotionSourceConnector,
+    opendal::source::OpenDalSourceConnector,
+    traits::{ConnectorConfig, SourceConnector},
+};
+use hoarder_core::types::{ConnectorKind, SourceId};
 use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::{
@@ -9,12 +16,6 @@ use crate::{
         CreateSourceRequest, SourceDto, SourceHealth, SourceTemplateDto, SourceTemplateOptionDto,
         SourceTestResponse, UpdateSourceRequest,
     },
-    connectors::traits::ConnectorConfig,
-    connectors::{
-        feishu::FeishuSourceConnector, notion::NotionSourceConnector,
-        opendal::source::OpenDalSourceConnector, traits::SourceConnector,
-    },
-    core::types::{ConnectorKind, SourceId},
     db::repository::{NewSource, SeaOrmRepository, SourceRepository, UpdateSource},
     entity::source,
 };
@@ -345,7 +346,7 @@ pub async fn test_source(
 async fn validate_source_connector(
     kind: ConnectorKind,
     source_id: SourceId,
-    config: &crate::connectors::traits::ConnectorConfig,
+    config: &hoarder_connectors::traits::ConnectorConfig,
 ) -> AppResult<()> {
     match kind {
         ConnectorKind::OpenDal => {
@@ -401,7 +402,7 @@ async fn update_source_check(
 pub fn connector_config_from_json(
     source_id: SourceId,
     config_json: serde_json::Value,
-) -> AppResult<crate::connectors::traits::ConnectorConfig> {
+) -> AppResult<hoarder_connectors::traits::ConnectorConfig> {
     serde_json::from_value(config_json).map_err(|error| {
         AppError::Database(format!(
             "invalid connector config for source {source_id}: {error}"

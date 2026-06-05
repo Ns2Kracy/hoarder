@@ -35,6 +35,7 @@ futures = "0.3.32"
 hex = "0.4.3"
 hoarder-core = { path = "crates/hoarder-core" }
 hoarder-connectors = { path = "crates/hoarder-connectors" }
+hoarder-server = { path = "crates/hoarder-server" }
 hoarder-sync = { path = "crates/hoarder-sync" }
 opendal = { version = "0.56.0", default-features = false, features = [
   "executors-tokio",

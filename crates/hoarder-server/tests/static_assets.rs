@@ -1,7 +1,7 @@
 use std::{fmt::Write as _, path::PathBuf};
 
 use axum::Router;
-use hoarder::{AppConfig, server};
+use hoarder_server::{AppConfig, server};
 use serde_json::json;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},

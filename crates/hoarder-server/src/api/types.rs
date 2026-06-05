@@ -5,13 +5,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
-use crate::{
-    config::{AppConfig, RuntimeSettings},
-    connectors::traits::ConnectorConfig,
-    core::types::{
-        ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
-    },
+use hoarder_connectors::traits::ConnectorConfig;
+use hoarder_core::types::{
+    ConnectorKind, ItemId, ItemType, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
 };
+
+use crate::config::{AppConfig, RuntimeSettings};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -1,13 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
 use chrono::Utc;
+use hoarder_core::types::JobStatus;
 use tokio::{task::JoinHandle, time};
 
 use crate::{
     AppConfig, AppResult,
     api::types::{JobDto, JobScheduleDto},
     app::job_service,
-    core::types::JobStatus,
     db::repository::{RuntimeSettingsRepository, SeaOrmRepository},
 };
 

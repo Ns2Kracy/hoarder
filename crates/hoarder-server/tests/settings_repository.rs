@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use hoarder::{
+use hoarder_server::{
     config::{AppConfig, RuntimeSettingsPatch},
     db::{
         connect_sqlite,

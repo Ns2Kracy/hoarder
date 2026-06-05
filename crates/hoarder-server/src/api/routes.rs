@@ -9,6 +9,8 @@ use axum::{
 };
 use utoipa_scalar::{Scalar, Servable};
 
+use hoarder_core::types::{JobId, RunId, SourceId};
+
 use crate::{
     api::{
         openapi,
@@ -22,7 +24,6 @@ use crate::{
         },
     },
     app::{job_service, run_service, settings_service, source_service},
-    core::types::{JobId, RunId, SourceId},
     db::repository::RuntimeSettingsRepository,
 };
 

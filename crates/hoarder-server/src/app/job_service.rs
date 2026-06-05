@@ -1,25 +1,27 @@
 use std::{path::PathBuf, sync::Arc};
 
+use hoarder_connectors::{
+    feishu::FeishuSourceConnector, notion::NotionSourceConnector,
+    opendal::source::OpenDalSourceConnector, traits::SourceConnector,
+};
+use hoarder_core::types::{
+    ConnectorKind, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus,
+};
+use hoarder_sync::{
+    engine::{SyncEngine, SyncEngineOptions},
+    vault_writer::VaultWriter,
+};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::{
     AppError, AppResult,
     api::types::{CreateJobRequest, JobDto, JobRunResponse, JobScheduleDto, UpdateJobRequest},
     app::run_control::JobRunRegistry,
-    connectors::{
-        feishu::FeishuSourceConnector, notion::NotionSourceConnector,
-        opendal::source::OpenDalSourceConnector, traits::SourceConnector,
-    },
-    core::types::{ConnectorKind, JobId, JobStatus, RunId, RunStatus, SourceId, SyncStatus},
     db::repository::{
         NewScheduledSyncJob, SeaOrmRepository, SyncJobRecord, SyncJobRepository, SyncJobSchedule,
         UpdateScheduledSyncJob,
     },
     entity::{sync_job, sync_run},
-    sync::{
-        engine::{SyncEngine, SyncEngineOptions},
-        vault_writer::VaultWriter,
-    },
 };
 
 /// Lists all sync jobs.
@@ -503,13 +505,13 @@ fn map_db_error(error: sea_orm::DbErr) -> AppError {
 mod tests {
     use std::{collections::BTreeMap, fs, path::PathBuf};
 
+    use hoarder_connectors::traits::ConnectorConfig;
+    use hoarder_core::types::{ConnectorKind, JobId, SourceId};
     use tokio::task::yield_now;
     use uuid::Uuid;
 
     use crate::{
         AppError,
-        connectors::traits::ConnectorConfig,
-        core::types::{ConnectorKind, JobId, SourceId},
         db::{
             connect_sqlite,
             repository::{

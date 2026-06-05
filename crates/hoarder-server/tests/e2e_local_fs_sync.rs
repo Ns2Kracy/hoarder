@@ -1,12 +1,12 @@
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
-use hoarder::{
+use hoarder_connectors::{
+    opendal::source::OpenDalSourceConnector,
+    traits::{ConnectorConfig, SourceConnector},
+};
+use hoarder_core::types::{ConnectorKind, SourceId};
+use hoarder_server::{
     app::run_service,
-    connectors::{
-        opendal::source::OpenDalSourceConnector,
-        traits::{ConnectorConfig, SourceConnector},
-    },
-    core::types::{ConnectorKind, SourceId},
     db::{
         connect_sqlite,
         repository::{
@@ -15,10 +15,10 @@ use hoarder::{
         schema::sync_schema,
     },
     entity::{sync_item, sync_run},
-    sync::{
-        engine::{SyncEngine, SyncRunSummary},
-        vault_writer::VaultWriter,
-    },
+};
+use hoarder_sync::{
+    engine::{SyncEngine, SyncRunSummary},
+    vault_writer::VaultWriter,
 };
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -180,15 +180,19 @@ async fn assert_first_run_persisted(
     assert_eq!(first_run.source_name, "local docs");
     assert_eq!(first_run.job_name, "default sync");
     assert_eq!(first_run.status, "completed");
-    assert_eq!(first_run.processed_count, first.processed.cast_signed());
-    assert_eq!(first_run.synced_count, first.synced.cast_signed());
-    assert_eq!(first_run.skipped_count, first.skipped.cast_signed());
+    assert_eq!(first_run.processed_count, signed_count(first.processed)?);
+    assert_eq!(first_run.synced_count, signed_count(first.synced)?);
+    assert_eq!(first_run.skipped_count, signed_count(first.skipped)?);
     assert_eq!(first_run.failed_count, 0);
     assert_eq!(first_run.deleted_count, 0);
-    assert_eq!(first_run.bytes_written, first.bytes_written.cast_signed());
+    assert_eq!(first_run.bytes_written, signed_count(first.bytes_written)?);
     assert!(first_run.finished_at.is_some());
 
     Ok(())
+}
+
+fn signed_count(value: u64) -> Result<i64, Box<dyn std::error::Error>> {
+    Ok(i64::try_from(value)?)
 }
 
 async fn assert_deleted_run_summary(

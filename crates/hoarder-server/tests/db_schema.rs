@@ -1,20 +1,20 @@
 use std::collections::BTreeSet;
 
-use hoarder::{
+use hoarder_core::{
     AppError,
-    core::types::{ConnectorKind, JobStatus, RunStatus, SourceId},
-    db::{
-        connect_sqlite,
-        repository::{
-            NewScheduledSyncJob, NewSource, NewSyncJob, SeaOrmRepository, SourceRepository,
-            SyncJobRepository, SyncJobSchedule,
-        },
-        schema::sync_schema,
+    types::{ConnectorKind, JobStatus, RunStatus, SourceId},
+};
+use hoarder_server::db::{
+    connect_sqlite,
+    repository::{
+        NewScheduledSyncJob, NewSource, NewSyncJob, SeaOrmRepository, SourceRepository,
+        SyncJobRepository, SyncJobSchedule,
     },
-    sync::{
-        engine::{SyncRunStatus, SyncRunSummary},
-        repository::SyncRepository,
-    },
+    schema::sync_schema,
+};
+use hoarder_sync::{
+    engine::{SyncRunStatus, SyncRunSummary},
+    repository::SyncRepository,
 };
 use sea_orm::{ConnectionTrait, DatabaseBackend, EntityTrait, Statement};
 use serde_json::json;
@@ -221,7 +221,7 @@ async fn db_schema_records_last_run_metadata_on_job() -> Result<(), Box<dyn std:
     assert!(finished_job.last_run_at.is_some());
     assert_eq!(finished_job.cursor, Some("cursor-after-run".to_owned()));
 
-    let finished_run = hoarder::entity::sync_run::Entity::find_by_id(run_id.as_i64())
+    let finished_run = hoarder_server::entity::sync_run::Entity::find_by_id(run_id.as_i64())
         .one(repository.connection())
         .await?
         .expect("finished run exists");
@@ -266,8 +266,8 @@ async fn repository_with_source() -> Result<(SeaOrmRepository, SourceId), Box<dy
 async fn assert_interval_job_is_listed(
     repository: &SeaOrmRepository,
     source_id: SourceId,
-    manual_job_id: hoarder::core::types::JobId,
-    interval_job_id: hoarder::core::types::JobId,
+    manual_job_id: hoarder_core::types::JobId,
+    interval_job_id: hoarder_core::types::JobId,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let jobs = repository.list_jobs(source_id).await?;
     assert_eq!(jobs.len(), 2);

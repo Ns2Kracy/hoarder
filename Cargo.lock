@@ -1379,6 +1379,7 @@ dependencies = [
  "hex",
  "hoarder-connectors",
  "hoarder-core",
+ "hoarder-server",
  "hoarder-sync",
  "opendal",
  "reqwest 0.12.28",
@@ -1433,6 +1434,25 @@ dependencies = [
 [[package]]
 name = "hoarder-server"
 version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "futures",
+ "hoarder-connectors",
+ "hoarder-core",
+ "hoarder-sync",
+ "rust-embed",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-scalar",
+ "uuid",
+]
 
 [[package]]
 name = "hoarder-sync"

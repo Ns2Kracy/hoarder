@@ -6,7 +6,9 @@ use std::{
 };
 
 use chrono::Utc;
-use hoarder::{
+use hoarder_connectors::traits::ConnectorConfig;
+use hoarder_core::types::{JobStatus, SyncStatus};
+use hoarder_server::{
     AppConfig, AppError,
     api::types::{
         CreateJobRequest, CreateSourceRequest, ErrorListQuery, ItemListQuery, JobScheduleDto,
@@ -14,8 +16,6 @@ use hoarder::{
     },
     app::run_control::JobRunRegistry,
     app::{job_service, run_service, settings_service, source_service},
-    connectors::traits::ConnectorConfig,
-    core::types::{JobStatus, SyncStatus},
     db::{connect_sqlite, repository::SeaOrmRepository, schema::sync_schema},
     entity::{sync_job, sync_run},
 };
@@ -303,7 +303,7 @@ impl TestServices {
 
 async fn set_job_running(
     repository: &SeaOrmRepository,
-    job_id: hoarder::core::types::JobId,
+    job_id: hoarder_core::types::JobId,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let job = sync_job::Entity::find_by_id(job_id.as_i64())
         .one(repository.connection())
@@ -318,8 +318,8 @@ async fn set_job_running(
 
 async fn insert_completed_run(
     repository: &SeaOrmRepository,
-    job_id: hoarder::core::types::JobId,
-    source_id: hoarder::core::types::SourceId,
+    job_id: hoarder_core::types::JobId,
+    source_id: hoarder_core::types::SourceId,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let now = Utc::now();
     let run = sync_run::ActiveModel {

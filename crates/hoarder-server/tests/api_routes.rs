@@ -6,11 +6,11 @@ use std::{
 };
 
 use axum::Router;
-use hoarder::{
+use hoarder_connectors::traits::ConnectorConfig;
+use hoarder_core::types::{ConnectorKind, ItemType, JobId, SourceId, SyncStatus};
+use hoarder_server::{
     api::{routes::router, state::ApiState},
     config::AppConfig,
-    connectors::traits::ConnectorConfig,
-    core::types::{ConnectorKind, ItemType, JobId, SourceId, SyncStatus},
     db::{
         connect_sqlite,
         repository::{
@@ -19,10 +19,10 @@ use hoarder::{
         schema::sync_schema,
     },
     entity::{source, sync_job},
-    sync::{
-        engine::{SyncRunStatus, SyncRunSummary},
-        repository::{ItemSyncOutcome, SyncRepository},
-    },
+};
+use hoarder_sync::{
+    engine::{SyncRunStatus, SyncRunSummary},
+    repository::{ItemSyncOutcome, SyncRepository},
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::{Value, json};

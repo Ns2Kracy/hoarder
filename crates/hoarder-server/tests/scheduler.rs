@@ -5,13 +5,13 @@ use std::{
     sync::Arc,
 };
 
-use hoarder::db::repository::RuntimeSettingsRepository;
-use hoarder::{
+use hoarder_connectors::traits::ConnectorConfig;
+use hoarder_core::types::{ConnectorKind, SourceId};
+use hoarder_server::db::repository::RuntimeSettingsRepository;
+use hoarder_server::{
     AppConfig,
     app::{job_service, scheduler},
     config::RuntimeSettingsPatch,
-    connectors::traits::ConnectorConfig,
-    core::types::{ConnectorKind, SourceId},
     db::{
         connect_sqlite,
         repository::{

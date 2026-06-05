@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use axum::Router;
-use hoarder::{AppConfig, db::connect_sqlite, server};
+use hoarder_server::{AppConfig, db::connect_sqlite, server};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},

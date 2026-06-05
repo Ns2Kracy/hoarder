@@ -1,10 +1,7 @@
 use axum::{body::to_bytes, http::StatusCode, response::IntoResponse};
-use hoarder::{
-    api::{error::ApiError, types::SourceDto},
-    connectors::traits::ConnectorConfig,
-    core::types::SourceId,
-    error::AppError,
-};
+use hoarder_connectors::traits::ConnectorConfig;
+use hoarder_core::{AppError, types::SourceId};
+use hoarder_server::api::{error::ApiError, types::SourceDto};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -111,7 +108,7 @@ fn api_error_source_dto_redacts_secret_config_values() {
         "Docs".to_owned(),
         &config,
         true,
-        hoarder::api::types::SourceHealth::Untested,
+        hoarder_server::api::types::SourceHealth::Untested,
         None,
     );
     let encoded = serde_json::to_value(source).unwrap();

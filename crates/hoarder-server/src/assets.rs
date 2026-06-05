@@ -8,7 +8,7 @@ use rust_embed::RustEmbed;
 use crate::api::error::ApiError;
 
 #[derive(RustEmbed)]
-#[folder = "web/dist"]
+#[folder = "../../web/dist"]
 struct WebAssets;
 
 pub async fn serve(uri: Uri) -> Response {

@@ -7,7 +7,7 @@ use axum::{
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::error::AppError;
+use hoarder_core::AppError;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
