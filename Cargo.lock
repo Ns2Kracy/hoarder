@@ -1377,6 +1377,7 @@ dependencies = [
  "clap",
  "futures",
  "hex",
+ "hoarder-connectors",
  "hoarder-core",
  "opendal",
  "reqwest 0.12.28",
@@ -1402,6 +1403,21 @@ version = "0.1.0"
 [[package]]
 name = "hoarder-connectors"
 version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "chrono",
+ "futures",
+ "hex",
+ "hoarder-core",
+ "opendal",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "hoarder-core"

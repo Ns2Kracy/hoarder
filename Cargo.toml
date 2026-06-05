@@ -34,6 +34,7 @@ clap = { version = "4.6.1", features = ["derive", "env"] }
 futures = "0.3.32"
 hex = "0.4.3"
 hoarder-core = { path = "crates/hoarder-core" }
+hoarder-connectors = { path = "crates/hoarder-connectors" }
 opendal = { version = "0.56.0", default-features = false, features = [
   "executors-tokio",
   "reqwest-rustls-tls",

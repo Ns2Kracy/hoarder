@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use hoarder::connectors::{
+use hoarder_connectors::{
     opendal::config::{
         OpenDalServiceConfig, OpenDalServiceKind, REDACTED_SECRET, redacted_connector_config,
         validate_connector_config,

@@ -1,11 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{
-    core::types::ConnectorKind,
-    error::{AppError, AppResult},
-};
-
-use super::traits::SourceConnector;
+use crate::traits::SourceConnector;
+use hoarder_core::{AppError, AppResult, types::ConnectorKind};
 
 pub type ConnectorFactory = Arc<dyn Fn() -> Arc<dyn SourceConnector> + Send + Sync>;
 

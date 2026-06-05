@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures::{Stream, future::BoxFuture};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    core::types::{ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot},
-    error::AppResult,
+use hoarder_core::{
+    AppResult,
+    types::{ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot},
 };
 
 pub type ConnectorFuture<'a, T> = BoxFuture<'a, AppResult<T>>;

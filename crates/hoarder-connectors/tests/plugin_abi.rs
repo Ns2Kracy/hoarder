@@ -1,11 +1,11 @@
-use hoarder::{
-    connectors::plugin::{
+use hoarder_connectors::{
+    plugin::{
         CONNECTOR_PLUGIN_ABI_VERSION, CONNECTOR_PLUGIN_ENTRYPOINT, ConnectorPluginManifest,
         PluginSecretField,
     },
-    connectors::traits::ConnectorConfig,
-    core::types::ConnectorCapabilities,
+    traits::ConnectorConfig,
 };
+use hoarder_core::types::ConnectorCapabilities;
 use std::collections::BTreeMap;
 
 #[test]

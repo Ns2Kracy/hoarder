@@ -1,12 +1,10 @@
 use std::{collections::BTreeMap, fs};
 
-use hoarder::{
-    connectors::{
-        opendal::source::OpenDalSourceConnector,
-        traits::{ConnectorConfig, SourceConnector},
-    },
-    core::types::SourceId,
+use hoarder_connectors::{
+    opendal::source::OpenDalSourceConnector,
+    traits::{ConnectorConfig, SourceConnector},
 };
+use hoarder_core::types::SourceId;
 use uuid::Uuid;
 
 #[tokio::test]

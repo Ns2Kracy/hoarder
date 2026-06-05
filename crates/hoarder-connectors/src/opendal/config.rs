@@ -2,10 +2,8 @@ use std::{collections::BTreeMap, fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    connectors::traits::ConnectorConfig,
-    error::{AppError, AppResult},
-};
+use crate::traits::ConnectorConfig;
+use hoarder_core::{AppError, AppResult};
 
 pub const REDACTED_SECRET: &str = "[redacted]";
 

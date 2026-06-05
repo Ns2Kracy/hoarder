@@ -8,16 +8,14 @@ use opendal::{
 };
 
 use crate::{
-    connectors::{
-        opendal::config::{OpenDalServiceConfig, validate_connector_config},
-        traits::{
-            ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
-        },
+    opendal::config::{OpenDalServiceConfig, validate_connector_config},
+    traits::{
+        ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
     },
-    core::types::{
-        ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
-    },
-    error::{AppError, AppResult},
+};
+use hoarder_core::{
+    AppError, AppResult,
+    types::{ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId},
 };
 
 const READ_CHUNK_SIZE: usize = 64 * 1024;

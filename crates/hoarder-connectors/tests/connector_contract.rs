@@ -2,16 +2,14 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, stream};
-use hoarder::{
-    connectors::{
-        registry::ConnectorRegistry,
-        traits::{
-            ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
-        },
+use hoarder_connectors::{
+    registry::ConnectorRegistry,
+    traits::{
+        ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
     },
-    core::types::{
-        ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
-    },
+};
+use hoarder_core::types::{
+    ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
 };
 
 #[derive(Debug)]

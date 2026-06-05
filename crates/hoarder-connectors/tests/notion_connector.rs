@@ -5,13 +5,11 @@ use axum::{
     routing::{get, post},
 };
 use futures::StreamExt;
-use hoarder::{
-    connectors::{
-        notion::NotionSourceConnector,
-        traits::{ConnectorConfig, SourceConnector},
-    },
-    core::types::{ConnectorKind, ItemType, SourceId},
+use hoarder_connectors::{
+    notion::NotionSourceConnector,
+    traits::{ConnectorConfig, SourceConnector},
 };
+use hoarder_core::types::{ConnectorKind, ItemType, SourceId};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::net::TcpListener;

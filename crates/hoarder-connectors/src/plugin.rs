@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{AppError, AppResult, core::types::ConnectorCapabilities};
+use hoarder_core::{AppError, AppResult, types::ConnectorCapabilities};
 
 pub const CONNECTOR_PLUGIN_ABI_VERSION: u32 = 1;
 pub const CONNECTOR_PLUGIN_ENTRYPOINT: &str = "hoarder_connector_plugin_v1";

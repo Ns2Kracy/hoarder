@@ -4,14 +4,12 @@ use futures::{FutureExt, stream};
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use serde_json::{Value, json};
 
-use crate::{
+use crate::traits::{
+    ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
+};
+use hoarder_core::{
     AppError, AppResult,
-    connectors::traits::{
-        ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
-    },
-    core::types::{
-        ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId,
-    },
+    types::{ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, SourceId},
 };
 
 const DEFAULT_BASE_URL: &str = "https://open.feishu.cn";

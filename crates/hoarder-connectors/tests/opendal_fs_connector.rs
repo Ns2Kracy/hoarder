@@ -2,13 +2,11 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 
 use bytes::Bytes;
 use futures::StreamExt;
-use hoarder::{
-    connectors::{
-        opendal::source::OpenDalSourceConnector,
-        traits::{ConnectorConfig, SourceConnector},
-    },
-    core::types::{ItemType, SourceId},
+use hoarder_connectors::{
+    opendal::source::OpenDalSourceConnector,
+    traits::{ConnectorConfig, SourceConnector},
 };
+use hoarder_core::types::{ItemType, SourceId};
 use uuid::Uuid;
 
 struct TempDir {
