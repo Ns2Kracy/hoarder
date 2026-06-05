@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use hoarder::core::types::{
+use hoarder_core::types::{
     ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, JobScheduleKind,
     JobStatus, RunStatus, SourceId, SyncStatus,
 };

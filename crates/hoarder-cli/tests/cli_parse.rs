@@ -1,10 +1,8 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
-use hoarder::{
-    cli::{Cli, Command, DbCommand, JobCommand, SourceCommand, SyncCommand},
-    server,
-};
+use hoarder_cli::cli::{Cli, Command, DbCommand, JobCommand, SourceCommand, SyncCommand};
+use hoarder_server::server;
 
 #[test]
 fn cli_parse_serve_accepts_global_options_and_addr() {

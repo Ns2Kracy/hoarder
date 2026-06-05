@@ -2,21 +2,17 @@
 
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
-use hoarder::{
-    connectors::{
-        opendal::source::OpenDalSourceConnector,
-        traits::{ConnectorConfig, SourceConnector},
-    },
-    core::types::{ConnectorKind, JobId, SourceId},
-    db::{
-        connect_sqlite,
-        repository::{
-            NewSource, NewSyncJob, SeaOrmRepository, SourceRepository, SyncJobRepository,
-        },
-        schema::sync_schema,
-    },
-    sync::{engine::SyncEngine, vault_writer::VaultWriter},
+use hoarder_connectors::{
+    opendal::source::OpenDalSourceConnector,
+    traits::{ConnectorConfig, SourceConnector},
 };
+use hoarder_core::types::{ConnectorKind, JobId, SourceId};
+use hoarder_server::db::{
+    connect_sqlite,
+    repository::{NewSource, NewSyncJob, SeaOrmRepository, SourceRepository, SyncJobRepository},
+    schema::sync_schema,
+};
+use hoarder_sync::{engine::SyncEngine, vault_writer::VaultWriter};
 use uuid::Uuid;
 
 pub struct LocalSyncHarness {

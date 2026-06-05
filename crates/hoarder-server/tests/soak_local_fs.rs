@@ -47,14 +47,14 @@ fn mutate_source_tree(
         format!("iteration={iteration}\n"),
     )?;
 
-    if iteration.is_multiple_of(3) {
+    if iteration % 3 == 0 {
         std::fs::write(
             churn_dir.join(format!("added-{iteration:04}.txt")),
             format!("added at iteration {iteration}\n"),
         )?;
     }
 
-    if iteration > 0 && iteration.is_multiple_of(5) {
+    if iteration > 0 && iteration % 5 == 0 {
         let deleted_candidate = churn_dir.join(format!("added-{:04}.txt", iteration - 3));
         if deleted_candidate.exists() {
             std::fs::remove_file(deleted_candidate)?;

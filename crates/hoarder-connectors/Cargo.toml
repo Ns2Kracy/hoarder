@@ -10,6 +10,9 @@ readme = "../../README.md"
 keywords = ["sync", "connector", "opendal"]
 categories = ["filesystem", "network-programming"]
 
+[lints]
+workspace = true
+
 [dependencies]
 bytes = "1.11.1"
 chrono = { version = "0.4.44", features = ["serde"] }

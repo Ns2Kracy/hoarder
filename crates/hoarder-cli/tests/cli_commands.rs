@@ -1,15 +1,11 @@
 use std::{fs, path::PathBuf};
 
-use hoarder::{
-    AppConfig,
-    api::types::SourceHealth,
-    cli::{
-        Cli, Command, DbCommand, JobCommand, SourceAddArgs, SourceCommand, SyncCommand, execute,
-    },
-    core::types::RunStatus,
-    server,
-    sync::repository::SyncRepository,
+use hoarder_cli::cli::{
+    Cli, Command, DbCommand, JobCommand, SourceAddArgs, SourceCommand, SyncCommand, execute,
 };
+use hoarder_core::types::RunStatus;
+use hoarder_server::{AppConfig, api::types::SourceHealth, server};
+use hoarder_sync::repository::SyncRepository;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -42,7 +38,7 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
     .await?;
 
     let (config, repository) = server::open_repository(Some(test.config_path.clone())).await?;
-    let sources = hoarder::app::source_service::list_sources(repository.as_ref()).await?;
+    let sources = hoarder_server::app::source_service::list_sources(repository.as_ref()).await?;
     let source_id = sources.first().expect("source was created").id;
     assert_eq!(sources[0].name, "Local Docs");
 
@@ -60,7 +56,7 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
         },
     }))
     .await?;
-    let sources = hoarder::app::source_service::list_sources(repository.as_ref()).await?;
+    let sources = hoarder_server::app::source_service::list_sources(repository.as_ref()).await?;
     assert_eq!(sources[0].health, SourceHealth::Healthy);
 
     execute(test.cli(Command::Job {
@@ -77,7 +73,7 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
     }))
     .await?;
 
-    let jobs = hoarder::app::job_service::list_jobs(repository.as_ref()).await?;
+    let jobs = hoarder_server::app::job_service::list_jobs(repository.as_ref()).await?;
     let job = jobs.first().expect("job was created");
     assert_eq!(job.name, "Docs sync");
 
@@ -88,7 +84,7 @@ async fn cli_commands_execute_local_source_job_and_sync_workflow()
     }))
     .await?;
 
-    let runs = hoarder::app::run_service::list_runs(repository.as_ref()).await?;
+    let runs = hoarder_server::app::run_service::list_runs(repository.as_ref()).await?;
     let run = runs.first().expect("sync run was created");
     assert_eq!(run.status, RunStatus::Completed);
     assert!(run.processed_count >= 1);
