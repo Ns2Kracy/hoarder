@@ -7,16 +7,18 @@ use axum::{
     http::StatusCode,
     routing::{get, patch, post},
 };
+use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
     api::{
         openapi,
         types::{
             CreateJobRequest, CreateSourceRequest, ErrorListQuery, FileBrowseQuery,
-            FileBrowseResponse, HealthResponse, ItemDto, ItemListQuery, JobDto, JobRunResponse,
-            ListResponse, RunDetailDto, RunDto, SettingsDto, SourceDto, SourceTemplateDto,
-            SourceTestResponse, SyncErrorDto, UpdateJobRequest, UpdateSettingsRequest,
-            UpdateSourceRequest,
+            FileBrowseResponse, HealthResponse, ItemDto, ItemListQuery, ItemListResponse, JobDto,
+            JobListResponse, JobRunResponse, ListResponse, RunDetailDto, RunDto, RunListResponse,
+            SettingsDto, SourceDto, SourceListResponse, SourceTemplateDto,
+            SourceTemplateListResponse, SourceTestResponse, SyncErrorDto, SyncErrorListResponse,
+            SyncStatusSchema, UpdateJobRequest, UpdateSettingsRequest, UpdateSourceRequest,
         },
     },
     app::{job_service, run_service, settings_service, source_service},
@@ -24,7 +26,10 @@ use crate::{
     db::repository::RuntimeSettingsRepository,
 };
 
-use super::{error::ApiError, state::ApiState};
+use super::{
+    error::{ApiError, ApiErrorBody},
+    state::ApiState,
+};
 
 pub fn router(state: ApiState) -> Router {
     api_routes_without_state()
@@ -57,21 +62,53 @@ fn api_routes_without_state() -> Router<ApiState> {
         .route("/api/items", get(list_items))
         .route("/api/errors", get(list_errors))
         .route("/api/settings", get(settings).patch(update_settings))
+        .merge(Scalar::with_url("/api/docs", openapi::document()))
 }
 
-async fn health() -> Json<HealthResponse> {
+#[utoipa::path(
+    get,
+    path = "/api/health",
+    operation_id = "getHealth",
+    tag = "system",
+    responses((status = 200, description = "Success", body = HealthResponse))
+)]
+pub(crate) async fn health() -> Json<HealthResponse> {
     Json(HealthResponse::ok())
 }
 
-async fn openapi_spec() -> Json<serde_json::Value> {
+#[utoipa::path(
+    get,
+    path = "/api/openapi.json",
+    operation_id = "getOpenApiSpec",
+    tag = "system",
+    responses((status = 200, description = "OpenAPI document", body = serde_json::Value))
+)]
+pub(crate) async fn openapi_spec() -> Json<serde_json::Value> {
     Json(openapi::spec())
 }
 
-async fn list_source_templates() -> Json<ListResponse<SourceTemplateDto>> {
+#[utoipa::path(
+    get,
+    path = "/api/source-templates",
+    operation_id = "listSourceTemplates",
+    tag = "sources",
+    responses((status = 200, description = "Success", body = SourceTemplateListResponse))
+)]
+pub(crate) async fn list_source_templates() -> Json<ListResponse<SourceTemplateDto>> {
     Json(ListResponse::new(source_service::source_templates()))
 }
 
-async fn list_sources(
+#[utoipa::path(
+    get,
+    path = "/api/sources",
+    operation_id = "listSources",
+    tag = "sources",
+    responses(
+        (status = 200, description = "Success", body = SourceListResponse),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn list_sources(
     State(state): State<ApiState>,
 ) -> Result<Json<ListResponse<SourceDto>>, ApiError> {
     Ok(Json(ListResponse::new(
@@ -79,7 +116,19 @@ async fn list_sources(
     )))
 }
 
-async fn create_source(
+#[utoipa::path(
+    post,
+    path = "/api/sources",
+    operation_id = "createSource",
+    tag = "sources",
+    request_body = CreateSourceRequest,
+    responses(
+        (status = 201, description = "Success", body = SourceDto),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn create_source(
     State(state): State<ApiState>,
     payload: Result<Json<CreateSourceRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<SourceDto>), ApiError> {
@@ -89,7 +138,21 @@ async fn create_source(
     Ok((StatusCode::CREATED, Json(source)))
 }
 
-async fn update_source(
+#[utoipa::path(
+    patch,
+    path = "/api/sources/{id}",
+    operation_id = "updateSource",
+    tag = "sources",
+    request_body = UpdateSourceRequest,
+    params(("id" = i64, Path, description = "Source identifier", minimum = 1)),
+    responses(
+        (status = 200, description = "Success", body = SourceDto),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn update_source(
     State(state): State<ApiState>,
     path: Result<Path<SourceId>, PathRejection>,
     payload: Result<Json<UpdateSourceRequest>, JsonRejection>,
@@ -102,7 +165,20 @@ async fn update_source(
     ))
 }
 
-async fn delete_source(
+#[utoipa::path(
+    delete,
+    path = "/api/sources/{id}",
+    operation_id = "deleteSource",
+    tag = "sources",
+    params(("id" = i64, Path, description = "Source identifier", minimum = 1)),
+    responses(
+        (status = 204, description = "Deleted"),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 409, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn delete_source(
     State(state): State<ApiState>,
     path: Result<Path<SourceId>, PathRejection>,
 ) -> Result<StatusCode, ApiError> {
@@ -112,7 +188,20 @@ async fn delete_source(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn test_source(
+#[utoipa::path(
+    post,
+    path = "/api/sources/{id}/test",
+    operation_id = "testSource",
+    tag = "sources",
+    params(("id" = i64, Path, description = "Source identifier", minimum = 1)),
+    responses(
+        (status = 200, description = "Success", body = SourceTestResponse),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 502, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn test_source(
     State(state): State<ApiState>,
     path: Result<Path<SourceId>, PathRejection>,
 ) -> Result<Json<SourceTestResponse>, ApiError> {
@@ -123,13 +212,38 @@ async fn test_source(
     ))
 }
 
-async fn list_jobs(State(state): State<ApiState>) -> Result<Json<ListResponse<JobDto>>, ApiError> {
+#[utoipa::path(
+    get,
+    path = "/api/jobs",
+    operation_id = "listJobs",
+    tag = "jobs",
+    responses(
+        (status = 200, description = "Success", body = JobListResponse),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn list_jobs(
+    State(state): State<ApiState>,
+) -> Result<Json<ListResponse<JobDto>>, ApiError> {
     Ok(Json(ListResponse::new(
         job_service::list_jobs(state.repository()).await?,
     )))
 }
 
-async fn create_job(
+#[utoipa::path(
+    post,
+    path = "/api/jobs",
+    operation_id = "createJob",
+    tag = "jobs",
+    request_body = CreateJobRequest,
+    responses(
+        (status = 201, description = "Success", body = JobDto),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 422, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn create_job(
     State(state): State<ApiState>,
     payload: Result<Json<CreateJobRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<JobDto>), ApiError> {
@@ -139,7 +253,23 @@ async fn create_job(
     Ok((StatusCode::CREATED, Json(job)))
 }
 
-async fn update_job(
+#[utoipa::path(
+    patch,
+    path = "/api/jobs/{id}",
+    operation_id = "updateJob",
+    tag = "jobs",
+    request_body = UpdateJobRequest,
+    params(("id" = i64, Path, description = "Job identifier", minimum = 1)),
+    responses(
+        (status = 200, description = "Success", body = JobDto),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 409, description = "Error", body = ApiErrorBody),
+        (status = 422, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn update_job(
     State(state): State<ApiState>,
     path: Result<Path<JobId>, PathRejection>,
     payload: Result<Json<UpdateJobRequest>, JsonRejection>,
@@ -152,7 +282,21 @@ async fn update_job(
     ))
 }
 
-async fn run_job(
+#[utoipa::path(
+    post,
+    path = "/api/jobs/{id}/run",
+    operation_id = "runJob",
+    tag = "jobs",
+    params(("id" = i64, Path, description = "Job identifier", minimum = 1)),
+    responses(
+        (status = 200, description = "Success", body = JobRunResponse),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 409, description = "Error", body = ApiErrorBody),
+        (status = 422, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn run_job(
     State(state): State<ApiState>,
     path: Result<Path<JobId>, PathRejection>,
 ) -> Result<Json<JobRunResponse>, ApiError> {
@@ -174,7 +318,20 @@ async fn run_job(
     ))
 }
 
-async fn stop_job(
+#[utoipa::path(
+    post,
+    path = "/api/jobs/{id}/stop",
+    operation_id = "stopJob",
+    tag = "jobs",
+    params(("id" = i64, Path, description = "Job identifier", minimum = 1)),
+    responses(
+        (status = 202, description = "Stop requested"),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 409, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn stop_job(
     State(state): State<ApiState>,
     path: Result<Path<JobId>, PathRejection>,
 ) -> Result<StatusCode, ApiError> {
@@ -184,13 +341,37 @@ async fn stop_job(
     Ok(StatusCode::ACCEPTED)
 }
 
-async fn list_runs(State(state): State<ApiState>) -> Result<Json<ListResponse<RunDto>>, ApiError> {
+#[utoipa::path(
+    get,
+    path = "/api/runs",
+    operation_id = "listRuns",
+    tag = "runs",
+    responses(
+        (status = 200, description = "Success", body = RunListResponse),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn list_runs(
+    State(state): State<ApiState>,
+) -> Result<Json<ListResponse<RunDto>>, ApiError> {
     Ok(Json(ListResponse::new(
         run_service::list_runs(state.repository()).await?,
     )))
 }
 
-async fn get_run_detail(
+#[utoipa::path(
+    get,
+    path = "/api/runs/{id}",
+    operation_id = "getRunDetail",
+    tag = "runs",
+    params(("id" = i64, Path, description = "Run identifier", minimum = 1)),
+    responses(
+        (status = 200, description = "Success", body = RunDetailDto),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn get_run_detail(
     State(state): State<ApiState>,
     path: Result<Path<RunId>, PathRejection>,
 ) -> Result<Json<RunDetailDto>, ApiError> {
@@ -201,7 +382,23 @@ async fn get_run_detail(
     ))
 }
 
-async fn list_items(
+#[utoipa::path(
+    get,
+    path = "/api/items",
+    operation_id = "listItems",
+    tag = "items",
+    params(
+        ("sourceId" = Option<i64>, Query, description = "Filter by source identifier", minimum = 1),
+        ("status" = Option<SyncStatusSchema>, Query, description = "Filter by item sync status"),
+        ("runId" = Option<i64>, Query, description = "Filter by run identifier", minimum = 1)
+    ),
+    responses(
+        (status = 200, description = "Success", body = ItemListResponse),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn list_items(
     State(state): State<ApiState>,
     Query(query): Query<ItemListQuery>,
 ) -> Result<Json<ListResponse<ItemDto>>, ApiError> {
@@ -210,7 +407,23 @@ async fn list_items(
     )))
 }
 
-async fn browse_files(
+#[utoipa::path(
+    get,
+    path = "/api/files",
+    operation_id = "browseFiles",
+    tag = "items",
+    params(
+        ("sourceId" = i64, Query, description = "Source identifier", minimum = 1),
+        ("path" = Option<String>, Query, description = "Source-relative directory path")
+    ),
+    responses(
+        (status = 200, description = "Success", body = FileBrowseResponse),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 404, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn browse_files(
     State(state): State<ApiState>,
     Query(query): Query<FileBrowseQuery>,
 ) -> Result<Json<FileBrowseResponse>, ApiError> {
@@ -219,7 +432,22 @@ async fn browse_files(
     ))
 }
 
-async fn list_errors(
+#[utoipa::path(
+    get,
+    path = "/api/errors",
+    operation_id = "listErrors",
+    tag = "errors",
+    params(
+        ("sourceId" = Option<i64>, Query, description = "Filter by source identifier", minimum = 1),
+        ("runId" = Option<i64>, Query, description = "Filter by run identifier", minimum = 1)
+    ),
+    responses(
+        (status = 200, description = "Success", body = SyncErrorListResponse),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn list_errors(
     State(state): State<ApiState>,
     Query(query): Query<ErrorListQuery>,
 ) -> Result<Json<ListResponse<SyncErrorDto>>, ApiError> {
@@ -228,13 +456,35 @@ async fn list_errors(
     )))
 }
 
-async fn settings(State(state): State<ApiState>) -> Result<Json<SettingsDto>, ApiError> {
+#[utoipa::path(
+    get,
+    path = "/api/settings",
+    operation_id = "getSettings",
+    tag = "settings",
+    responses(
+        (status = 200, description = "Success", body = SettingsDto),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn settings(State(state): State<ApiState>) -> Result<Json<SettingsDto>, ApiError> {
     Ok(Json(
         settings_service::get_settings(state.repository(), state.config()).await?,
     ))
 }
 
-async fn update_settings(
+#[utoipa::path(
+    patch,
+    path = "/api/settings",
+    operation_id = "updateSettings",
+    tag = "settings",
+    request_body = UpdateSettingsRequest,
+    responses(
+        (status = 200, description = "Success", body = SettingsDto),
+        (status = 400, description = "Error", body = ApiErrorBody),
+        (status = 500, description = "Error", body = ApiErrorBody)
+    )
+)]
+pub(crate) async fn update_settings(
     State(state): State<ApiState>,
     payload: Result<Json<UpdateSettingsRequest>, JsonRejection>,
 ) -> Result<Json<SettingsDto>, ApiError> {

@@ -1,943 +1,255 @@
-use serde_json::{Value, json};
+use serde_json::Value;
+use utoipa::OpenApi;
 
-/// Returns the machine-readable `OpenAPI` contract for the local Hoarder API.
+use crate::api::{
+    error::{ApiErrorBody, ApiErrorDetail},
+    types::{
+        ConnectorConfigSchema, ConnectorKindSchema, CreateJobRequest, CreateSourceRequest,
+        FileBrowseResponse, FileEntryDto, FileEntryKind, HealthResponse, ItemDto, ItemListResponse,
+        ItemTypeSchema, JobDto, JobListResponse, JobRunResponse, JobScheduleDto, JobStatusSchema,
+        ReadOnlySettingsDto, RedactedConnectorConfig, RunCountsDto, RunDetailDto, RunDto,
+        RunListResponse, RunStatusSchema, SettingsDto, SourceDto, SourceHealth, SourceListResponse,
+        SourceTemplateDto, SourceTemplateListResponse, SourceTemplateOptionDto, SourceTestResponse,
+        SyncErrorDto, SyncErrorListResponse, SyncStatusSchema, UpdateJobRequest,
+        UpdateSettingsRequest, UpdateSourceRequest,
+    },
+};
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        crate::api::routes::health,
+        crate::api::routes::openapi_spec,
+        crate::api::routes::list_source_templates,
+        crate::api::routes::list_sources,
+        crate::api::routes::create_source,
+        crate::api::routes::update_source,
+        crate::api::routes::delete_source,
+        crate::api::routes::test_source,
+        crate::api::routes::list_jobs,
+        crate::api::routes::create_job,
+        crate::api::routes::update_job,
+        crate::api::routes::run_job,
+        crate::api::routes::stop_job,
+        crate::api::routes::list_runs,
+        crate::api::routes::get_run_detail,
+        crate::api::routes::browse_files,
+        crate::api::routes::list_items,
+        crate::api::routes::list_errors,
+        crate::api::routes::settings,
+        crate::api::routes::update_settings,
+    ),
+    components(schemas(
+        ApiErrorBody,
+        ApiErrorDetail,
+        ConnectorConfigSchema,
+        ConnectorKindSchema,
+        CreateJobRequest,
+        CreateSourceRequest,
+        FileBrowseResponse,
+        FileEntryDto,
+        FileEntryKind,
+        HealthResponse,
+        ItemDto,
+        ItemListResponse,
+        ItemTypeSchema,
+        JobDto,
+        JobListResponse,
+        JobRunResponse,
+        JobScheduleDto,
+        JobStatusSchema,
+        ReadOnlySettingsDto,
+        RedactedConnectorConfig,
+        RunCountsDto,
+        RunDetailDto,
+        RunDto,
+        RunListResponse,
+        RunStatusSchema,
+        SettingsDto,
+        SourceDto,
+        SourceHealth,
+        SourceListResponse,
+        SourceTemplateDto,
+        SourceTemplateListResponse,
+        SourceTemplateOptionDto,
+        SourceTestResponse,
+        SyncErrorDto,
+        SyncErrorListResponse,
+        SyncStatusSchema,
+        UpdateJobRequest,
+        UpdateSettingsRequest,
+        UpdateSourceRequest,
+    )),
+    info(
+        title = "Hoarder Local API",
+        description = "Local-first one-way data aggregation control plane API."
+    ),
+    servers((url = "/"))
+)]
+struct ApiDoc;
+
+/// Returns the generated machine-readable `OpenAPI` contract for the local Hoarder API.
+#[must_use]
+pub fn document() -> utoipa::openapi::OpenApi {
+    ApiDoc::openapi()
+}
+
+/// Returns the generated `OpenAPI` contract as JSON for the HTTP endpoint.
+///
+/// # Panics
+///
+/// Panics if the generated `utoipa` document cannot be serialized to JSON.
 #[must_use]
 pub fn spec() -> Value {
-    json!({
-        "openapi": "3.1.0",
-        "info": {
-            "title": "Hoarder Local API",
-            "version": env!("CARGO_PKG_VERSION"),
-            "description": "Local-first one-way data aggregation control plane API."
-        },
-        "servers": [{"url": "/"}],
-        "paths": paths(),
-        "components": {
-            "schemas": schemas()
-        }
-    })
+    let mut spec =
+        serde_json::to_value(document()).expect("generated OpenAPI document serializes to JSON");
+    inline_local_id_refs(&mut spec);
+    inline_simple_enum_refs(&mut spec);
+    normalize_nullable_local_ids(&mut spec);
+
+    spec
 }
 
-#[must_use]
-fn paths() -> Value {
-    json!({
-        "/api/health": health_path(),
-        "/api/openapi.json": openapi_path(),
-        "/api/source-templates": source_templates_path(),
-        "/api/sources": sources_path(),
-        "/api/sources/{id}": source_path(),
-        "/api/sources/{id}/test": source_test_path(),
-        "/api/jobs": jobs_path(),
-        "/api/jobs/{id}": job_path(),
-        "/api/jobs/{id}/run": job_run_path(),
-        "/api/jobs/{id}/stop": job_stop_path(),
-        "/api/runs": runs_path(),
-        "/api/runs/{id}": run_detail_path(),
-        "/api/files": files_path(),
-        "/api/items": items_path(),
-        "/api/errors": errors_path(),
-        "/api/settings": settings_path()
-    })
+fn inline_simple_enum_refs(spec: &mut Value) {
+    const ENUM_SCHEMAS: &[&str] = &[
+        "ConnectorKindSchema",
+        "FileEntryKind",
+        "ItemTypeSchema",
+        "JobStatusSchema",
+        "RunStatusSchema",
+        "SourceHealth",
+        "SyncStatusSchema",
+    ];
+
+    let Some(schemas) = spec
+        .pointer("/components/schemas")
+        .and_then(Value::as_object)
+        .cloned()
+    else {
+        return;
+    };
+
+    inline_named_component_refs(spec, &schemas, ENUM_SCHEMAS);
 }
 
-#[must_use]
-fn health_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["system"],
-            "operationId": "getHealth",
-            "responses": {
-                "200": json_response("HealthResponse")
+fn inline_named_component_refs(
+    value: &mut Value,
+    schemas: &serde_json::Map<String, Value>,
+    names: &[&str],
+) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                inline_named_component_refs(value, schemas, names);
             }
         }
-    })
-}
-
-#[must_use]
-fn openapi_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["system"],
-            "operationId": "getOpenApiSpec",
-            "responses": {
-                "200": {
-                    "description": "OpenAPI document",
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    })
-}
-
-#[must_use]
-fn source_templates_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["sources"],
-            "operationId": "listSourceTemplates",
-            "responses": {
-                "200": list_response("SourceTemplateDto")
-            }
-        }
-    })
-}
-
-#[must_use]
-fn sources_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["sources"],
-            "operationId": "listSources",
-            "responses": {
-                "200": list_response("SourceDto"),
-                "500": error_response()
-            }
-        },
-        "post": {
-            "tags": ["sources"],
-            "operationId": "createSource",
-            "requestBody": request_body("CreateSourceRequest"),
-            "responses": {
-                "201": json_response("SourceDto"),
-                "400": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn source_path() -> Value {
-    json!({
-        "patch": {
-            "tags": ["sources"],
-            "operationId": "updateSource",
-            "parameters": [path_local_id_parameter("id", "Source identifier")],
-            "requestBody": request_body("UpdateSourceRequest"),
-            "responses": {
-                "200": json_response("SourceDto"),
-                "400": error_response(),
-                "404": error_response(),
-                "500": error_response()
-            }
-        },
-        "delete": {
-            "tags": ["sources"],
-            "operationId": "deleteSource",
-            "parameters": [path_local_id_parameter("id", "Source identifier")],
-            "responses": {
-                "204": {"description": "Deleted"},
-                "404": error_response(),
-                "409": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn source_test_path() -> Value {
-    json!({
-        "post": {
-            "tags": ["sources"],
-            "operationId": "testSource",
-            "parameters": [path_local_id_parameter("id", "Source identifier")],
-            "responses": {
-                "200": json_response("SourceTestResponse"),
-                "400": error_response(),
-                "404": error_response(),
-                "502": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn jobs_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["jobs"],
-            "operationId": "listJobs",
-            "responses": {
-                "200": list_response("JobDto"),
-                "500": error_response()
-            }
-        },
-        "post": {
-            "tags": ["jobs"],
-            "operationId": "createJob",
-            "requestBody": request_body("CreateJobRequest"),
-            "responses": {
-                "201": json_response("JobDto"),
-                "400": error_response(),
-                "422": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn job_path() -> Value {
-    json!({
-        "patch": {
-            "tags": ["jobs"],
-            "operationId": "updateJob",
-            "parameters": [path_local_id_parameter("id", "Job identifier")],
-            "requestBody": request_body("UpdateJobRequest"),
-            "responses": {
-                "200": json_response("JobDto"),
-                "400": error_response(),
-                "404": error_response(),
-                "409": error_response(),
-                "422": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn job_run_path() -> Value {
-    json!({
-        "post": {
-            "tags": ["jobs"],
-            "operationId": "runJob",
-            "parameters": [path_local_id_parameter("id", "Job identifier")],
-            "responses": {
-                "200": json_response("JobRunResponse"),
-                "404": error_response(),
-                "409": error_response(),
-                "422": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn job_stop_path() -> Value {
-    json!({
-        "post": {
-            "tags": ["jobs"],
-            "operationId": "stopJob",
-            "parameters": [path_local_id_parameter("id", "Job identifier")],
-            "responses": {
-                "202": {"description": "Stop requested"},
-                "404": error_response(),
-                "409": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn runs_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["runs"],
-            "operationId": "listRuns",
-            "responses": {
-                "200": list_response("RunDto"),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn run_detail_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["runs"],
-            "operationId": "getRunDetail",
-            "parameters": [path_local_id_parameter("id", "Run identifier")],
-            "responses": {
-                "200": json_response("RunDetailDto"),
-                "404": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn files_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["items"],
-            "operationId": "browseFiles",
-            "parameters": [
-                required_query_local_id_parameter("sourceId", "Source identifier"),
-                query_string_parameter("path", "Source-relative directory path")
-            ],
-            "responses": {
-                "200": json_response("FileBrowseResponse"),
-                "400": error_response(),
-                "404": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn items_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["items"],
-            "operationId": "listItems",
-            "parameters": [
-                query_local_id_parameter("sourceId", "Filter by source identifier"),
-                query_enum_parameter("status", "SyncStatus", "Filter by item sync status"),
-                query_local_id_parameter("runId", "Filter by run identifier")
-            ],
-            "responses": {
-                "200": list_response("ItemDto"),
-                "400": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn errors_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["errors"],
-            "operationId": "listErrors",
-            "parameters": [
-                query_local_id_parameter("sourceId", "Filter by source identifier"),
-                query_local_id_parameter("runId", "Filter by run identifier")
-            ],
-            "responses": {
-                "200": list_response("SyncErrorDto"),
-                "400": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn settings_path() -> Value {
-    json!({
-        "get": {
-            "tags": ["settings"],
-            "operationId": "getSettings",
-            "responses": {
-                "200": json_response("SettingsDto"),
-                "500": error_response()
-            }
-        },
-        "patch": {
-            "tags": ["settings"],
-            "operationId": "updateSettings",
-            "requestBody": request_body("UpdateSettingsRequest"),
-            "responses": {
-                "200": json_response("SettingsDto"),
-                "400": error_response(),
-                "500": error_response()
-            }
-        }
-    })
-}
-
-#[must_use]
-fn schemas() -> Value {
-    json!({
-        "ApiErrorBody": api_error_body_schema(),
-        "CreateJobRequest": create_job_request_schema(),
-        "CreateSourceRequest": create_source_request_schema(),
-        "FileBrowseResponse": file_browse_response_schema(),
-        "FileEntryDto": file_entry_schema(),
-        "FileEntryKind": file_entry_kind_schema(),
-        "HealthResponse": health_response_schema(),
-        "ItemDto": item_schema(),
-        "JobDto": job_schema(),
-        "JobRunResponse": job_run_response_schema(),
-        "JobScheduleDto": job_schedule_schema(),
-        "ReadOnlySettingsDto": read_only_settings_schema(),
-        "RedactedConnectorConfig": connector_config_schema(),
-        "RunCountsDto": run_counts_schema(),
-        "RunDetailDto": run_detail_schema(),
-        "RunDto": run_schema(),
-        "SettingsDto": settings_schema(),
-        "SourceDto": source_schema(),
-        "SourceTemplateDto": source_template_schema(),
-        "SourceTemplateOptionDto": source_template_option_schema(),
-        "SourceTestResponse": source_test_response_schema(),
-        "SyncErrorDto": sync_error_schema(),
-        "UpdateJobRequest": update_job_request_schema(),
-        "UpdateSettingsRequest": update_settings_request_schema(),
-        "UpdateSourceRequest": update_source_request_schema()
-    })
-}
-
-#[must_use]
-fn api_error_body_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["error"],
-        "properties": {
-            "error": {
-                "type": "object",
-                "required": ["code", "message"],
-                "properties": {
-                    "code": {"type": "string"},
-                    "message": {"type": "string"}
-                }
-            }
-        }
-    })
-}
-
-#[must_use]
-fn create_job_request_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["sourceId", "name", "schedule"],
-        "properties": {
-            "sourceId": local_id_schema(),
-            "name": {"type": "string"},
-            "enabled": {"type": "boolean", "default": true},
-            "schedule": ref_schema("JobScheduleDto")
-        }
-    })
-}
-
-#[must_use]
-fn update_job_request_schema() -> Value {
-    create_job_request_schema()
-}
-
-#[must_use]
-fn create_source_request_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["name", "config"],
-        "properties": {
-            "name": {"type": "string"},
-            "config": ref_schema("RedactedConnectorConfig"),
-            "enabled": {"type": "boolean", "default": true}
-        }
-    })
-}
-
-#[must_use]
-fn update_source_request_schema() -> Value {
-    create_source_request_schema()
-}
-
-#[must_use]
-fn health_response_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["status"],
-        "properties": {
-            "status": {"type": "string", "enum": ["ok"]}
-        }
-    })
-}
-
-#[must_use]
-fn file_browse_response_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["sourceId", "path", "entries"],
-        "properties": {
-            "sourceId": local_id_schema(),
-            "path": {"type": "string"},
-            "entries": array_ref_schema("FileEntryDto")
-        }
-    })
-}
-
-#[must_use]
-fn file_entry_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["name", "path", "kind", "item"],
-        "properties": {
-            "name": {"type": "string"},
-            "path": {"type": "string"},
-            "kind": ref_schema("FileEntryKind"),
-            "item": {
-                "oneOf": [
-                    ref_schema("ItemDto"),
-                    {"type": "null"}
-                ]
-            }
-        }
-    })
-}
-
-#[must_use]
-fn file_entry_kind_schema() -> Value {
-    json!({"type": "string", "enum": ["directory", "file", "virtual_document"]})
-}
-
-#[must_use]
-fn item_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "sourceId", "sourcePath", "itemType", "status"],
-        "properties": {
-            "id": local_id_schema(),
-            "sourceId": local_id_schema(),
-            "sourcePath": {"type": "string"},
-            "itemType": {"type": "string", "enum": ["file", "directory", "virtual_document"]},
-            "status": sync_status_schema(),
-            "size": nullable_integer_schema(),
-            "etag": nullable_string_schema(),
-            "modifiedAt": nullable_datetime_schema(),
-            "contentHash": nullable_string_schema(),
-            "metadataJson": {"type": ["object", "array", "string", "number", "boolean", "null"]}
-        }
-    })
-}
-
-#[must_use]
-fn job_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "sourceId", "name", "enabled", "schedule", "status"],
-        "properties": {
-            "id": local_id_schema(),
-            "sourceId": local_id_schema(),
-            "name": {"type": "string"},
-            "enabled": {"type": "boolean"},
-            "schedule": ref_schema("JobScheduleDto"),
-            "status": job_status_schema(),
-            "lastRunAt": nullable_datetime_schema(),
-            "lastRunStatus": nullable_run_status_schema(),
-            "lastRunId": nullable_local_id_schema(),
-            "nextRunAt": nullable_datetime_schema()
-        }
-    })
-}
-
-#[must_use]
-fn job_run_response_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["runId", "status"],
-        "properties": {
-            "runId": local_id_schema(),
-            "status": sync_status_schema()
-        }
-    })
-}
-
-#[must_use]
-fn job_schedule_schema() -> Value {
-    json!({
-        "oneOf": [
+        Value::Object(object) => {
+            if object.len() == 1
+                && let Some(name) = object
+                    .get("$ref")
+                    .and_then(Value::as_str)
+                    .and_then(component_ref_name)
+                && names.contains(&name)
+                && let Some(schema) = schemas.get(name)
             {
-                "type": "object",
-                "required": ["kind"],
-                "properties": {
-                    "kind": {"type": "string", "enum": ["manual"]}
-                }
-            },
+                *value = schema.clone();
+                return;
+            }
+
+            for value in object.values_mut() {
+                inline_named_component_refs(value, schemas, names);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
+fn inline_local_id_refs(value: &mut Value) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                inline_local_id_refs(value);
+            }
+        }
+        Value::Object(object) => {
+            if object.len() == 1
+                && object
+                    .get("$ref")
+                    .and_then(Value::as_str)
+                    .is_some_and(is_local_id_ref)
             {
-                "type": "object",
-                "required": ["kind", "intervalSeconds"],
-                "properties": {
-                    "kind": {"type": "string", "enum": ["interval"]},
-                    "intervalSeconds": {"type": "integer", "minimum": 1}
+                *value = local_id_schema();
+                return;
+            }
+
+            for value in object.values_mut() {
+                inline_local_id_refs(value);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
+fn normalize_nullable_local_ids(value: &mut Value) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                normalize_nullable_local_ids(value);
+            }
+        }
+        Value::Object(object) => {
+            for key in ["anyOf", "oneOf"] {
+                if object
+                    .get(key)
+                    .and_then(Value::as_array)
+                    .is_some_and(|values| is_nullable_local_id_schema(values))
+                {
+                    *value = serde_json::json!({
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    });
+                    return;
                 }
             }
-        ]
-    })
-}
 
-#[must_use]
-fn read_only_settings_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["databasePath", "vaultPath", "listenAddr"],
-        "properties": {
-            "databasePath": {"type": "boolean"},
-            "vaultPath": {"type": "boolean"},
-            "listenAddr": {"type": "boolean"}
-        }
-    })
-}
-
-#[must_use]
-fn connector_config_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["kind"],
-        "properties": {
-            "kind": {"type": "string", "enum": ["opendal", "notion", "feishu", "plugin"]},
-            "service": {"type": "string", "enum": ["fs", "webdav", "sftp", "s3"]},
-            "token": {"type": "string"},
-            "dataSourceId": {"type": ["string", "null"]},
-            "pageId": {"type": ["string", "null"]},
-            "version": {"type": ["string", "null"]},
-            "appId": {"type": "string"},
-            "appSecret": {"type": "string"},
-            "folderToken": {"type": ["string", "null"]},
-            "baseUrl": {"type": ["string", "null"]},
-            "pluginId": {"type": "string"},
-            "options": {
-                "type": "object",
-                "additionalProperties": {"type": "string"}
+            for value in object.values_mut() {
+                normalize_nullable_local_ids(value);
             }
         }
-    })
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
 }
 
-#[must_use]
-fn run_counts_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["processed", "synced", "skipped", "failed", "deleted"],
-        "properties": {
-            "processed": {"type": "integer", "minimum": 0},
-            "synced": {"type": "integer", "minimum": 0},
-            "skipped": {"type": "integer", "minimum": 0},
-            "failed": {"type": "integer", "minimum": 0},
-            "deleted": {"type": "integer", "minimum": 0}
-        }
-    })
+fn is_nullable_local_id_schema(values: &[Value]) -> bool {
+    values.len() == 2 && values.iter().any(is_local_id_schema) && values.iter().any(is_null_schema)
 }
 
-#[must_use]
-fn run_detail_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "jobId", "sourceId", "sourceName", "jobName", "status", "counts", "errors"],
-        "properties": {
-            "id": local_id_schema(),
-            "jobId": local_id_schema(),
-            "sourceId": local_id_schema(),
-            "sourceName": {"type": "string"},
-            "jobName": {"type": "string"},
-            "status": run_status_schema(),
-            "startedAt": nullable_datetime_schema(),
-            "finishedAt": nullable_datetime_schema(),
-            "durationMs": nullable_integer_schema(),
-            "counts": ref_schema("RunCountsDto"),
-            "errors": array_ref_schema("SyncErrorDto")
-        }
-    })
+fn is_local_id_schema(value: &Value) -> bool {
+    value.get("type") == Some(&Value::String("integer".to_owned()))
+        && value.get("minimum").and_then(Value::as_i64) == Some(1)
 }
 
-#[must_use]
-fn run_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "jobId", "sourceId", "sourceName", "jobName", "status", "processedCount", "syncedCount", "skippedCount", "failedCount", "deletedCount"],
-        "properties": {
-            "id": local_id_schema(),
-            "jobId": local_id_schema(),
-            "sourceId": local_id_schema(),
-            "sourceName": {"type": "string"},
-            "jobName": {"type": "string"},
-            "status": run_status_schema(),
-            "startedAt": nullable_datetime_schema(),
-            "finishedAt": nullable_datetime_schema(),
-            "processedCount": {"type": "integer", "minimum": 0},
-            "syncedCount": {"type": "integer", "minimum": 0},
-            "skippedCount": {"type": "integer", "minimum": 0},
-            "failedCount": {"type": "integer", "minimum": 0},
-            "deletedCount": {"type": "integer", "minimum": 0}
-        }
-    })
+fn is_null_schema(value: &Value) -> bool {
+    value.get("type") == Some(&Value::String("null".to_owned()))
 }
 
-#[must_use]
-fn settings_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["databasePath", "vaultPath", "listenAddr", "jobConcurrency", "fileConcurrency", "logLevel", "readOnly"],
-        "properties": {
-            "databasePath": {"type": "string"},
-            "vaultPath": {"type": "string"},
-            "listenAddr": {"type": "string"},
-            "jobConcurrency": {"type": "integer", "minimum": 1},
-            "fileConcurrency": {"type": "integer", "minimum": 1},
-            "logLevel": log_level_schema(),
-            "readOnly": ref_schema("ReadOnlySettingsDto")
-        }
-    })
+fn is_local_id_ref(reference: &str) -> bool {
+    matches!(
+        reference,
+        "#/components/schemas/SourceId"
+            | "#/components/schemas/JobId"
+            | "#/components/schemas/RunId"
+            | "#/components/schemas/ItemId"
+    )
 }
 
-#[must_use]
-fn source_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "name", "connectorKind", "config", "enabled", "health"],
-        "properties": {
-            "id": local_id_schema(),
-            "name": {"type": "string"},
-            "connectorKind": {"type": "string", "enum": ["opendal", "notion", "feishu", "plugin"]},
-            "config": ref_schema("RedactedConnectorConfig"),
-            "enabled": {"type": "boolean"},
-            "health": {"type": "string", "enum": ["healthy", "warning", "failed", "untested", "disabled"]},
-            "lastCheckedAt": nullable_datetime_schema()
-        }
-    })
+fn component_ref_name(reference: &str) -> Option<&str> {
+    reference.strip_prefix("#/components/schemas/")
 }
 
-#[must_use]
-fn source_template_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "label", "description", "connectorKind", "service", "options"],
-        "properties": {
-            "id": {"type": "string"},
-            "label": {"type": "string"},
-            "description": {"type": "string"},
-            "connectorKind": {"type": "string", "enum": ["opendal"]},
-            "service": {"type": "string", "enum": ["fs", "webdav", "sftp", "s3"]},
-            "options": array_ref_schema("SourceTemplateOptionDto")
-        }
-    })
-}
-
-#[must_use]
-fn source_template_option_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["key", "label", "required", "secret"],
-        "properties": {
-            "key": {"type": "string"},
-            "label": {"type": "string"},
-            "required": {"type": "boolean"},
-            "secret": {"type": "boolean"},
-            "defaultValue": nullable_string_schema(),
-            "placeholder": nullable_string_schema()
-        }
-    })
-}
-
-#[must_use]
-fn source_test_response_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["ok", "checkedAt"],
-        "properties": {
-            "ok": {"type": "boolean"},
-            "checkedAt": datetime_schema()
-        }
-    })
-}
-
-#[must_use]
-fn sync_error_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["id", "code", "message"],
-        "properties": {
-            "id": local_id_schema(),
-            "runId": nullable_local_id_schema(),
-            "sourceId": nullable_local_id_schema(),
-            "sourcePath": nullable_string_schema(),
-            "code": {"type": "string"},
-            "message": {"type": "string"},
-            "createdAt": nullable_datetime_schema()
-        }
-    })
-}
-
-#[must_use]
-fn update_settings_request_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["jobConcurrency", "fileConcurrency", "logLevel"],
-        "properties": {
-            "jobConcurrency": {"type": "integer", "minimum": 1},
-            "fileConcurrency": {"type": "integer", "minimum": 1},
-            "logLevel": log_level_schema()
-        }
-    })
-}
-
-#[must_use]
-fn request_body(schema_name: &str) -> Value {
-    json!({
-        "required": true,
-        "content": {
-            "application/json": {
-                "schema": ref_schema(schema_name)
-            }
-        }
-    })
-}
-
-#[must_use]
-fn json_response(schema_name: &str) -> Value {
-    json!({
-        "description": "Success",
-        "content": {
-            "application/json": {
-                "schema": ref_schema(schema_name)
-            }
-        }
-    })
-}
-
-#[must_use]
-fn list_response(item_schema_name: &str) -> Value {
-    json!({
-        "description": "Success",
-        "content": {
-            "application/json": {
-                "schema": {
-                    "type": "object",
-                    "required": ["data"],
-                    "properties": {
-                        "data": array_ref_schema(item_schema_name)
-                    }
-                }
-            }
-        }
-    })
-}
-
-#[must_use]
-fn error_response() -> Value {
-    json!({
-        "description": "Error",
-        "content": {
-            "application/json": {
-                "schema": ref_schema("ApiErrorBody")
-            }
-        }
-    })
-}
-
-#[must_use]
-fn path_local_id_parameter(name: &str, description: &str) -> Value {
-    json!({
-        "name": name,
-        "in": "path",
-        "required": true,
-        "description": description,
-        "schema": local_id_schema()
-    })
-}
-
-#[must_use]
-fn query_local_id_parameter(name: &str, description: &str) -> Value {
-    json!({
-        "name": name,
-        "in": "query",
-        "required": false,
-        "description": description,
-        "schema": local_id_schema()
-    })
-}
-
-#[must_use]
-fn required_query_local_id_parameter(name: &str, description: &str) -> Value {
-    json!({
-        "name": name,
-        "in": "query",
-        "required": true,
-        "description": description,
-        "schema": local_id_schema()
-    })
-}
-
-#[must_use]
-fn query_string_parameter(name: &str, description: &str) -> Value {
-    json!({
-        "name": name,
-        "in": "query",
-        "required": false,
-        "description": description,
-        "schema": {"type": "string"}
-    })
-}
-
-#[must_use]
-fn query_enum_parameter(name: &str, schema_name: &str, description: &str) -> Value {
-    json!({
-        "name": name,
-        "in": "query",
-        "required": false,
-        "description": description,
-        "schema": ref_schema(schema_name)
-    })
-}
-
-#[must_use]
-fn ref_schema(schema_name: &str) -> Value {
-    json!({"$ref": format!("#/components/schemas/{schema_name}")})
-}
-
-#[must_use]
-fn array_ref_schema(schema_name: &str) -> Value {
-    json!({
-        "type": "array",
-        "items": ref_schema(schema_name)
-    })
-}
-
-#[must_use]
 fn local_id_schema() -> Value {
-    json!({"type": "integer", "minimum": 1})
-}
-
-#[must_use]
-fn nullable_local_id_schema() -> Value {
-    json!({"type": ["integer", "null"], "minimum": 1})
-}
-
-#[must_use]
-fn datetime_schema() -> Value {
-    json!({"type": "string", "format": "date-time"})
-}
-
-#[must_use]
-fn nullable_datetime_schema() -> Value {
-    json!({"type": ["string", "null"], "format": "date-time"})
-}
-
-#[must_use]
-fn nullable_string_schema() -> Value {
-    json!({"type": ["string", "null"]})
-}
-
-#[must_use]
-fn nullable_integer_schema() -> Value {
-    json!({"type": ["integer", "null"], "minimum": 0})
-}
-
-#[must_use]
-fn job_status_schema() -> Value {
-    json!({"type": "string", "enum": ["idle", "running", "paused", "failed"]})
-}
-
-#[must_use]
-fn run_status_schema() -> Value {
-    json!({"type": "string", "enum": ["running", "completed", "completed_with_failures", "failed", "cancelled"]})
-}
-
-#[must_use]
-fn nullable_run_status_schema() -> Value {
-    json!({"type": ["string", "null"], "enum": ["running", "completed", "completed_with_failures", "failed", "cancelled", null]})
-}
-
-#[must_use]
-fn sync_status_schema() -> Value {
-    json!({"type": "string", "enum": ["pending", "synced", "skipped", "failed", "deleted_on_source"]})
-}
-
-#[must_use]
-fn log_level_schema() -> Value {
-    json!({"type": "string", "enum": ["trace", "debug", "info", "warn", "error"]})
+    serde_json::json!({
+        "type": "integer",
+        "minimum": 1
+    })
 }

@@ -585,6 +585,23 @@ async fn api_routes_openapi_spec_lists_current_routes() {
 }
 
 #[tokio::test]
+async fn api_routes_scalar_docs_serves_generated_openapi_viewer() {
+    let test = TestApp::new().await;
+    let response = request_raw(test.app.clone(), "GET", "/api/docs", None).await;
+
+    assert_eq!(response.status, 200);
+    assert!(
+        response
+            .headers
+            .to_ascii_lowercase()
+            .contains("content-type: text/html")
+    );
+    let body = String::from_utf8(response.body).unwrap();
+    assert!(body.contains("<title>Scalar</title>"));
+    assert!(body.contains("Hoarder Local API"));
+}
+
+#[tokio::test]
 async fn api_routes_run_job_runs_sync_engine() {
     let test = TestApp::new().await;
 
@@ -757,7 +774,26 @@ struct HttpResponse {
     body: Value,
 }
 
+struct RawHttpResponse {
+    status: u16,
+    headers: String,
+    body: Vec<u8>,
+}
+
 async fn request(app: Router, method: &str, path: &str, body: Option<&str>) -> HttpResponse {
+    let response = request_raw(app, method, path, body).await;
+
+    HttpResponse {
+        status: response.status,
+        body: if response.body.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&response.body).unwrap()
+        },
+    }
+}
+
+async fn request_raw(app: Router, method: &str, path: &str, body: Option<&str>) -> RawHttpResponse {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
@@ -776,15 +812,15 @@ async fn request(app: Router, method: &str, path: &str, body: Option<&str>) -> H
     stream.read_to_end(&mut response).await.unwrap();
     server.abort();
 
-    decode_response(&response)
+    decode_raw_response(&response)
 }
 
-fn decode_response(response: &[u8]) -> HttpResponse {
+fn decode_raw_response(response: &[u8]) -> RawHttpResponse {
     let separator = response
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
         .expect("response contains header separator");
-    let headers = String::from_utf8_lossy(&response[..separator]);
+    let headers = String::from_utf8_lossy(&response[..separator]).into_owned();
     let body = &response[separator + 4..];
     let status = headers
         .lines()
@@ -801,13 +837,10 @@ fn decode_response(response: &[u8]) -> HttpResponse {
         body.to_vec()
     };
 
-    HttpResponse {
+    RawHttpResponse {
         status,
-        body: if body.is_empty() {
-            Value::Null
-        } else {
-            serde_json::from_slice(&body).unwrap()
-        },
+        headers,
+        body,
     }
 }
 

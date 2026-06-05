@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, net::SocketAddr};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 
 use crate::{
     config::{AppConfig, RuntimeSettings},
@@ -25,7 +26,131 @@ impl<T> ListResponse<T> {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum ConnectorConfigSchema {
+    #[serde(rename = "opendal")]
+    OpenDal {
+        service: String,
+        #[serde(default)]
+        options: BTreeMap<String, String>,
+    },
+    #[serde(rename = "notion")]
+    Notion {
+        token: String,
+        #[serde(default, rename = "dataSourceId", alias = "data_source_id")]
+        data_source_id: Option<String>,
+        #[serde(default, rename = "pageId", alias = "page_id")]
+        page_id: Option<String>,
+        #[serde(default)]
+        version: Option<String>,
+        #[serde(default, rename = "baseUrl", alias = "base_url")]
+        base_url: Option<String>,
+    },
+    #[serde(rename = "feishu")]
+    Feishu {
+        #[serde(rename = "appId", alias = "app_id")]
+        app_id: String,
+        #[serde(rename = "appSecret", alias = "app_secret")]
+        app_secret: String,
+        #[serde(default, rename = "folderToken", alias = "folder_token")]
+        folder_token: Option<String>,
+        #[serde(default, rename = "baseUrl", alias = "base_url")]
+        base_url: Option<String>,
+    },
+    #[serde(rename = "plugin")]
+    Plugin {
+        #[serde(rename = "pluginId", alias = "plugin_id")]
+        plugin_id: String,
+        #[serde(default)]
+        options: BTreeMap<String, String>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ConnectorKindSchema {
+    #[serde(rename = "opendal")]
+    OpenDal,
+    Notion,
+    Feishu,
+    Plugin,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ItemTypeSchema {
+    File,
+    Directory,
+    VirtualDocument,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum JobStatusSchema {
+    Idle,
+    Running,
+    Paused,
+    Failed,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RunStatusSchema {
+    Running,
+    Completed,
+    CompletedWithFailures,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SyncStatusSchema {
+    Pending,
+    Synced,
+    Failed,
+    Skipped,
+    DeletedOnSource,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SourceListResponse {
+    pub data: Vec<SourceDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SourceTemplateListResponse {
+    pub data: Vec<SourceTemplateDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JobListResponse {
+    pub data: Vec<JobDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RunListResponse {
+    pub data: Vec<RunDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemListResponse {
+    pub data: Vec<ItemDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SyncErrorListResponse {
+    pub data: Vec<SyncErrorDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HealthResponse {
     pub status: String,
@@ -40,11 +165,13 @@ impl HealthResponse {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceDto {
+    #[schema(value_type = i64, minimum = 1)]
     pub id: SourceId,
     pub name: String,
+    #[schema(value_type = ConnectorKindSchema)]
     pub connector_kind: ConnectorKind,
     pub config: RedactedConnectorConfig,
     pub enabled: bool,
@@ -74,7 +201,7 @@ impl SourceDto {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum SourceHealth {
     Healthy,
@@ -100,9 +227,10 @@ impl SourceHealth {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RedactedConnectorConfig {
+    #[schema(value_type = ConnectorKindSchema)]
     pub kind: ConnectorKind,
     pub service: String,
     pub options: BTreeMap<String, String>,
@@ -203,43 +331,46 @@ fn redacted_app_options<const N: usize>(
         .collect()
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSourceRequest {
     pub name: String,
+    #[schema(value_type = ConnectorConfigSchema)]
     pub config: ConnectorConfig,
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSourceRequest {
     pub name: String,
+    #[schema(value_type = ConnectorConfigSchema)]
     pub config: ConnectorConfig,
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTestResponse {
     pub ok: bool,
     pub checked_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTemplateDto {
     pub id: String,
     pub label: String,
     pub description: String,
+    #[schema(value_type = ConnectorKindSchema)]
     pub connector_kind: ConnectorKind,
     pub service: String,
     pub options: Vec<SourceTemplateOptionDto>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTemplateOptionDto {
     pub key: String,
@@ -250,22 +381,27 @@ pub struct SourceTemplateOptionDto {
     pub placeholder: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JobDto {
+    #[schema(value_type = i64, minimum = 1)]
     pub id: JobId,
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub name: String,
     pub enabled: bool,
     pub schedule: JobScheduleDto,
+    #[schema(value_type = JobStatusSchema)]
     pub status: JobStatus,
     pub last_run_at: Option<DateTime<Utc>>,
+    #[schema(value_type = Option<RunStatusSchema>)]
     pub last_run_status: Option<RunStatus>,
+    #[schema(value_type = Option<i64>, minimum = 1)]
     pub last_run_id: Option<RunId>,
     pub next_run_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum JobScheduleDto {
     Manual,
@@ -275,9 +411,10 @@ pub enum JobScheduleDto {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateJobRequest {
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub name: String,
     #[serde(default = "default_enabled")]
@@ -285,9 +422,10 @@ pub struct CreateJobRequest {
     pub schedule: JobScheduleDto,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateJobRequest {
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub name: String,
     #[serde(default = "default_enabled")]
@@ -295,14 +433,18 @@ pub struct UpdateJobRequest {
     pub schedule: JobScheduleDto,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RunDto {
+    #[schema(value_type = i64, minimum = 1)]
     pub id: RunId,
+    #[schema(value_type = i64, minimum = 1)]
     pub job_id: JobId,
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub source_name: String,
     pub job_name: String,
+    #[schema(value_type = RunStatusSchema)]
     pub status: RunStatus,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
@@ -313,7 +455,7 @@ pub struct RunDto {
     pub deleted_count: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RunCountsDto {
     pub processed: u64,
@@ -323,14 +465,18 @@ pub struct RunCountsDto {
     pub deleted: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RunDetailDto {
+    #[schema(value_type = i64, minimum = 1)]
     pub id: RunId,
+    #[schema(value_type = i64, minimum = 1)]
     pub job_id: JobId,
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub source_name: String,
     pub job_name: String,
+    #[schema(value_type = RunStatusSchema)]
     pub status: RunStatus,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
@@ -339,13 +485,17 @@ pub struct RunDetailDto {
     pub errors: Vec<SyncErrorDto>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemDto {
+    #[schema(value_type = i64, minimum = 1)]
     pub id: ItemId,
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub source_path: String,
+    #[schema(value_type = ItemTypeSchema)]
     pub item_type: ItemType,
+    #[schema(value_type = SyncStatusSchema)]
     pub status: SyncStatus,
     pub size: Option<u64>,
     pub etag: Option<String>,
@@ -361,15 +511,16 @@ pub struct FileBrowseQuery {
     pub path: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileBrowseResponse {
+    #[schema(value_type = i64, minimum = 1)]
     pub source_id: SourceId,
     pub path: String,
     pub entries: Vec<FileEntryDto>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileEntryDto {
     pub name: String,
@@ -378,7 +529,7 @@ pub struct FileEntryDto {
     pub item: Option<ItemDto>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FileEntryKind {
     Directory,
@@ -386,11 +537,13 @@ pub enum FileEntryKind {
     VirtualDocument,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncErrorDto {
     pub id: i64,
+    #[schema(value_type = Option<i64>, minimum = 1)]
     pub run_id: Option<RunId>,
+    #[schema(value_type = Option<i64>, minimum = 1)]
     pub source_id: Option<SourceId>,
     pub source_path: Option<String>,
     pub code: String,
@@ -413,11 +566,12 @@ pub struct ErrorListQuery {
     pub run_id: Option<RunId>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDto {
     pub database_path: String,
     pub vault_path: String,
+    #[schema(value_type = String)]
     pub listen_addr: SocketAddr,
     pub job_concurrency: usize,
     pub file_concurrency: usize,
@@ -425,7 +579,7 @@ pub struct SettingsDto {
     pub read_only: ReadOnlySettingsDto,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadOnlySettingsDto {
     pub database_path: bool,
@@ -433,7 +587,7 @@ pub struct ReadOnlySettingsDto {
     pub listen_addr: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSettingsRequest {
     pub job_concurrency: usize,
@@ -477,10 +631,12 @@ impl From<RuntimeSettings> for SettingsDto {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JobRunResponse {
+    #[schema(value_type = i64, minimum = 1)]
     pub run_id: RunId,
+    #[schema(value_type = SyncStatusSchema)]
     pub status: SyncStatus,
 }
 
