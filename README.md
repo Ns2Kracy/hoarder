@@ -25,8 +25,7 @@ The first implementation focuses on a strong local foundation: Rust, Axum, SeaOR
 
 Prerequisites:
 
-- Rust 2024 toolchain
-- Bun
+- mise
 
 Install the latest release binary:
 
@@ -36,14 +35,12 @@ curl -fsSL https://raw.githubusercontent.com/Ns2Kracy/hoarder/main/scripts/insta
 
 Or build from source.
 
-Build the web UI, then run the local server:
+Prepare the local toolchain and dependencies, then run the local server:
 
 ```bash
-cd web
-bun install
-bun run build
-cd ..
-cargo run -p hoarder-cli -- serve
+mise trust
+mise run setup
+mise run serve
 ```
 
 Open:
@@ -66,7 +63,7 @@ Use a custom config:
 ```
 
 ```bash
-cargo run -p hoarder-cli -- --config ./hoarder.config.json serve
+mise run cli -- --config ./hoarder.config.json serve
 ```
 
 ## Project Docs
@@ -80,19 +77,19 @@ cargo run -p hoarder-cli -- --config ./hoarder.config.json serve
 
 | Command | Status | Description |
 | --- | --- | --- |
-| `cargo run -p hoarder-cli -- serve` | [x] | Start the Axum API and embedded web console. |
-| `cargo run -p hoarder-cli -- serve --addr 127.0.0.1:4762` | [x] | Override the listen address. |
-| `cargo run -p hoarder-cli -- --config ./hoarder.config.json serve` | [x] | Load JSON config before serving. |
-| `cargo run -p hoarder-cli -- db sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
-| `cargo run -p hoarder-cli -- source list` | [x] | List configured sources from SQLite. |
-| `cargo run -p hoarder-cli -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
-| `cargo run -p hoarder-cli -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | Create a Notion virtual-document source. |
-| `cargo run -p hoarder-cli -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | Create a Feishu Drive virtual-document source. |
-| `cargo run -p hoarder-cli -- source test --id 1` | [x] | Validate a source and persist health. |
-| `cargo run -p hoarder-cli -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval source sync job. |
-| `cargo run -p hoarder-cli -- job list` | [x] | List configured source sync jobs. |
-| `cargo run -p hoarder-cli -- sync run --job-id 1` | [x] | Run one source-to-vault job immediately. |
-| `cargo run -p hoarder-cli -- sync status` | [x] | Print source-to-vault run status summaries. |
+| `mise run serve` | [x] | Build the web console, then start the Axum API and embedded web console. |
+| `mise run serve -- --addr 127.0.0.1:4762` | [x] | Override the listen address. |
+| `mise run cli -- --config ./hoarder.config.json serve` | [x] | Load JSON config before serving. |
+| `mise run db:sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
+| `mise run cli -- source list` | [x] | List configured sources from SQLite. |
+| `mise run cli -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
+| `mise run cli -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | Create a Notion virtual-document source. |
+| `mise run cli -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | Create a Feishu Drive virtual-document source. |
+| `mise run cli -- source test --id 1` | [x] | Validate a source and persist health. |
+| `mise run cli -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval source sync job. |
+| `mise run cli -- job list` | [x] | List configured source sync jobs. |
+| `mise run cli -- sync run --job-id 1` | [x] | Run one source-to-vault job immediately. |
+| `mise run cli -- sync status` | [x] | Print source-to-vault run status summaries. |
 
 ## Feature Checklist
 
@@ -226,11 +223,8 @@ cargo run -p hoarder-cli -- --config ./hoarder.config.json serve
 ### Packaging And Quality
 
 - [x] Single Rust binary embeds frontend assets from `web/dist`
-- [x] `cargo fmt --check`
-- [x] Strict `cargo clippy --workspace --all-targets --all-features`
-- [x] `cargo test --workspace`
-- [x] `bun run verify`
-- [x] `cargo build -p hoarder-cli --release`
+- [x] `mise run verify` wraps Rust metadata, formatting, Clippy, tests, frontend verification, and CLI smoke checks
+- [x] `mise run release:build` builds embedded frontend assets and the release binary
 - [x] End-to-end local filesystem sync test
 - [x] Static asset fallback tests
 - [x] App service integration tests
@@ -292,32 +286,28 @@ Source paths are normalized before writing. Hoarder rejects absolute paths, trav
 Install frontend dependencies:
 
 ```bash
-cd web
-bun install
+mise run setup
 ```
 
-Run frontend verification:
+Run the full local quality gate:
 
 ```bash
-cd web
-bun run verify
+mise run verify
 ```
 
-Run backend verification:
+Run focused frontend or backend checks:
 
 ```bash
-cargo fmt --check
-cargo clippy --workspace --all-targets --all-features --message-format=short
-cargo test --workspace
+mise run web:verify
+mise run rust:fmt
+mise run rust:clippy
+mise run rust:test
 ```
 
 Build the packaged release binary:
 
 ```bash
-cd web
-bun run build
-cd ..
-cargo build -p hoarder-cli --release
+mise run release:build
 ```
 
 ## Current Status

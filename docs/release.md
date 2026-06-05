@@ -47,8 +47,8 @@ Installer environment variables:
 
 ## Manual Release Checklist
 
-1. Run local verification: `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features --message-format=short`, `cargo test --workspace`, and `cd web && bun run verify`.
-2. Build a local release smoke: `cd web && bun run build && cd .. && cargo build -p hoarder-cli --release`.
+1. Run local verification: `mise run verify`.
+2. Build a local release smoke: `mise run release:smoke`.
 3. Tag the release: `git tag v0.1.0 && git push origin v0.1.0`.
 4. Wait for the `Release Artifacts` workflow to finish.
 5. Download one artifact and run `hoarder --help` before announcing the release.
@@ -60,11 +60,11 @@ Benchmarks and soak tests are intentionally excluded from default `cargo test --
 Run the performance benchmark locally:
 
 ```bash
-cargo test -p hoarder-server --test performance_benchmark -- --ignored --nocapture
+mise run bench:local-fs
 ```
 
 Run the soak test locally:
 
 ```bash
-HOARDER_SOAK_ITERATIONS=40 HOARDER_SOAK_FILES=100 cargo test -p hoarder-server --test soak_local_fs -- --ignored --nocapture
+mise run soak:local-fs
 ```

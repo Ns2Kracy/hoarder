@@ -15,13 +15,13 @@ Hoarder is a Rust 2024 workspace with a CLI binary, Axum API, SQLite persistence
 
 ## Build, Test, and Development Commands
 
-- `cd web && bun install`: install frontend dependencies.
-- `cd web && bun run dev`: start the Vite dev server on loopback.
-- `cd web && bun run build`: build `web/dist` for embedding in the Rust binary.
-- `cargo run -p hoarder-cli -- serve`: run the local API and embedded console at `127.0.0.1:4761`.
-- `cargo run -p hoarder-cli -- db sync`: synchronize the SQLite schema from SeaORM entities.
-- `cargo build -p hoarder-cli --release`: build the packaged binary. Rebuild the frontend first when `web/src/` changes.
-- `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features`, `cargo test --workspace`, and `cd web && bun run verify`: pre-merge checks.
+- `mise run setup`: install frontend dependencies from `web/bun.lock`.
+- `mise run web:dev`: start the Vite dev server on loopback.
+- `mise run web:build`: build `web/dist` for embedding in the Rust binary.
+- `mise run serve`: build the web console, then run the local API and embedded console at `127.0.0.1:4761`.
+- `mise run db:sync`: synchronize the SQLite schema from SeaORM entities.
+- `mise run release:build`: build `web/dist` and the packaged release binary.
+- `mise run verify`: run Cargo metadata, Rust formatting, Clippy, Rust tests, frontend verification, debug CLI build, and CLI smoke checks.
 
 ## Coding Style & Naming Conventions
 
@@ -29,7 +29,7 @@ Rust warnings and strict Clippy lint groups are denied through workspace lints i
 
 ## Testing Guidelines
 
-Add or update integration tests under the affected crate's `tests/` directory. Name test files by feature area and test functions by expected behavior. Run `cargo test --workspace` for Rust changes and `bun run verify` inside `web/` for UI changes. For packaging changes, run `bun run build` before `cargo build -p hoarder-cli --release`.
+Add or update integration tests under the affected crate's `tests/` directory. Name test files by feature area and test functions by expected behavior. Run `mise run rust:test` for Rust changes and `mise run web:verify` for UI changes. For packaging changes, run `mise run release:build`.
 
 ## Commit & Pull Request Guidelines
 
@@ -37,4 +37,4 @@ Recent history uses short Conventional Commit-style subjects such as `feat: add 
 
 ## Security & Configuration Tips
 
-Default local serving binds to `127.0.0.1`. Do not commit real vault data, generated databases such as `hoarder.db`, secrets, or connector credentials. Use `--config ./hoarder.config.json` for local path and concurrency overrides.
+Default local serving binds to `127.0.0.1`. Do not commit real vault data, generated databases such as `hoarder.db`, secrets, or connector credentials. Use `mise run cli -- --config ./hoarder.config.json serve` for local path and concurrency overrides.

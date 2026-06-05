@@ -10,8 +10,7 @@ Hoarder is a Rust workspace with a CLI binary, Axum API, SQLite persistence, Ope
 
 ## Prerequisites
 
-- Rust 2024 toolchain
-- Bun
+- mise
 - SQLite support through SeaORM/sqlx
 
 ## Build Order
@@ -19,43 +18,38 @@ Hoarder is a Rust workspace with a CLI binary, Axum API, SQLite persistence, Ope
 The release binary embeds the built frontend from `web/dist`. Build the frontend before compiling Rust when you want the packaged UI to match the latest web source:
 
 ```bash
-cd web
-bun install
-bun run build
-cd ..
-cargo build -p hoarder-cli --release
+mise run setup
+mise run release:build
 ```
 
 During Rust compilation, `crates/hoarder-server/src/assets.rs` embeds the current contents of `web/dist` into the binary. Rebuild the frontend after changing files under `web/`.
 
 ## Verification
 
-Run the strict Clippy gate before merging Rust changes:
+Run the full local quality gate before merging:
 
 ```bash
-cargo clippy --workspace --all-targets --all-features -- -D warnings
+mise run verify
 ```
 
-Run the backend test suite:
+Run focused backend checks:
 
 ```bash
-cargo test --workspace
+mise run rust:fmt
+mise run rust:clippy
+mise run rust:test
 ```
 
 Run the frontend checks and build:
 
 ```bash
-cd web
-bun run verify
+mise run web:verify
 ```
 
 Run the release packaging check:
 
 ```bash
-cd web
-bun run build
-cd ..
-cargo build -p hoarder-cli --release
+mise run release:build
 ```
 
 ## Local Run
@@ -63,7 +57,7 @@ cargo build -p hoarder-cli --release
 Start the packaged app on the default loopback address:
 
 ```bash
-cargo run -p hoarder-cli -- serve
+mise run serve
 ```
 
 Open `http://127.0.0.1:4761`. API routes are available under `/api/*`; frontend routes are served from the embedded app shell.
@@ -71,32 +65,32 @@ Open `http://127.0.0.1:4761`. API routes are available under `/api/*`; frontend 
 Override the server address:
 
 ```bash
-cargo run -p hoarder-cli -- serve --addr 127.0.0.1:4762
+mise run serve -- --addr 127.0.0.1:4762
 ```
 
 Sync the SQLite schema for the configured database:
 
 ```bash
-cargo run -p hoarder-cli -- db sync
+mise run db:sync
 ```
 
 Create and run a local filesystem workflow from the CLI:
 
 ```bash
-cargo run -p hoarder-cli -- source add --name docs --service fs --root ./docs
-cargo run -p hoarder-cli -- source list
-cargo run -p hoarder-cli -- source test --id 1
-cargo run -p hoarder-cli -- job add --source-id 1 --name docs --interval 300
-cargo run -p hoarder-cli -- job list
-cargo run -p hoarder-cli -- sync run --job-id 1
-cargo run -p hoarder-cli -- sync status
+mise run cli -- source add --name docs --service fs --root ./docs
+mise run cli -- source list
+mise run cli -- source test --id 1
+mise run cli -- job add --source-id 1 --name docs --interval 300
+mise run cli -- job list
+mise run cli -- sync run --job-id 1
+mise run cli -- sync status
 ```
 
 Create app connector sources through the generic JSON config path:
 
 ```bash
-cargo run -p hoarder-cli -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'
-cargo run -p hoarder-cli -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'
+mise run cli -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'
+mise run cli -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'
 ```
 
 Use a JSON config file when you need non-default paths:
@@ -115,5 +109,5 @@ Use a JSON config file when you need non-default paths:
 Pass it with `--config`:
 
 ```bash
-cargo run -p hoarder-cli -- --config ./hoarder.config.json serve
+mise run cli -- --config ./hoarder.config.json serve
 ```

@@ -25,8 +25,7 @@ Hoarder 是一个本地优先、多源、单向同步平台，也是 AI 盛行�
 
 前置要求：
 
-- Rust 2024 toolchain
-- Bun
+- mise
 
 安装最新 release binary：
 
@@ -36,14 +35,12 @@ curl -fsSL https://raw.githubusercontent.com/Ns2Kracy/hoarder/main/scripts/insta
 
 也可以从源码构建。
 
-先构建 Web UI，再启动本地服务：
+准备本地工具链和依赖，然后启动本地服务：
 
 ```bash
-cd web
-bun install
-bun run build
-cd ..
-cargo run -- serve
+mise trust
+mise run setup
+mise run serve
 ```
 
 打开：
@@ -66,7 +63,7 @@ http://127.0.0.1:4761
 ```
 
 ```bash
-cargo run -- --config ./hoarder.config.json serve
+mise run cli -- --config ./hoarder.config.json serve
 ```
 
 ## 项目文档
@@ -80,19 +77,19 @@ cargo run -- --config ./hoarder.config.json serve
 
 | 命令 | 状态 | 说明 |
 | --- | --- | --- |
-| `cargo run -- serve` | [x] | 启动 Axum API 和嵌入式 Web 控制台。 |
-| `cargo run -- serve --addr 127.0.0.1:4762` | [x] | 覆盖监听地址。 |
-| `cargo run -- --config ./hoarder.config.json serve` | [x] | 启动前读取 JSON 配置。 |
-| `cargo run -- db sync` | [x] | 根据 SeaORM entities 同步 SQLite schema。 |
-| `cargo run -- source list` | [x] | 从 SQLite 列出已配置 sources。 |
-| `cargo run -- source add --name docs --service fs --root ./docs` | [x] | 创建 OpenDAL filesystem source。 |
-| `cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | 创建 Notion 虚拟文档 source。 |
-| `cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | 创建飞书 Drive 虚拟文档 source。 |
-| `cargo run -- source test --id 1` | [x] | 校验 source 并持久化健康状态。 |
-| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | 创建手动或固定间隔 source sync job。 |
-| `cargo run -- job list` | [x] | 列出 source sync jobs。 |
-| `cargo run -- sync run --job-id 1` | [x] | 立即运行一个 source-to-vault job。 |
-| `cargo run -- sync status` | [x] | 输出 source-to-vault run 状态摘要。 |
+| `mise run serve` | [x] | 构建 Web 控制台，然后启动 Axum API 和嵌入式 Web 控制台。 |
+| `mise run serve -- --addr 127.0.0.1:4762` | [x] | 覆盖监听地址。 |
+| `mise run cli -- --config ./hoarder.config.json serve` | [x] | 启动前读取 JSON 配置。 |
+| `mise run db:sync` | [x] | 根据 SeaORM entities 同步 SQLite schema。 |
+| `mise run cli -- source list` | [x] | 从 SQLite 列出已配置 sources。 |
+| `mise run cli -- source add --name docs --service fs --root ./docs` | [x] | 创建 OpenDAL filesystem source。 |
+| `mise run cli -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | 创建 Notion 虚拟文档 source。 |
+| `mise run cli -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | 创建飞书 Drive 虚拟文档 source。 |
+| `mise run cli -- source test --id 1` | [x] | 校验 source 并持久化健康状态。 |
+| `mise run cli -- job add --source-id 1 --name docs --interval 300` | [x] | 创建手动或固定间隔 source sync job。 |
+| `mise run cli -- job list` | [x] | 列出 source sync jobs。 |
+| `mise run cli -- sync run --job-id 1` | [x] | 立即运行一个 source-to-vault job。 |
+| `mise run cli -- sync status` | [x] | 输出 source-to-vault run 状态摘要。 |
 
 ## 功能清单
 
@@ -226,11 +223,8 @@ cargo run -- --config ./hoarder.config.json serve
 ### 打包和质量
 
 - [x] 单个 Rust binary 嵌入 `web/dist` 前端资源
-- [x] `cargo fmt --check`
-- [x] 严格 `cargo clippy --all-targets --all-features`
-- [x] `cargo test`
-- [x] `bun run verify`
-- [x] `cargo build --release`
+- [x] `mise run verify` 封装 Rust metadata、格式、Clippy、测试、前端验证和 CLI smoke checks
+- [x] `mise run release:build` 构建嵌入式前端资源和 release binary
 - [x] 本地文件系统端到端同步测试
 - [x] 静态资源 fallback 测试
 - [x] App service 集成测试
@@ -268,12 +262,11 @@ CLI / Web UI
 
 关键边界：
 
-- `src/core`：跨层共享的稳定领域类型。
-- `src/connectors`：连接器 trait 和 OpenDAL-backed 实现。
-- `src/sync`：planner、engine、repository trait 和 vault writer。
-- `src/db`：SeaORM repository 和 schema sync。
-- `src/api`：DTO、routes、state traits 和错误映射。
-- `src/server.rs`：Axum server 组装和数据库驱动的 API wiring。
+- `crates/hoarder-core`：稳定领域类型、错误和 vault path helpers。
+- `crates/hoarder-connectors`：connector traits 和 source adapters。
+- `crates/hoarder-sync`：planner、engine、repository trait、cancellation 和 vault writer。
+- `crates/hoarder-server`：API routes、app services、SeaORM repository/entities、assets、middleware 和 server lifecycle。
+- `crates/hoarder-cli`：`hoarder` binary 的 Clap parser 和 command handlers。
 - `web`：Svelte 管理控制台。
 
 ## 本地 Vault 布局
@@ -293,32 +286,28 @@ vault/
 安装前端依赖：
 
 ```bash
-cd web
-bun install
+mise run setup
 ```
 
-运行前端验证：
+运行完整本地质量门禁：
 
 ```bash
-cd web
-bun run verify
+mise run verify
 ```
 
-运行后端验证：
+运行聚焦的前端或后端检查：
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features --message-format=short
-cargo test
+mise run web:verify
+mise run rust:fmt
+mise run rust:clippy
+mise run rust:test
 ```
 
 构建打包后的 release binary：
 
 ```bash
-cd web
-bun run build
-cd ..
-cargo build --release
+mise run release:build
 ```
 
 ## 当前状态
