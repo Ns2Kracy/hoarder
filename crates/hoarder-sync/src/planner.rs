@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::core::types::{ItemSnapshot, ItemType};
+use hoarder_core::types::{ItemSnapshot, ItemType};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlanDecision {

@@ -6,13 +6,11 @@ use sha2::{Digest, Sha256};
 use tokio::{fs, io::AsyncWriteExt};
 use uuid::Uuid;
 
-use crate::{
+use hoarder_connectors::traits::ByteStream;
+use hoarder_core::{
     AppResult,
-    connectors::traits::ByteStream,
-    core::{
-        types::ItemRef,
-        vault_path::{normalize_source_path, target_path},
-    },
+    types::ItemRef,
+    vault_path::{normalize_source_path, target_path},
 };
 
 #[derive(Clone, Debug)]

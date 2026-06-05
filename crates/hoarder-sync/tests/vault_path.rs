@@ -1,4 +1,4 @@
-use hoarder::core::{
+use hoarder_core::{
     types::SourceId,
     vault_path::{normalize_source_path, target_path},
 };

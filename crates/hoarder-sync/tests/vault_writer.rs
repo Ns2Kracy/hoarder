@@ -2,11 +2,12 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use futures::stream;
-use hoarder::{
-    connectors::traits::ByteStream,
-    core::types::{ItemRef, ItemType, SourceId},
-    sync::vault_writer::VaultWriter,
+use hoarder_connectors::traits::ByteStream;
+use hoarder_core::{
+    AppError,
+    types::{ItemRef, ItemType, SourceId},
 };
+use hoarder_sync::vault_writer::VaultWriter;
 
 #[tokio::test]
 async fn vault_writer_writes_stream_to_normalized_target_and_returns_hash() {
@@ -93,7 +94,7 @@ async fn vault_writer_rejects_traversal_before_creating_final_path() {
     );
 }
 
-fn byte_stream<const N: usize>(items: [Result<Bytes, hoarder::AppError>; N]) -> ByteStream {
+fn byte_stream<const N: usize>(items: [Result<Bytes, AppError>; N]) -> ByteStream {
     Box::pin(stream::iter(items))
 }
 

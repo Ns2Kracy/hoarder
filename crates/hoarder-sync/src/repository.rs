@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 
-use crate::{
+use hoarder_core::{
     AppResult,
-    core::types::{ItemType, JobId, RunId, SourceId, SyncStatus},
+    types::{ItemType, JobId, RunId, SourceId, SyncStatus},
 };
 
 use super::{

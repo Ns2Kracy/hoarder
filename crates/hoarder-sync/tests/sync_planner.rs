@@ -1,8 +1,6 @@
 use chrono::{TimeZone, Utc};
-use hoarder::{
-    core::types::{ItemSnapshot, ItemType, SourceId},
-    sync::planner::{PlanDecision, StoredItemState, SyncPlanner},
-};
+use hoarder_core::types::{ItemSnapshot, ItemType, SourceId};
+use hoarder_sync::planner::{PlanDecision, StoredItemState, SyncPlanner};
 
 #[test]
 fn sync_planner_syncs_new_items() {

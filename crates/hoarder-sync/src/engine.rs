@@ -2,11 +2,11 @@ use std::{future::Future, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Dur
 
 use futures::{StreamExt, stream::FuturesUnordered};
 
-use crate::{
+use crate::run_control::CancellationToken;
+use hoarder_connectors::traits::{ConnectorConfig, SourceConnector};
+use hoarder_core::{
     AppError, AppResult,
-    app::run_control::CancellationToken,
-    connectors::traits::{ConnectorConfig, SourceConnector},
-    core::types::{ConnectorKind, ItemSnapshot, ItemType, JobId, RunId, SourceId, SyncStatus},
+    types::{ConnectorKind, ItemSnapshot, ItemType, JobId, RunId, SourceId, SyncStatus},
 };
 
 use super::{

@@ -10,23 +10,23 @@ use std::{
 
 use bytes::Bytes;
 use futures::{FutureExt, stream};
-use hoarder::{
-    connectors::traits::{
-        ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
-    },
-    core::types::{
+use hoarder_connectors::traits::{
+    ByteStream, ConnectorConfig, ConnectorFuture, ScanOutcome, ScanStream, SourceConnector,
+};
+use hoarder_core::{
+    AppError,
+    types::{
         ConnectorCapabilities, ConnectorKind, ItemRef, ItemSnapshot, ItemType, JobId, RunId,
         SourceId, SyncStatus,
     },
-    sync::{
-        engine::{
-            ConnectorRetryPolicy, SyncEngine, SyncEngineOptions, SyncJob, SyncRunStatus,
-            SyncRunSummary,
-        },
-        planner::StoredItemState,
-        repository::{ItemSyncOutcome, SyncRepository},
-        vault_writer::VaultWriter,
+};
+use hoarder_sync::{
+    engine::{
+        ConnectorRetryPolicy, SyncEngine, SyncEngineOptions, SyncJob, SyncRunStatus, SyncRunSummary,
     },
+    planner::StoredItemState,
+    repository::{ItemSyncOutcome, SyncRepository},
+    vault_writer::VaultWriter,
 };
 use tokio::time::sleep;
 
@@ -614,14 +614,14 @@ impl SourceConnector for FakeConnector {
                 })
                 .is_ok()
             {
-                return Err(hoarder::AppError::ConnectorTransient(
+                return Err(AppError::ConnectorTransient(
                     "transient scan failed".to_owned(),
                 ));
             }
 
             let snapshots = self.snapshots.clone().into_iter().map(|event| match event {
                 ScanEvent::Snapshot(snapshot) => Ok(snapshot),
-                ScanEvent::Error(message) => Err(hoarder::AppError::Connector(message)),
+                ScanEvent::Error(message) => Err(AppError::Connector(message)),
             });
 
             let items = Box::pin(stream::iter(snapshots)) as ScanStream;
@@ -655,11 +655,11 @@ impl SourceConnector for FakeConnector {
                 .expect("fake read attempt must exist");
             match attempt {
                 ReadAttempt::Bytes(bytes) => Ok(Box::pin(stream::iter([Ok(bytes)])) as ByteStream),
-                ReadAttempt::StreamPermanent(message) => Ok(Box::pin(stream::iter([Err(
-                    hoarder::AppError::Connector(message),
-                )])) as ByteStream),
+                ReadAttempt::StreamPermanent(message) => {
+                    Ok(Box::pin(stream::iter([Err(AppError::Connector(message))])) as ByteStream)
+                }
                 ReadAttempt::StreamTransient(message) => Ok(Box::pin(stream::iter([Err(
-                    hoarder::AppError::ConnectorTransient(message),
+                    AppError::ConnectorTransient(message),
                 )])) as ByteStream),
             }
         }
