@@ -1,0 +1,13 @@
+[package]
+name = "hoarder-connectors"
+version = "0.1.0"
+description = "Connector contracts and adapters for Hoarder sources"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "../../README.md"
+keywords = ["sync", "connector", "opendal"]
+categories = ["filesystem", "network-programming"]
+
+[dependencies]

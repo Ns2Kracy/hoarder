@@ -1,0 +1,13 @@
+[package]
+name = "hoarder-core"
+version = "0.1.0"
+description = "Core domain types and errors for Hoarder"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "../../README.md"
+keywords = ["sync", "vault", "domain"]
+categories = ["data-structures"]
+
+[dependencies]

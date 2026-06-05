@@ -1,0 +1,13 @@
+[package]
+name = "hoarder-server"
+version = "0.1.0"
+description = "Local API, persistence, and server control plane for Hoarder"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "../../README.md"
+keywords = ["axum", "sqlite", "sync"]
+categories = ["web-programming", "database"]
+
+[dependencies]

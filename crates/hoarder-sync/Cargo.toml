@@ -1,0 +1,13 @@
+[package]
+name = "hoarder-sync"
+version = "0.1.0"
+description = "Source-to-vault sync runtime for Hoarder"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "../../README.md"
+keywords = ["sync", "vault", "runtime"]
+categories = ["filesystem"]
+
+[dependencies]

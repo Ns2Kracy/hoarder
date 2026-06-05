@@ -1,0 +1,13 @@
+[package]
+name = "hoarder-cli"
+version = "0.1.0"
+description = "Command-line interface for Hoarder"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+readme = "../../README.md"
+keywords = ["cli", "sync", "vault"]
+categories = ["command-line-utilities"]
+
+[dependencies]
