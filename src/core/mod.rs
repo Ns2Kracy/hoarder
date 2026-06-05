@@ -1,2 +1,1 @@
-pub mod types;
-pub mod vault_path;
+pub use hoarder_core::{types, vault_path};

@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    core::types::SourceId,
     error::{AppError, AppResult},
+    types::SourceId,
 };
 
 /// Normalizes a source-relative path for safe storage in the vault.
