@@ -47,10 +47,10 @@ jobs:
         env:
           HOARDER_BENCH_FILES: 500
           HOARDER_BENCH_BYTES: 1024
-        run: cargo test --test performance_benchmark -- --ignored --nocapture
+        run: cargo test -p hoarder-server --test performance_benchmark -- --ignored --nocapture
 
       - name: Run local filesystem soak test
         env:
           HOARDER_SOAK_ITERATIONS: 40
           HOARDER_SOAK_FILES: 100
-        run: cargo test --test soak_local_fs -- --ignored --nocapture
+        run: cargo test -p hoarder-server --test soak_local_fs -- --ignored --nocapture

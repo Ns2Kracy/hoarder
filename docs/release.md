@@ -8,9 +8,9 @@ Hoarder ships as a single Rust binary with the Svelte console embedded from `web
 
 The workflow has three gates:
 
-- Rust: `cargo fmt --check`, build embedded `web/dist` assets for `RustEmbed`, `cargo clippy --all-targets --all-features --message-format=short`, and `cargo test`.
+- Rust: `cargo fmt --check`, build embedded `web/dist` assets for `RustEmbed`, `cargo clippy --workspace --all-targets --all-features --message-format=short`, and `cargo test --workspace`.
 - Web: `bun install --frozen-lockfile`, `bun run fmt:check`, `bun run lint`, `bun run check`, `bun test`, and `bun run build`.
-- Package smoke: build `web/dist`, run `cargo build --release`, then execute `hoarder --help` and `hoarder source templates`.
+- Package smoke: build `web/dist`, run `cargo build -p hoarder-cli --release`, then execute `hoarder --help` and `hoarder source templates`.
 
 ## Release Artifacts
 
@@ -47,24 +47,24 @@ Installer environment variables:
 
 ## Manual Release Checklist
 
-1. Run local verification: `cargo fmt --check`, `cargo clippy --all-targets --all-features --message-format=short`, `cargo test`, and `cd web && bun run verify`.
-2. Build a local release smoke: `cd web && bun run build && cd .. && cargo build --release`.
+1. Run local verification: `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features --message-format=short`, `cargo test --workspace`, and `cd web && bun run verify`.
+2. Build a local release smoke: `cd web && bun run build && cd .. && cargo build -p hoarder-cli --release`.
 3. Tag the release: `git tag v0.1.0 && git push origin v0.1.0`.
 4. Wait for the `Release Artifacts` workflow to finish.
 5. Download one artifact and run `hoarder --help` before announcing the release.
 
 ## Benchmark And Soak Gates
 
-Benchmarks and soak tests are intentionally excluded from default `cargo test` because they are longer-running and environment-sensitive.
+Benchmarks and soak tests are intentionally excluded from default `cargo test --workspace` because they are longer-running and environment-sensitive.
 
 Run the performance benchmark locally:
 
 ```bash
-cargo test --test performance_benchmark -- --ignored --nocapture
+cargo test -p hoarder-server --test performance_benchmark -- --ignored --nocapture
 ```
 
 Run the soak test locally:
 
 ```bash
-HOARDER_SOAK_ITERATIONS=40 HOARDER_SOAK_FILES=100 cargo test --test soak_local_fs -- --ignored --nocapture
+HOARDER_SOAK_ITERATIONS=40 HOARDER_SOAK_FILES=100 cargo test -p hoarder-server --test soak_local_fs -- --ignored --nocapture
 ```

@@ -322,5 +322,5 @@ RAG 场景的关键约束：
 | 本地端到端 | `tests/e2e_local_fs_sync.rs` |
 | Schema | `tests/db_schema.rs`、空数据库启动 smoke test |
 | Web 控制台 | `cd web && bun run verify`，后续补浏览器截图回归 |
-| 打包 | `cd web && bun run build && cargo build --release` |
+| 打包 | `cd web && bun run build && cargo build -p hoarder-cli --release` |
 | RAG 索引扩展 | parser/chunker 单元测试、provenance 保留测试、hash 增量索引测试、外部 embedding 禁用默认值测试 |

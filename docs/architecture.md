@@ -97,7 +97,7 @@ flowchart TB
 flowchart LR
     User[Local user] --> Browser[Browser]
     Browser -->|http://127.0.0.1:4761| Process[hoarder serve]
-    Terminal[Terminal] -->|cargo run -- ... / hoarder ...| Process
+    Terminal[Terminal] -->|cargo run -p hoarder-cli -- ... / hoarder ...| Process
     Process -->|read/write metadata| DB[(./hoarder.db)]
     Process -->|write synced files| Vault[(./vault)]
     Process -->|scan/read| Remote[(Configured sources)]
@@ -120,38 +120,38 @@ flowchart LR
 
 | 层 | 主要目录 | 职责 | 不应做的事 |
 | --- | --- | --- | --- |
-| Interface | `src/cli.rs`、`src/api/`、`web/src/` | 参数解析、request/response、页面状态与交互 | 不直接实现同步业务规则 |
-| App services | `src/app/` | source/job/run/settings 编排，复用业务流程 | 不直接写 SQL 或处理 HTTP 细节 |
-| Sync runtime | `src/sync/` | scan、plan、read、write、record run/item/error | 不知道 Axum、CLI、Svelte 或具体 UI |
-| Connector | `src/connectors/` | 连接器 trait、OpenDAL 实现、配置校验、capability | 不写入 vault，不决定 item 是否同步 |
-| Persistence | `src/db/`、`src/entity/` | SeaORM entities、repository、schema sync | 不编码产品流程 |
-| Core domain | `src/core/` | ID、状态枚举、snapshot、vault path 安全规则 | 不依赖 Web/API/数据库实现 |
-| Packaging | `src/server.rs`、`src/assets.rs` | Axum app 组装、静态资产嵌入、server 生命周期 | 不改变业务语义 |
+| Interface | `crates/hoarder-cli/`、`crates/hoarder-server/src/api/`、`web/src/` | 参数解析、request/response、页面状态与交互 | 不直接实现同步业务规则 |
+| App services | `crates/hoarder-server/src/app/` | source/job/run/settings 编排，复用业务流程 | 不直接写 SQL 或处理 HTTP 细节 |
+| Sync runtime | `crates/hoarder-sync/` | scan、plan、read、write、record run/item/error | 不知道 Axum、CLI、Svelte 或具体 UI |
+| Connector | `crates/hoarder-connectors/` | 连接器 trait、OpenDAL 实现、配置校验、capability | 不写入 vault，不决定 item 是否同步 |
+| Persistence | `crates/hoarder-server/src/db/`、`crates/hoarder-server/src/entity/` | SeaORM entities、repository、schema sync | 不编码产品流程 |
+| Core domain | `crates/hoarder-core/` | ID、状态枚举、snapshot、vault path 安全规则 | 不依赖 Web/API/数据库实现 |
+| Packaging | `crates/hoarder-server/src/server.rs`、`crates/hoarder-server/src/assets.rs` | Axum app 组装、静态资产嵌入、server 生命周期 | 不改变业务语义 |
 | Future AI/RAG | 后续模块 | 文件解析、chunk、embedding、全文/向量索引、RAG retrieval API | 不阻塞或改变基础 sync run 语义 |
 
 ## 5. 模块地图
 
 | 模块 | 说明 |
 | --- | --- |
-| `src/main.rs` | binary 入口 |
-| `src/cli.rs` | Clap 命令定义与 CLI handler |
-| `src/server.rs` | 加载配置、连接 SQLite、schema sync、启动 scheduler 和 Axum |
-| `src/api/routes.rs` | API route 定义，调用 app services |
-| `src/api/types.rs` | API DTO 和 query/request/response 类型 |
-| `src/app/source_service.rs` | source 创建、更新、列表、测试 |
-| `src/app/job_service.rs` | job 创建、更新、列表、手动 run、运行互斥 |
-| `src/app/run_service.rs` | run、item、error 查询 |
-| `src/app/settings_service.rs` | runtime settings 读取和更新 |
-| `src/app/scheduler.rs` | serve 模式固定间隔调度 |
-| `src/sync/engine.rs` | 同步执行器，处理 run 生命周期和 item 结果 |
-| `src/sync/planner.rs` | 变更判断：sync、skip、mark deleted |
-| `src/sync/vault_writer.rs` | 安全路径、临时写入、hash、原子替换 |
-| `src/connectors/traits.rs` | connector 公共接口和 config enum |
-| `src/connectors/opendal/` | OpenDAL fs/webdav/sftp/s3 配置校验、operator、scan、read |
-| `src/connectors/notion.rs` | Notion data source/page 虚拟文档扫描、分页 cursor、读取 JSON 文档 |
-| `src/connectors/feishu.rs` | 飞书 tenant token、Drive folder 分页扫描、引用型 JSON 文档读取 |
-| `src/connectors/plugin.rs` | 第三方编译 connector ABI 常量、manifest、配置 schema 和 secret field 契约 |
-| `src/db/repository.rs` | SeaORM repository，实现 source/job/settings/sync repository traits |
+| `crates/hoarder-cli/src/main.rs` | binary 入口 |
+| `crates/hoarder-cli/src/cli.rs` | Clap 命令定义与 CLI handler |
+| `crates/hoarder-server/src/server.rs` | 加载配置、连接 SQLite、schema sync、启动 scheduler 和 Axum |
+| `crates/hoarder-server/src/api/routes.rs` | API route 定义，调用 app services |
+| `crates/hoarder-server/src/api/types.rs` | API DTO 和 query/request/response 类型 |
+| `crates/hoarder-server/src/app/source_service.rs` | source 创建、更新、列表、测试 |
+| `crates/hoarder-server/src/app/job_service.rs` | job 创建、更新、列表、手动 run、运行互斥 |
+| `crates/hoarder-server/src/app/run_service.rs` | run、item、error 查询 |
+| `crates/hoarder-server/src/app/settings_service.rs` | runtime settings 读取和更新 |
+| `crates/hoarder-server/src/app/scheduler.rs` | serve 模式固定间隔调度 |
+| `crates/hoarder-sync/src/engine.rs` | 同步执行器，处理 run 生命周期和 item 结果 |
+| `crates/hoarder-sync/src/planner.rs` | 变更判断：sync、skip、mark deleted |
+| `crates/hoarder-sync/src/vault_writer.rs` | 安全路径、临时写入、hash、原子替换 |
+| `crates/hoarder-connectors/src/traits.rs` | connector 公共接口和 config enum |
+| `crates/hoarder-connectors/src/opendal/` | OpenDAL fs/webdav/sftp/s3 配置校验、operator、scan、read |
+| `crates/hoarder-connectors/src/notion.rs` | Notion data source/page 虚拟文档扫描、分页 cursor、读取 JSON 文档 |
+| `crates/hoarder-connectors/src/feishu.rs` | 飞书 tenant token、Drive folder 分页扫描、引用型 JSON 文档读取 |
+| `crates/hoarder-connectors/src/plugin.rs` | 第三方编译 connector ABI 常量、manifest、配置 schema 和 secret field 契约 |
+| `crates/hoarder-server/src/db/repository.rs` | SeaORM repository，实现 source/job/settings/sync repository traits |
 | `web/src/` | Svelte 5 控制台：Overview、Sources、Jobs、Runs、Settings |
 
 ## 6. Connector 架构
@@ -425,8 +425,8 @@ flowchart LR
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets --all-features --message-format=short
-cargo test
+cargo clippy --workspace --all-targets --all-features --message-format=short
+cargo test --workspace
 ```
 
 前端变更：
@@ -442,5 +442,5 @@ bun run verify
 cd web
 bun run build
 cd ..
-cargo build --release
+cargo build -p hoarder-cli --release
 ```

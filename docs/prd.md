@@ -144,9 +144,9 @@ hoarder sync status
 | 可靠性 | item 级失败不中断整个 run；connector 级失败使 run 失败；每次 run 都落库 |
 | 性能 | scan 与 read 使用 stream；文件同步受 `file_concurrency` 限制；job 启动受 `job_concurrency` 限制 |
 | 可扩展性 | connector trait 输出 Hoarder 领域模型；sync engine 不依赖 OpenDAL 类型 |
-| 可维护性 | route 只做提取和响应映射；业务编排放在 `src/app/`；持久化放在 repository |
+| 可维护性 | route 只做提取和响应映射；业务编排放在 `crates/hoarder-server/src/app/`；持久化放在 repository |
 | 可发布性 | 前端先构建，Rust binary 嵌入 `web/dist`；release profile 开启 LTO 和 strip |
-| 可验证性 | Rust 使用 `cargo fmt --check`、strict clippy、`cargo test`；前端使用 `bun run verify` |
+| 可验证性 | Rust 使用 `cargo fmt --check`、strict clippy、`cargo test --workspace`；前端使用 `bun run verify` |
 
 ## 8. 成功指标
 

@@ -43,7 +43,7 @@ cd web
 bun install
 bun run build
 cd ..
-cargo run -- serve
+cargo run -p hoarder-cli -- serve
 ```
 
 Open:
@@ -66,7 +66,7 @@ Use a custom config:
 ```
 
 ```bash
-cargo run -- --config ./hoarder.config.json serve
+cargo run -p hoarder-cli -- --config ./hoarder.config.json serve
 ```
 
 ## Project Docs
@@ -80,19 +80,19 @@ cargo run -- --config ./hoarder.config.json serve
 
 | Command | Status | Description |
 | --- | --- | --- |
-| `cargo run -- serve` | [x] | Start the Axum API and embedded web console. |
-| `cargo run -- serve --addr 127.0.0.1:4762` | [x] | Override the listen address. |
-| `cargo run -- --config ./hoarder.config.json serve` | [x] | Load JSON config before serving. |
-| `cargo run -- db sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
-| `cargo run -- source list` | [x] | List configured sources from SQLite. |
-| `cargo run -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
-| `cargo run -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | Create a Notion virtual-document source. |
-| `cargo run -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | Create a Feishu Drive virtual-document source. |
-| `cargo run -- source test --id 1` | [x] | Validate a source and persist health. |
-| `cargo run -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval source sync job. |
-| `cargo run -- job list` | [x] | List configured source sync jobs. |
-| `cargo run -- sync run --job-id 1` | [x] | Run one source-to-vault job immediately. |
-| `cargo run -- sync status` | [x] | Print source-to-vault run status summaries. |
+| `cargo run -p hoarder-cli -- serve` | [x] | Start the Axum API and embedded web console. |
+| `cargo run -p hoarder-cli -- serve --addr 127.0.0.1:4762` | [x] | Override the listen address. |
+| `cargo run -p hoarder-cli -- --config ./hoarder.config.json serve` | [x] | Load JSON config before serving. |
+| `cargo run -p hoarder-cli -- db sync` | [x] | Synchronize the SQLite schema from SeaORM entities. |
+| `cargo run -p hoarder-cli -- source list` | [x] | List configured sources from SQLite. |
+| `cargo run -p hoarder-cli -- source add --name docs --service fs --root ./docs` | [x] | Create an OpenDAL filesystem source. |
+| `cargo run -p hoarder-cli -- source add --name notion --config-json '{"kind":"notion","token":"secret","dataSourceId":"..."}'` | [x] | Create a Notion virtual-document source. |
+| `cargo run -p hoarder-cli -- source add --name feishu --config-json '{"kind":"feishu","appId":"cli_xxx","appSecret":"secret","folderToken":"..."}'` | [x] | Create a Feishu Drive virtual-document source. |
+| `cargo run -p hoarder-cli -- source test --id 1` | [x] | Validate a source and persist health. |
+| `cargo run -p hoarder-cli -- job add --source-id 1 --name docs --interval 300` | [x] | Create a manual or interval source sync job. |
+| `cargo run -p hoarder-cli -- job list` | [x] | List configured source sync jobs. |
+| `cargo run -p hoarder-cli -- sync run --job-id 1` | [x] | Run one source-to-vault job immediately. |
+| `cargo run -p hoarder-cli -- sync status` | [x] | Print source-to-vault run status summaries. |
 
 ## Feature Checklist
 
@@ -227,10 +227,10 @@ cargo run -- --config ./hoarder.config.json serve
 
 - [x] Single Rust binary embeds frontend assets from `web/dist`
 - [x] `cargo fmt --check`
-- [x] Strict `cargo clippy --all-targets --all-features`
-- [x] `cargo test`
+- [x] Strict `cargo clippy --workspace --all-targets --all-features`
+- [x] `cargo test --workspace`
 - [x] `bun run verify`
-- [x] `cargo build --release`
+- [x] `cargo build -p hoarder-cli --release`
 - [x] End-to-end local filesystem sync test
 - [x] Static asset fallback tests
 - [x] App service integration tests
@@ -268,12 +268,11 @@ CLI / Web UI
 
 Key boundaries:
 
-- `src/core`: stable domain types shared across layers.
-- `src/connectors`: connector traits and OpenDAL-backed implementation.
-- `src/sync`: planner, engine, repository trait, and vault writer.
-- `src/db`: SeaORM repository and schema sync.
-- `src/api`: DTOs, routes, state traits, and error mapping.
-- `src/server.rs`: Axum server assembly and database-backed API wiring.
+- `crates/hoarder-core`: stable domain types, errors, and vault path helpers.
+- `crates/hoarder-connectors`: connector traits and source adapters.
+- `crates/hoarder-sync`: planner, engine, repository trait, cancellation, and vault writer.
+- `crates/hoarder-server`: API routes, app services, SeaORM repository/entities, assets, middleware, and server lifecycle.
+- `crates/hoarder-cli`: Clap parser and command handlers for the `hoarder` binary.
 - `web`: Svelte management console.
 
 ## Local Vault Layout
@@ -308,8 +307,8 @@ Run backend verification:
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets --all-features --message-format=short
-cargo test
+cargo clippy --workspace --all-targets --all-features --message-format=short
+cargo test --workspace
 ```
 
 Build the packaged release binary:
@@ -318,7 +317,7 @@ Build the packaged release binary:
 cd web
 bun run build
 cd ..
-cargo build --release
+cargo build -p hoarder-cli --release
 ```
 
 ## Current Status
