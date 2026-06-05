@@ -14,25 +14,18 @@ categories = ["filesystem", "network-programming"]
 workspace = true
 
 [dependencies]
-bytes = "1.11.1"
-chrono = { version = "0.4.44", features = ["serde"] }
-futures = "0.3.32"
-hex = "0.4.3"
-hoarder-core = { path = "../hoarder-core" }
-opendal = { version = "0.56.0", default-features = false, features = [
-  "executors-tokio",
-  "reqwest-rustls-tls",
-  "services-fs",
-  "services-s3",
-  "services-sftp",
-  "services-webdav",
-] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-sha2 = "0.11.0"
-tokio = { version = "1.52.3", features = ["fs", "io-util", "macros", "net", "rt-multi-thread"] }
+bytes = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+hoarder-core = { workspace = true }
+opendal = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt-multi-thread"] }
 
 [dev-dependencies]
-axum = "0.8.9"
-uuid = { version = "1.23.1", features = ["serde", "v4"] }
+axum = { workspace = true }
+uuid = { workspace = true }
